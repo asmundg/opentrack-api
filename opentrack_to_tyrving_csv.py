@@ -1,4 +1,3 @@
-import json
 import csv
 import sys
 from opentrack_utils import (
@@ -95,19 +94,9 @@ def main():
     # Load data using utility function
     try:
         json_data = load_opentrack_data(input_source)
-        
-        # Get meeting name
         meeting_name = get_meeting_name(json_data)
-        
-        # Create a safe filename from the meeting name
         safe_meeting_name = create_safe_filename(meeting_name)
-        
-        # Set default output filename
-        output_file = 'opentrack_results.csv'
-        
-        # Use meeting name in the filename if available
-        if safe_meeting_name:
-            output_file = f"opentrack_{safe_meeting_name}.csv"
+        output_file = f"opentrack_{safe_meeting_name}.csv"
         
         # Override with command line argument if provided
         if len(sys.argv) > 2:
