@@ -1,28 +1,10 @@
 import json
 import csv
 import sys
-import urllib.request
-import urllib.error
-
-def fetch_json_data(url):
-    """Fetch JSON data from a given URL using only standard library."""
-    if not url.endswith('/json/'):
-        if url.endswith('/'):
-            url += 'json/'
-        else:
-            url += '/json/'
-            
-    print(f"Fetching data from {url}")
-    try:
-        with urllib.request.urlopen(url) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            return data
-    except urllib.error.HTTPError as e:
-        raise urllib.error.HTTPError(url, e.code, f"HTTP Error: {e.code} - {e.reason}", e.hdrs, e.fp)
-    except urllib.error.URLError as e:
-        raise urllib.error.URLError(f"URL Error: {e.reason}")
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(f"JSON Decode Error from {url}: {e.msg}", e.doc, e.pos)
+from opentrack_utils import (
+    fetch_json_data, get_meeting_name, clean_event_name, 
+    process_local_json, create_safe_filename, load_opentrack_data
+)
 
 def parse_opentrack_json(data):
     """Parse OpenTrack JSON and extract required fields."""
@@ -53,26 +35,14 @@ def parse_opentrack_json(data):
     # Process events
     events = data['events']
     
-    meeting_name = data['fullName']
+    meeting_name = get_meeting_name(data)
     
     for event in events:
         # Require fields
         event_name = event['name']
         
-        # Strip category prefix from event name if present
-        # For example, convert "G16 200 meter" to just "200 meter"
-        # First check if the event name starts with a category code
-        event_name_parts = event_name.split(' ', 1)
-        clean_event_name = event_name
-        
-        # Common Norwegian category prefixes: G (Gutter/Boys), J (Jenter/Girls), 
-        # K (Kvinner/Women), M (Menn/Men), followed by age group
-        if len(event_name_parts) > 1:
-            first_part = event_name_parts[0]
-            # Check if first part starts with a category letter and contains numbers (age)
-            if (first_part.startswith(('G', 'J', 'K', 'M')) and 
-                any(char.isdigit() for char in first_part)):
-                clean_event_name = event_name_parts[1]
+        # Use utility function to clean event name
+        clean_event_name_str = clean_event_name(event_name)
                 
         # Process units within events
         for unit in event['units']:
@@ -96,7 +66,7 @@ def parse_opentrack_json(data):
                     'Navn': competitor_name,
                     'Klubb': club_name,
                     'Klasse': category,
-                    'Øvelse': clean_event_name,
+                    'Øvelse': clean_event_name_str,
                     'Stevne': meeting_name,
                     'Tyrvingpoeng': athlon_points
                 })
@@ -115,17 +85,6 @@ def save_to_csv(data, filename='opentrack_results.csv'):
     
     print(f"Data saved to {filename}")
 
-def process_local_json(filepath):
-    """Process a local JSON file instead of fetching from URL."""
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            return data
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {filepath}")
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(f"JSON Decode Error in {filepath}: {e.msg}", e.doc, e.pos)
-
 def main():
     # Check if argument is provided
     if len(sys.argv) <= 1:
@@ -133,29 +92,15 @@ def main():
     
     input_source = sys.argv[1]
     
-    # Determine if input is a local file or URL
+    # Load data using utility function
     try:
-        if input_source.startswith('http://') or input_source.startswith('https://'):
-            json_data = fetch_json_data(input_source)
-        else:
-            json_data = process_local_json(input_source)
+        json_data = load_opentrack_data(input_source)
         
-        # Generate a filename based on the meeting name
-        meeting_name = ""
-        if 'fullName' in json_data:
-            meeting_name = json_data['fullName']
-        elif 'meetingName' in json_data:
-            meeting_name = json_data['meetingName']
-        elif 'name' in json_data:
-            meeting_name = json_data['name']
+        # Get meeting name
+        meeting_name = get_meeting_name(json_data)
         
         # Create a safe filename from the meeting name
-        safe_meeting_name = ""
-        if meeting_name:
-            # Replace unsafe characters and spaces with underscores
-            import re
-            safe_meeting_name = re.sub(r'[^\w\s-]', '', meeting_name)
-            safe_meeting_name = re.sub(r'[\s-]+', '_', safe_meeting_name)
+        safe_meeting_name = create_safe_filename(meeting_name)
         
         # Set default output filename
         output_file = 'opentrack_results.csv'
