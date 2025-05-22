@@ -1,0 +1,16 @@
+[project]
+name = "opentrack"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "reportlab>=4.4.1",
+]
+
+[dependency-groups]
+dev = [
+    "pylsp-mypy>=0.7.0",
+    "python-lsp-ruff>=2.2.2",
+    "python-lsp-server>=1.12.2",
+]
