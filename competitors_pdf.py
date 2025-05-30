@@ -4,7 +4,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm, mm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
 from reportlab.lib.enums import TA_CENTER
 import itertools
 from collections import defaultdict
@@ -22,10 +22,10 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
     doc = SimpleDocTemplate(
         output_filename,
         pagesize=A4,
-        rightMargin=1.5*cm,
-        leftMargin=1.5*cm,
-        topMargin=2*cm,
-        bottomMargin=2*cm
+        rightMargin=0.8*cm,
+        leftMargin=0.8*cm,
+        topMargin=1.2*cm,
+        bottomMargin=1.2*cm
     )
     
     # Get current date
@@ -39,8 +39,8 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
     events_style = ParagraphStyle(
         name='EventsStyle',
         parent=styles['Normal'],
-        fontSize=10,
-        leading=12,  # Line spacing
+        fontSize=8,
+        leading=9,  # Line spacing
         wordWrap='CJK'  # CJK wrapping provides better handling of long words
     )
     
@@ -48,18 +48,23 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
     title_style = ParagraphStyle(
         name='TitleStyle',
         parent=styles['Heading1'],
-        fontSize=16,
+        fontSize=11,
         alignment=TA_CENTER,
-        spaceAfter=12
+        spaceAfter=6
     )
     
     # Create a custom style for the club headers
     club_style = ParagraphStyle(
         name='ClubStyle',
         parent=styles['Heading2'],
-        fontSize=14,
-        spaceAfter=6,
-        spaceBefore=12
+        fontSize=9,
+        spaceAfter=4,
+        spaceBefore=8,
+        borderWidth=1,
+        borderColor=colors.lightblue,
+        borderPadding=2,
+        borderRadius=2,
+        leftIndent=3
     )
     
     # Create a list to hold the elements that will be built into the PDF
@@ -75,122 +80,114 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
     date_style = ParagraphStyle(
         name='DateStyle',
         parent=styles['Normal'],
-        fontSize=10,
+        fontSize=7,
         alignment=TA_CENTER,
-        spaceAfter=6
+        spaceAfter=3
     )
     elements.append(Paragraph(f"Generated on {current_date}", date_style))
-    elements.append(Spacer(1, 0.5*cm))
+    elements.append(Spacer(1, 0.2*cm))
     
-    # Group competitors by club
+    # First, preserve the original order which is sorted by bib
+    # Make a copy of each competitor with an index to track original order
+    indexed_competitors = []
+    for i, competitor in enumerate(competitors_data):
+        competitor_copy = competitor.copy()
+        competitor_copy['_original_index'] = i
+        indexed_competitors.append(competitor_copy)
+    
+    # Group competitors by club while preserving original bib order
     club_competitors = defaultdict(list)
-    for competitor in competitors_data:
+    for competitor in indexed_competitors:
         club_competitors[competitor['club']].append(competitor)
     
-    # Alternate row colors
-    rowcolors = (colors.whitesmoke, colors.white)
-    
-    # Process each club
+    # Process each club in alphabetical order
     for club_name in sorted(club_competitors.keys()):
         # Get competitors for this club
         club_competitors_list = club_competitors[club_name]
         competitor_count = len(club_competitors_list)
         
+        # Sort this club's competitors by family name (last part of the name)
+        # With a secondary sort by first name if last names are equal
+        club_competitors_list.sort(key=lambda x: (x['name'].split()[-1], " ".join(x['name'].split()[:-1]) if len(x['name'].split()) > 1 else ""))
+        
         # Add club header with competitor count
         elements.append(Paragraph(f"{club_name} ({competitor_count} competitor{'s' if competitor_count != 1 else ''})", club_style))
         
-        # Create the table data
-        table_data = [['Bib', 'Name', 'Category', 'Events']]
+        # Create styles for list items
+        competitor_name_style = ParagraphStyle(
+            name='CompetitorNameStyle',
+            parent=styles['Normal'],
+            fontSize=7,
+            fontName='Helvetica-Bold',
+            spaceBefore=3,
+            spaceAfter=0
+        )
         
-        # Sort competitors within the club by bib number
-        club_competitors[club_name].sort(key=lambda x: int(x['bib']) if x['bib'].isdigit() else float('inf'))
+        events_style = ParagraphStyle(
+            name='EventsStyle',
+            parent=styles['Normal'],
+            fontSize=6,  # Smaller font for events
+            spaceAfter=2,
+            leading=8,
+            wordWrap='CJK'
+        )
         
-        # Add competitors to the table
-        for competitor in club_competitors[club_name]:
-            if competitor['events']:
-                # Format events with bullet points for better readability
-                events_list = competitor['events']
-                events_str = " • ".join(events_list)  # Using bullet separator instead of semicolon
+        # Create a list item for each competitor
+        for competitor in club_competitors_list:
+            # Format competitor info with name as LASTNAME, FIRSTNAME
+            name_parts = competitor['name'].split()
+            if len(name_parts) > 1:
+                last_name = name_parts[-1]
+                first_name = " ".join(name_parts[:-1])
+                formatted_name = f"{last_name.upper()}, {first_name}"
             else:
-                events_str = ""
+                # Just one name part
+                formatted_name = competitor['name'].upper()
                 
-            # Wrap events text in a Paragraph to enable text wrapping
-            events_paragraph = Paragraph(events_str, events_style)
+            competitor_info = f"{competitor['bib']} - {formatted_name} ({competitor['category']})"
             
-            table_data.append([
-                competitor['bib'],
-                competitor['name'],
-                competitor['category'],
-                events_paragraph
-            ])
-        
-        # Calculate available width for the table
-        available_width = doc.width
-        
-        # Define column widths as a percentage of available width
-        col_widths = [
-            available_width * 0.10,  # Bib (10%)
-            available_width * 0.35,  # Name (35%)
-            available_width * 0.15,  # Category (15%)
-            available_width * 0.40   # Events (40%)
-        ]
-        
-        # Create the table with fixed column widths
-        table = Table(table_data, repeatRows=1, colWidths=col_widths)
-        
-        # Create the style for the table
-        table_style = TableStyle([
-            # Header styling
-            ('BACKGROUND', (0, 0), (-1, 0), colors.lightblue),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 12),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-            ('TOPPADDING', (0, 0), (-1, 0), 12),
+            # Create a paragraph with competitor info in bold and events in smaller font
+            if competitor['events']:
+                events_list = competitor['events']
+                events_str = " • ".join(events_list)
+                
+                # Use XML formatting to combine different styles in one paragraph
+                combined_text = f"{competitor_info}: <font size='6'>{events_str}</font>"
+                elements.append(Paragraph(combined_text, competitor_name_style))
+            else:
+                # Just the competitor info with "No events" in smaller font
+                combined_text = f"{competitor_info}: <font size='6'>No events</font>"
+                elements.append(Paragraph(combined_text, competitor_name_style))
             
-            # Cell styling
-            ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-            ('GRID', (0, 0), (-1, -1), 1, colors.black),
-            ('VALIGN', (0, 0), (-1, -1), 'TOP'),  # Align to top for better text wrapping
+            # Add a light horizontal line between competitors
+            elements.append(Spacer(1, 1))
             
-            # Column-specific styling
-            ('ALIGN', (0, 0), (0, -1), 'CENTER'),  # Bib numbers centered
-            ('ALIGN', (2, 0), (2, -1), 'CENTER'),  # Category centered
-            ('ALIGN', (1, 1), (1, -1), 'LEFT'),    # Names left-aligned
-            ('ALIGN', (3, 1), (3, -1), 'LEFT'),    # Events left-aligned
+            # Add horizontal line
+            from reportlab.platypus import HRFlowable
+            elements.append(HRFlowable(
+                width="100%",
+                thickness=0.2,
+                color=colors.lightgrey,
+                spaceBefore=0,
+                spaceAfter=0
+            ))
             
-            # Padding for all cells
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-            ('TOPPADDING', (0, 1), (-1, -1), 8),
-            ('BOTTOMPADDING', (0, 1), (-1, -1), 8),
-        ])
-        
-        # Add alternating row colors
-        for i, row in enumerate(table_data[1:], 1):
-            table_style.add('BACKGROUND', (0, i), (-1, i), rowcolors[i % 2])
-        
-        # Apply the style to the table
-        table.setStyle(table_style)
-        
-        # Add the table to the elements
-        elements.append(table)
-        elements.append(Spacer(1, 0.5*cm))
+            elements.append(Spacer(1, 1))
+        elements.append(Spacer(1, 0.2*cm))
     
     # Add a summary section
     summary_style = ParagraphStyle(
         name='SummaryStyle',
         parent=styles['Heading3'],
-        fontSize=12,
-        spaceAfter=6,
-        spaceBefore=12
+        fontSize=8,
+        spaceAfter=3,
+        spaceBefore=6
     )
     normal_style = ParagraphStyle(
         name='NormalText',
         parent=styles['Normal'],
-        fontSize=10,
-        spaceAfter=6
+        fontSize=7,
+        spaceAfter=2
     )
     
     # Calculate statistics
@@ -221,8 +218,8 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
         page_num = canvas.getPageNumber()
         text = f"Page {page_num}"
         canvas.saveState()
-        canvas.setFont("Helvetica", 8)
-        canvas.drawRightString(doc.width + doc.rightMargin - 6, doc.bottomMargin - 10, text)
+        canvas.setFont("Helvetica", 7)
+        canvas.drawRightString(doc.width + doc.rightMargin - 5, doc.bottomMargin - 8, text)
         canvas.restoreState()
     
     # Build the PDF with page numbers

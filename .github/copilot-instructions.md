@@ -1,0 +1,2 @@
+- Do not run terminal commands
+- Do not create tests unless explicitly asked to do so
