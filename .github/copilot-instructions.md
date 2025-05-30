@@ -1,2 +1,4 @@
 - Do not run terminal commands
 - Do not create tests unless explicitly asked to do so
+- Do not mask errors - Unexpected data should lead to fast fail
+- Always use type annotations
