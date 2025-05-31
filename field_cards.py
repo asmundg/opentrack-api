@@ -217,7 +217,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         'max_attempts': 0,
         'all_bibs': set(),
         'throwing_events': set(),
-        'weight_by_event': {}
+        'weight_by_competitor': {}  # Store weight by bib number instead of event code
     })
     
     print("Phase 1: Grouping events by type and time...")
@@ -275,8 +275,9 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                 # Extract weight information for throwing events
                 if 'weight' in result and base_event_type in ['SP', 'DT', 'HT', 'JT', 'BT']:
                     event_groups[group_key]['throwing_events'].add(base_event_type)
-                    if event_code not in event_groups[group_key]['weight_by_event']:
-                        event_groups[group_key]['weight_by_event'][event_code] = result['weight']
+                    # Store weight by competitor bib number for accurate per-competitor lookup
+                    competitor_bib = result['bib']
+                    event_groups[group_key]['weight_by_competitor'][competitor_bib] = result['weight']
         
         # Store the ordered bibs for this event
         if 'ordered_bibs_by_event' not in event_groups[group_key]:
@@ -535,11 +536,9 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                 # REGULAR FIELD EVENT ROW LAYOUT
                 # Add weight column for throwing events
                 if is_throwing:
-                    # Try to find weight from any event in the group
-                    weight = ""
-                    for event_code in group_data['weight_by_event']:
-                        weight = group_data['weight_by_event'][event_code]
-                        break
+                    # Look up weight for this specific competitor by bib number
+                    competitor_bib = competitor['bib']
+                    weight = group_data['weight_by_competitor'].get(competitor_bib, "")
                     if weight:
                         weight_text = f"{weight}kg"
                     else:
@@ -749,11 +748,18 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         
         # Add special styling for spacing rows between event categories
         for spacing_row_idx in spacing_rows:
-            # Increase row height for spacing
-            table_style.add('TOPPADDING', (0, spacing_row_idx), (-1, spacing_row_idx), 12)
-            table_style.add('BOTTOMPADDING', (0, spacing_row_idx), (-1, spacing_row_idx), 12)
-            # Remove horizontal line above spacing row to create visual separation
-            table_style.add('LINEABOVE', (0, spacing_row_idx), (-1, spacing_row_idx), 0, colors.white)
+            # Make spacing rows much narrower to reduce whitespace
+            table_style.add('TOPPADDING', (0, spacing_row_idx), (-1, spacing_row_idx), 1)
+            table_style.add('BOTTOMPADDING', (0, spacing_row_idx), (-1, spacing_row_idx), 1)
+            # Add cross-hatch-like pattern using distinctive background and borders
+            table_style.add('BACKGROUND', (0, spacing_row_idx), (-1, spacing_row_idx), colors.Color(0.85, 0.85, 0.85))  # Medium gray background
+            # Create visual cross-hatch effect with subtle borders
+            table_style.add('LINEABOVE', (0, spacing_row_idx), (-1, spacing_row_idx), 0.5, colors.Color(0.6, 0.6, 0.6))
+            table_style.add('LINEBELOW', (0, spacing_row_idx), (-1, spacing_row_idx), 0.5, colors.Color(0.6, 0.6, 0.6))
+            # Add alternating vertical lines to create cross-hatch visual effect
+            for col_idx in range(0, len(header_row), 3):  # Every 3rd column gets a subtle line
+                if col_idx < len(header_row):
+                    table_style.add('LINEBEFORE', (col_idx, spacing_row_idx), (col_idx, spacing_row_idx), 0.3, colors.Color(0.7, 0.7, 0.7))
         
         # Add solid bottom line to the last contestant row in each category for merged events
         for category_end_row_idx in category_end_rows:
