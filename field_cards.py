@@ -336,7 +336,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         base_event_type = group_key.split('_')[0]
         has_wind = base_event_type in ['LJ', 'TJ']
         is_throwing = len(group_data['throwing_events']) > 0
-        is_high_jump = base_event_type == 'HJ'
+        is_high_jump = base_event_type in ['HJ', 'PV']  # Both HJ and PV use height-based layout
         
         # Resolve bib numbers to competitors in proper order
         all_competitors = []
@@ -410,7 +410,10 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         
         # Add High Jump instructions
         if is_high_jump:
-            elements.append(Paragraph("<i>High Jump: Each height has 3 columns for attempts. Mark O (cleared), X (missed), or - (passed) in each attempt box.</i>", small_style))
+            if base_event_type == 'HJ':
+                elements.append(Paragraph("<i>High Jump: Each height has 3 columns for attempts. Mark O (cleared), X (missed), or - (passed) in each attempt box.</i>", small_style))
+            elif base_event_type == 'PV':
+                elements.append(Paragraph("<i>Pole Vault: Each height has 3 columns for attempts. Mark O (cleared), X (missed), or - (passed) in each attempt box.</i>", small_style))
         
         elements.append(Spacer(1, 0.3*cm))
         
@@ -418,8 +421,9 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         # all_competitors.sort(key=lambda x: int(x['bib']))  # Removed - preserve original order
         
         if is_high_jump:
-            # HIGH JUMP SPECIAL LAYOUT
-            print(f"    Creating High Jump layout with height columns")
+            # HIGH JUMP/POLE VAULT SPECIAL LAYOUT
+            event_name = "High Jump" if base_event_type == 'HJ' else "Pole Vault"
+            print(f"    Creating {event_name} layout with height columns")
             
             # Create blank height columns that judges can fill in
             num_height_columns = 9  # Provide 9 blank height columns
@@ -443,7 +447,10 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                 header_row.append("")  # Attempt 3 (will be merged with height header)
             
             # Add final columns
-            header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
+            if base_event_type == 'HJ':
+                header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
+            elif base_event_type == 'PV':
+                header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
             header_row.append(Paragraph("<b>PB /<br/>Note</b>", header_style))
             header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
             
@@ -520,7 +527,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
             ]
             
             if is_high_jump:
-                # HIGH JUMP ROW LAYOUT
+                # HIGH JUMP/POLE VAULT ROW LAYOUT
                 # Add empty cells for each height (3 attempts per height)
                 for i in range(num_height_columns):
                     row.append("")  # Attempt 1
@@ -571,14 +578,14 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         name_width = 3.2 * cm  
         club_width = 2.8 * cm
         age_width = 1.0 * cm  # Age - wider to prevent wrapping
-        weight_width = 1.2 * cm if (is_throwing and not is_high_jump) else 0  # Weight - not used in HJ
+        weight_width = 1.2 * cm if (is_throwing and not is_high_jump) else 0  # Weight - not used in HJ/PV
         best_width = 1.2 * cm  # Best result
         pb_note_width = 1.3 * cm  # PB/Note
         final_pos_width = 1.1 * cm  # Final Pos - wider for better word wrapping
         
         if is_high_jump:
-            # HIGH JUMP COLUMN LAYOUT
-            # Calculate fixed width total (no weight column for HJ)
+            # HIGH JUMP/POLE VAULT COLUMN LAYOUT
+            # Calculate fixed width total (no weight column for HJ/PV)
             fixed_width = order_width + bib_width + name_width + club_width + age_width + best_width + pb_note_width + final_pos_width
             
             # Calculate space for height columns (3 attempts per height)
@@ -696,7 +703,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         table_style.add('LINEBEFORE', (0, 0), (0, -1), 1, colors.black)
         
         if is_high_jump:
-            # HIGH JUMP VERTICAL LINES
+            # HIGH JUMP/POLE VAULT VERTICAL LINES
             # Vertical line before first height column
             table_style.add('LINEBEFORE', (heights_start_col, 0), (heights_start_col, -1), 1, colors.black)
             
