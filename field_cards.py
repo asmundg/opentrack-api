@@ -601,19 +601,16 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
             # Calculate fixed width total
             fixed_width = order_width + bib_width + name_width + club_width + age_width + weight_width + best_width + pb_note_width + final_pos_width
             
-            # Calculate space for attempts - distribute evenly between trial and wind columns
+            # Calculate space for attempts - fixed width for both trial and wind boxes
             remaining_width = available_width - fixed_width
             
             if has_wind:
-                # Each attempt has a result and wind column - distribute space equally
-                total_attempt_columns = group_data['max_attempts'] * 2  # trial + wind per attempt
-                column_width = remaining_width / total_attempt_columns
-                
-                result_width = column_width
-                wind_width = column_width
+                # Fixed width for both trial and wind columns
+                result_width = 1.5 * cm  # Fixed width for trial boxes
+                wind_width = 1.0 * cm    # Fixed width for wind columns
             else:
-                # Only result columns, no wind columns - use all remaining space
-                result_width = remaining_width / group_data['max_attempts']
+                # Only result columns, no wind columns - use fixed width
+                result_width = 1.5 * cm  # Fixed width for trial boxes
             
             # Create column widths list
             col_widths = [order_width, bib_width, name_width, club_width, age_width]
