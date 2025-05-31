@@ -18,7 +18,7 @@ from datetime import datetime
 # Import required functions from local modules - no fallbacks
 from opentrack_utils import fetch_json_data, process_local_json
 
-def create_field_cards(data, output_filename=None, event_type=None, events=None):
+def create_field_cards(data, output_filename=None, event_type=None, events=None, day=None):
     """
     Create field cards PDF for field events with wind registration.
     
@@ -27,6 +27,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         output_filename: Name of the output PDF file (optional, will be auto-generated if not provided)
         event_type: Type of field event to filter by (optional)
         events: List of event codes to filter by (optional, overrides event_type)
+        day: Day number to filter by (optional, e.g., 1, 2, 3)
     """
     # Require raw JSON format from OpenTrack
     if not isinstance(data, dict) or 'competitors' not in data or 'events' not in data:
@@ -75,6 +76,12 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
             if event_type not in event_code:
                 continue
         
+        # Filter by day if specified
+        if day is not None:
+            event_day = event.get('day', 1)
+            if event_day != day:
+                continue
+        
         # Require maxFieldAttempts to be present
         if 'maxFieldAttempts' not in event:
             print(f"WARNING: Event {event_code} (ID: {event_id}) missing 'maxFieldAttempts' field, skipping")
@@ -95,22 +102,28 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
             safe_meeting_name = re.sub(r'[^\w\s-]', '', safe_meeting_name)
             safe_meeting_name = re.sub(r'[\s-]+', '_', safe_meeting_name)
             
+            day_suffix = f"_day{day}" if day is not None else ""
+            
             if len(events_to_process) == 1:
                 event_code = events_to_process[0]['eventCode']
-                output_filename = f"field_cards_{event_code}_{safe_meeting_name}.pdf"
+                output_filename = f"field_cards_{event_code}_{safe_meeting_name}{day_suffix}.pdf"
             else:
-                output_filename = f"field_cards_multiple_{safe_meeting_name}.pdf"
+                output_filename = f"field_cards_multiple_{safe_meeting_name}{day_suffix}.pdf"
         else:
+            day_suffix = f"_day{day}" if day is not None else ""
+            
             if len(events_to_process) == 1:
                 event_code = events_to_process[0]['eventCode']
-                output_filename = f"field_cards_{event_code}.pdf"
+                output_filename = f"field_cards_{event_code}{day_suffix}.pdf"
             else:
-                output_filename = f"field_cards_multiple.pdf"
+                output_filename = f"field_cards_multiple{day_suffix}.pdf"
     
     # Print debug information
-    print(f"Creating field cards for {len(events_to_process)} events:")
+    day_filter_text = f" (filtered by day {day})" if day is not None else ""
+    print(f"Creating field cards for {len(events_to_process)} events{day_filter_text}:")
     for event in events_to_process:
-        print(f"  - {event['eventCode']} (ID: {event.get('eventId', 'N/A')}) - {event['maxFieldAttempts']} attempts")
+        event_day = event.get('day', 1)
+        print(f"  - {event['eventCode']} (ID: {event.get('eventId', 'N/A')}) - Day {event_day} - {event['maxFieldAttempts']} attempts")
     print(f"Meeting name: {meeting_name}")
     print(f"Output filename: {output_filename}")
     
@@ -276,9 +289,42 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
     
     print(f"Phase 2: Processing {len(event_groups)} event groups...")
     
+    # Define the preferred order of field events
+    event_type_order = ['LJ', 'TJ', 'HJ', 'PV', 'SP', 'DT', 'JT', 'HT', 'BT']
+    
+    def sort_group_key(group_item):
+        """Sort groups first by event type order, then by full datetime (day + time)"""
+        group_key, group_data = group_item
+        base_event_type = group_key.split('_')[0]
+        event_time = group_data['time']
+        event_day = group_data.get('day', 1)
+        
+        # Get the order index for the event type, default to 999 if not found
+        type_order = event_type_order.index(base_event_type) if base_event_type in event_type_order else 999
+        
+        # Convert time to minutes since midnight for proper sorting
+        try:
+            time_parts = event_time.split(':')
+            hours = int(time_parts[0])
+            minutes = int(time_parts[1])
+            minutes_since_midnight = hours * 60 + minutes
+        except (ValueError, IndexError):
+            minutes_since_midnight = 9999  # Put invalid times at the end
+        
+        # Create a comprehensive datetime sort key:
+        # (event_type_priority, day, minutes_since_midnight)
+        # This ensures events are sorted by type first, then by actual start datetime
+        return (type_order, event_day, minutes_since_midnight)
+    
     # Second pass: process each group and create combined tables
-    first_table = True
-    for group_key, group_data in sorted(event_groups.items()):
+    sorted_groups = sorted(event_groups.items(), key=sort_group_key)
+    print(f"Groups will be processed in this order:")
+    for group_key, group_data in sorted_groups:
+        base_event_type = group_key.split('_')[0]
+        event_day = group_data.get('day', 1)
+        print(f"  {group_key} (Event Type: {base_event_type}, Day: {event_day}, Time: {group_data['time']})")
+    
+    for group_key, group_data in sorted_groups:
         print(f"\nProcessing group: {group_key}")
         print(f"  Events in group: {[e['code'] for e in group_data['events']]}")
         print(f"  Time: {group_data['time']}")
@@ -326,15 +372,6 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         if len(all_competitors) == 0:
             print(f"  No competitors in group {group_key}, skipping")
             continue
-        
-        # Add main title only on first table - ORIS style header
-        if first_table:
-            # Main competition title - simplified
-            elements.append(Paragraph(f"{meeting_name}", title_style))
-            if formatted_meeting_date:
-                elements.append(Paragraph(f"{formatted_meeting_date}", subtitle_style))
-            elements.append(Spacer(1, 0.4*cm))
-            first_table = False
         
         # Create group header using event names in the same order as competitors
         if 'ordered_bibs_by_event' in group_data and len(group_data['ordered_bibs_by_event']) > 1:
@@ -432,7 +469,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
                 suffix = ordinal_suffixes.get(i, "th")
                 header_row.append(Paragraph(f"<b>{i}{suffix}<br/>Trial</b>", header_style))
                 if has_wind:
-                    header_row.append(Paragraph("<b>SB</b>", header_style))  # SB for wind like in image
+                    header_row.append(Paragraph("<b>Wind</b>", header_style))  # Wind column for LJ/TJ
             
             # Add columns for best result and final position
             header_row.append(Paragraph(f"<b>Best<br/>of {group_data['max_attempts']}</b>", header_style))
@@ -564,19 +601,19 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
             # Calculate fixed width total
             fixed_width = order_width + bib_width + name_width + club_width + age_width + weight_width + best_width + pb_note_width + final_pos_width
             
-            # Calculate space for attempts - make trial boxes narrower and more square
+            # Calculate space for attempts - distribute evenly between trial and wind columns
             remaining_width = available_width - fixed_width
             
             if has_wind:
-                # Each attempt has a result and wind column - make them narrower
-                trial_box_width = 1.5 * cm  # Narrower, more square trial boxes
-                wind_box_width = 1.0 * cm   # Narrower wind boxes
+                # Each attempt has a result and wind column - distribute space equally
+                total_attempt_columns = group_data['max_attempts'] * 2  # trial + wind per attempt
+                column_width = remaining_width / total_attempt_columns
                 
-                result_width = trial_box_width
-                wind_width = wind_box_width
+                result_width = column_width
+                wind_width = column_width
             else:
-                # Only result columns, no wind columns - make them narrower and more square
-                result_width = 1.5 * cm  # Narrower, more square trial boxes
+                # Only result columns, no wind columns - use all remaining space
+                result_width = remaining_width / group_data['max_attempts']
             
             # Create column widths list
             col_widths = [order_width, bib_width, name_width, club_width, age_width]
@@ -689,8 +726,12 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
                 col_idx = trials_start_col + trial_num * (2 if has_wind else 1)
                 if trial_num > 0:  # Don't add line before first trial (already added above)
                     table_style.add('LINEBEFORE', (col_idx, 0), (col_idx, -1), 1, colors.black)
-                if has_wind and trial_num < group_data['max_attempts'] - 1:  # Add line after wind column (except last)
-                    table_style.add('LINEAFTER', (col_idx + 1, 0), (col_idx + 1, -1), 1, colors.black)
+                if has_wind:
+                    # Add thin divider between trial and wind column
+                    table_style.add('LINEAFTER', (col_idx, 0), (col_idx, -1), 0.5, colors.gray)
+                    # Add line after wind column (except for the last wind column)
+                    if trial_num < group_data['max_attempts'] - 1:
+                        table_style.add('LINEAFTER', (col_idx + 1, 0), (col_idx + 1, -1), 1, colors.black)
         
         # Vertical line before final result columns (Best, PB/Note, Final Pos)
         table_style.add('LINEBEFORE', (final_results_start, 0), (final_results_start, -1), 1, colors.black)
@@ -735,13 +776,15 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         text = f"Page {page_num}"
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
-        # Position the page number within the margins
-        canvas.drawRightString(doc.width + doc.rightMargin - 2, doc.bottomMargin - 12, text)
+        
+        # Calculate position for signature area - snap to bottom of page
+        sig_y_position = 0.5*cm  # Position very close to bottom edge of page
+        
+        # Position the page number above the signature area
+        canvas.drawRightString(doc.width + doc.rightMargin - 2, sig_y_position + 4*cm, text)
         
         # Add signature area at bottom if provided
         if signature_elements:
-            # Calculate position for signature area (above page number)
-            sig_y_position = doc.bottomMargin + 2*cm  # Position above bottom margin
             
             canvas.setFont("Helvetica-Bold", 10)
             # Use the correct ReportLab method for centered text
@@ -755,17 +798,13 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
                 canvas.drawString(center_x - text_width/2, sig_y_position + 3*cm, "OFFICIALS")
             
             canvas.setFont("Helvetica", 8)
-            # Field Judge and Technical Delegate on same line
-            canvas.drawString(doc.leftMargin, sig_y_position + 2*cm, "Field Judge: ____________________________")
-            canvas.drawString(doc.leftMargin + doc.width/2, sig_y_position + 2*cm, "Technical Delegate: ____________________________")
+            # Actual start and End fields
+            canvas.drawString(doc.leftMargin, sig_y_position + 2.5*cm, "Actual start: ____________________________")
+            canvas.drawString(doc.leftMargin + doc.width/2, sig_y_position + 2.5*cm, "End: ____________________________")
             
-            # Signatures
-            canvas.drawString(doc.leftMargin, sig_y_position + 1.5*cm, "Signature: ____________________________")
-            canvas.drawString(doc.leftMargin + doc.width/2, sig_y_position + 1.5*cm, "Signature: ____________________________")
-            
-            # Date and Time
-            canvas.drawString(doc.leftMargin, sig_y_position + 1*cm, "Date: ____________________________")
-            canvas.drawString(doc.leftMargin + doc.width/2, sig_y_position + 1*cm, "Time: ____________________________")
+            # Judge and Technical Delegate signatures
+            canvas.drawString(doc.leftMargin, sig_y_position + 1.5*cm, "Judge: ____________________________")
+            canvas.drawString(doc.leftMargin + doc.width/2, sig_y_position + 1.5*cm, "Technical Delegate: ____________________________")
             
             # Timestamp
             timestamp = datetime.now().strftime("Last changed: %a %b %d %H:%M:%S %Y")
@@ -856,6 +895,7 @@ if __name__ == "__main__":
     parser.add_argument('-e', '--event', help='Event type code (optional, will be auto-detected if not specified)',
                         action='append', dest='events')
     parser.add_argument('--all-events', action='store_true', help='Process all field events found in the data')
+    parser.add_argument('-d', '--day', type=int, help='Filter events by day number (e.g., 1, 2, 3)', metavar='N')
     
     args = parser.parse_args()
     
@@ -890,7 +930,8 @@ if __name__ == "__main__":
         create_field_cards(
             data, 
             output_filename=args.output, 
-            events=events_to_process
+            events=events_to_process,
+            day=args.day
         )
         
         print(f"Field cards successfully generated")
