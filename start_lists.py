@@ -53,9 +53,9 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
             formatted_meeting_date = meeting_date
     
     # Filter events to process - track events only
-    track_event_codes = ['60', '100', '200', '400', '800', '1500', '3000', '5000', '10000', 
+    track_event_codes = ['60', '100', '200', '400', '600', '800', '1500', '3000', '5000', '10000', 
                          '60H', '80H', '100H', '110H', '200H', '400H', '3000SC', 
-                         '4x100', '4x200', '4x400', '600']
+                         '4x100', '4x200', '4x400']
     events_to_process = []
     
     for event in data['events']:
@@ -187,64 +187,62 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
     # Create a list to hold the elements that will be built into the PDF
     elements = []
     
-    # Group events by type and time to create combined lists
+    print("Phase 1: Processing events and grouping by time...")
+    
+    # Group events by time (and optionally event type for same-discipline events)
     from collections import defaultdict
     
-    # First pass: group events by type and time, collect lane assignments
-    event_groups = defaultdict(lambda: {
+    time_groups = defaultdict(lambda: {
         'events': [],
         'time': '',
+        'day': 1,
         'all_heats': {},  # heat_id -> list of (lane, bib, competitor_info)
         'heat_names': {}  # heat_id -> heat_name
     })
-    
-    print("Phase 1: Grouping events by type and time...")
     
     for event in events_to_process:
         event_code = event['eventCode']
         event_id = event.get('eventId', event_code)
         event_name = event.get('name', event_code)
         event_time = event.get('r1Time', '')
+        event_day = event.get('day', 1)
         
-        # Determine the base event type (e.g., 100, 200, 400)
-        base_event_type = None
-        track_event_codes = ['100', '200', '400', '800', '1500', '3000', '5000', '10000', '110H', '100H', '400H', '3000SC', '4x100', '4x400']
-        for code in track_event_codes:
-            if code in event_code:
-                base_event_type = code
-                break
-        
-        if not base_event_type:
-            print(f"WARNING: Could not determine base event type for {event_code}, skipping")
-            continue
-        
-        # Create group key based on event type and time
         if not event_time:
-            print(f"ERROR: Event {event_code} (ID: {event_id}) missing 'r1Time' field, cannot group events without start time")
+            print(f"ERROR: Event {event_code} (ID: {event_id}) missing 'r1Time' field, skipping event")
             continue
-        group_key = f"{base_event_type}_{event_time}"
         
-        print(f"Processing event: {event_name} ({event_code}, ID: {event_id}) -> Group: {group_key}")
+        print(f"Processing event: {event_name} ({event_code}, ID: {event_id}) - Day {event_day}, Time: {event_time}")
         
-        # Add event info to group
-        event_groups[group_key]['events'].append({
+        # Create time group key - just use time for grouping (allowing category merging)
+        time_key = f"day{event_day}_{event_time}"
+        
+        # Add event info to time group
+        time_groups[time_key]['events'].append({
             'code': event_code,
             'id': event_id,
             'name': event_name,
-            'day': event.get('day', 1)
+            'day': event_day
         })
-        event_groups[group_key]['time'] = event_time
-        if 'day' not in event_groups[group_key]:
-            event_groups[group_key]['day'] = event.get('day', 1)
+        time_groups[time_key]['time'] = event_time
+        time_groups[time_key]['day'] = event_day
         
         # Extract heat and lane information from units/results
         for unit in event.get('units', []):
             heat_id = unit.get('unitId', 'Heat 1')
             heat_name = unit.get('name', heat_id)
             
-            if heat_id not in event_groups[group_key]['all_heats']:
-                event_groups[group_key]['all_heats'][heat_id] = []
-                event_groups[group_key]['heat_names'][heat_id] = heat_name
+            # Create unique heat ID that includes event info to avoid conflicts between events
+            unique_heat_id = f"{event_code}_{heat_id}"
+            
+            if unique_heat_id not in time_groups[time_key]['all_heats']:
+                time_groups[time_key]['all_heats'][unique_heat_id] = []
+                # Store both event code and heat name for flexible formatting later
+                time_groups[time_key]['heat_names'][unique_heat_id] = {
+                    'event_code': event_code,
+                    'event_name': event_name,
+                    'heat_name': heat_name,
+                    'original_heat_id': heat_id
+                }
             
             for result in unit.get('results', []):
                 if 'bib' in result and 'lane' in result:
@@ -258,29 +256,20 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
                         'category': 'Unknown'
                     })
                     
-                    event_groups[group_key]['all_heats'][heat_id].append({
+                    time_groups[time_key]['all_heats'][unique_heat_id].append({
                         'lane': lane,
                         'bib': bib,
                         'competitor': competitor_info,
                         'event_name': event_name
                     })
     
-    print(f"Phase 2: Processing {len(event_groups)} event groups...")
+    print(f"Phase 2: Sorting {len(time_groups)} time groups by chronological order...")
     
-    # Define the preferred order of track events
-    event_type_order = ['60', '100', '200', '400', '600', '800', '1500', '3000', '5000', '10000', 
-                        '60H', '80H', '100H', '110H', '200H', '400H', '3000SC', 
-                        '4x100', '4x200', '4x400']
-    
-    def sort_group_key(group_item):
-        """Sort groups first by event type order, then by full datetime (day + time)"""
-        group_key, group_data = group_item
-        base_event_type = group_key.split('_')[0]
+    def sort_time_group_key(time_group_item):
+        """Sort time groups purely by day and time"""
+        time_key, group_data = time_group_item
         event_time = group_data['time']
-        event_day = group_data.get('day', 1)
-        
-        # Get the order index for the event type, default to 999 if not found
-        type_order = event_type_order.index(base_event_type) if base_event_type in event_type_order else 999
+        event_day = group_data['day']
         
         # Convert time to minutes since midnight for proper sorting
         try:
@@ -291,36 +280,32 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
         except (ValueError, IndexError):
             minutes_since_midnight = 9999  # Put invalid times at the end
         
-        return (type_order, event_day, minutes_since_midnight)
+        return (event_day, minutes_since_midnight)
     
-    # Process each group and create start lists
-    sorted_groups = sorted(event_groups.items(), key=sort_group_key)
-    print(f"Groups will be processed in this order:")
-    for group_key, group_data in sorted_groups:
-        base_event_type = group_key.split('_')[0]
-        event_day = group_data.get('day', 1)
-        print(f"  {group_key} (Event Type: {base_event_type}, Day: {event_day}, Time: {group_data['time']})")
+    # Sort time groups by chronological order only
+    sorted_time_groups = sorted(time_groups.items(), key=sort_time_group_key)
+    print(f"Time groups sorted chronologically (Day, Time):")
+    for time_key, group_data in sorted_time_groups:
+        event_names = [e['name'] for e in group_data['events']]
+        events_str = " / ".join(event_names)
+        print(f"  Day {group_data['day']}, {group_data['time']} - {events_str}")
     
-    for group_key, group_data in sorted_groups:
-        print(f"\nProcessing group: {group_key}")
-        print(f"  Events in group: {[e['code'] for e in group_data['events']]}")
+    for time_key, group_data in sorted_time_groups:
+        print(f"\nProcessing time group: {time_key}")
+        event_names = [e['name'] for e in group_data['events']]
+        events_str = " / ".join(event_names)
+        print(f"  Events: {events_str}")
         print(f"  Time: {group_data['time']}")
+        print(f"  Day: {group_data['day']}")
         print(f"  Total heats: {len(group_data['all_heats'])}")
         
         if len(group_data['all_heats']) == 0:
-            print(f"  No heats in group {group_key}, skipping")
+            print(f"  No heats in time group {time_key}, skipping")
             continue
-        
-        # Create group header using event names
-        if len(group_data['events']) > 1:
-            event_names = [e['name'] for e in group_data['events']]
-            group_header = " / ".join(event_names)
-        else:
-            group_header = group_data['events'][0]['name']
         
         # Calculate the actual event date by combining base date and event day
         event_date_str = formatted_meeting_date
-        if meeting_date and 'day' in group_data:
+        if meeting_date and group_data['day']:
             try:
                 from datetime import datetime as dt, timedelta
                 base_date = dt.strptime(meeting_date, '%Y-%m-%d')
@@ -328,6 +313,12 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
                 event_date_str = event_date.strftime('%Y-%m-%d')
             except (ValueError, TypeError):
                 event_date_str = formatted_meeting_date
+        
+        # Create header for this time group (multiple events if merged)
+        if len(group_data['events']) > 1:
+            group_header = events_str
+        else:
+            group_header = group_data['events'][0]['name']
         
         # Add event header
         elements.append(Paragraph(f"{group_header}", event_title_style))
@@ -337,14 +328,14 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
         # Sort heats by heat ID/name for consistent ordering
         sorted_heats = sorted(group_data['all_heats'].items(), key=lambda x: x[0])
         
+        # Determine if we have multiple events (merged) to decide on heat naming
+        is_merged = len(group_data['events']) > 1
+        
         for heat_id, heat_competitors in sorted_heats:
-            heat_name = group_data['heat_names'][heat_id]
+            heat_info = group_data['heat_names'][heat_id]
             
             if not heat_competitors:
                 continue
-            
-            # Add heat header
-            elements.append(Paragraph(f"{heat_name}", heat_title_style))
             
             # Sort competitors by lane number
             sorted_competitors = sorted(heat_competitors, key=lambda x: int(x['lane']) if str(x['lane']).isdigit() else 999)
@@ -370,7 +361,7 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
             
             elements.append(Spacer(1, 0.4*cm))
         
-        # Add page break between event groups
+        # Add page break between time groups
         elements.append(PageBreak())
     
     # Define a function for page numbers
@@ -400,9 +391,9 @@ def detect_track_event(data):
         Detected event code or '100' as default if none detected
     """
     # Common track event codes
-    track_event_codes = ['60', '100', '200', '400', '800', '1500', '3000', '5000', '10000', 
+    track_event_codes = ['60', '100', '200', '400', '600', '800', '1500', '3000', '5000', '10000', 
                          '60H', '80H', '100H', '110H', '200H', '400H', '3000SC', 
-                         '4x100', '4x200', '4x400', '600']
+                         '4x100', '4x200', '4x400']
     
     # First, try to find events that have units with results
     events_with_competitors = set()
@@ -478,9 +469,9 @@ if __name__ == "__main__":
         
         if args.all_events:
             # Process all track events
-            track_event_codes = ['60', '100', '200', '400', '800', '1500', '3000', '5000', '10000', 
+            track_event_codes = ['60', '100', '200', '400', '600', '800', '1500', '3000', '5000', '10000', 
                                  '60H', '80H', '100H', '110H', '200H', '400H', '3000SC', 
-                                 '4x100', '4x200', '4x400', '600']
+                                 '4x100', '4x200', '4x400']
             events_to_process = []
             
             if isinstance(data, dict) and 'events' in data:
