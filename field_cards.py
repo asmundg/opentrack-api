@@ -289,6 +289,7 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         base_event_type = group_key.split('_')[0]
         has_wind = base_event_type in ['LJ', 'TJ']
         is_throwing = len(group_data['throwing_events']) > 0
+        is_high_jump = base_event_type == 'HJ'
         
         # Resolve bib numbers to competitors in proper order
         all_competitors = []
@@ -369,38 +370,74 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         if has_wind:
             elements.append(Paragraph("<i>Wind measurements required for record purposes</i>", small_style))
         
+        # Add High Jump instructions
+        if is_high_jump:
+            elements.append(Paragraph("<i>High Jump: Each height has 3 columns for attempts. Mark O (cleared), X (missed), or - (passed) in each attempt box.</i>", small_style))
+        
         elements.append(Spacer(1, 0.3*cm))
         
         # Don't sort competitors by bib - preserve the order from results
         # all_competitors.sort(key=lambda x: int(x['bib']))  # Removed - preserve original order
         
-        # Create ORIS-style header row
-        header_row = [
-            Paragraph("<b>Order</b>", header_style),
-            Paragraph("<b>Bib</b>", header_style),
-            Paragraph("<b>Name</b>", header_style),
-            Paragraph("<b>Club</b>", header_style),
-            Paragraph("<b>Age</b>", header_style)
-        ]
-        
-        # Add weight column for throwing events
-        if is_throwing:
-            header_row.append(Paragraph("<b>Weight</b>", header_style))
-        
-        # Add columns for each attempt - using ordinal numbers like in the image
-        ordinal_suffixes = {1: "st", 2: "nd", 3: "rd"}
-        wind_text = " (with wind)" if has_wind else ""
-        print(f"    Creating {group_data['max_attempts']} attempt columns{wind_text}")
-        for i in range(1, group_data['max_attempts'] + 1):
-            suffix = ordinal_suffixes.get(i, "th")
-            header_row.append(Paragraph(f"<b>{i}{suffix}<br/>Trial</b>", header_style))
-            if has_wind:
-                header_row.append(Paragraph("<b>SB</b>", header_style))  # SB for wind like in image
-        
-        # Add columns for best result and final position
-        header_row.append(Paragraph(f"<b>Best<br/>of {group_data['max_attempts']}</b>", header_style))
-        header_row.append(Paragraph("<b>PB /<br/>Note</b>", header_style))
-        header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
+        if is_high_jump:
+            # HIGH JUMP SPECIAL LAYOUT
+            print(f"    Creating High Jump layout with height columns")
+            
+            # Create blank height columns that judges can fill in
+            num_height_columns = 9  # Provide 9 blank height columns
+            
+            # Create header row for High Jump
+            header_row = [
+                Paragraph("<b>Order</b>", header_style),
+                Paragraph("<b>Bib</b>", header_style),
+                Paragraph("<b>Name</b>", header_style),
+                Paragraph("<b>Club</b>", header_style),
+                Paragraph("<b>Age</b>", header_style)
+            ]
+            
+            # Add blank height columns - judges will fill in the actual heights
+            # Each height gets 3 sub-columns for the 3 attempts
+            for i in range(num_height_columns):
+                # Add a main height header that will span 3 columns
+                header_row.append(Paragraph("<b>_____m</b>", header_style))
+                # Add two more columns for the 3 attempts (total 3 per height)
+                header_row.append("")  # Attempt 2 (will be merged with height header)
+                header_row.append("")  # Attempt 3 (will be merged with height header)
+            
+            # Add final columns
+            header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
+            header_row.append(Paragraph("<b>PB /<br/>Note</b>", header_style))
+            header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
+            
+        else:
+            # REGULAR FIELD EVENT LAYOUT
+            # Create ORIS-style header row
+            header_row = [
+                Paragraph("<b>Order</b>", header_style),
+                Paragraph("<b>Bib</b>", header_style),
+                Paragraph("<b>Name</b>", header_style),
+                Paragraph("<b>Club</b>", header_style),
+                Paragraph("<b>Age</b>", header_style)
+            ]
+            
+            # Add weight column for throwing events
+            if is_throwing:
+                header_row.append(Paragraph("<b>Weight</b>", header_style))
+            
+            # Add columns for each attempt - using ordinal numbers like in the image
+            ordinal_suffixes = {1: "st", 2: "nd", 3: "rd"}
+            wind_text = " (with wind)" if has_wind else ""
+            print(f"    Creating {group_data['max_attempts']} attempt columns{wind_text}")
+            for i in range(1, group_data['max_attempts'] + 1):
+                suffix = ordinal_suffixes.get(i, "th")
+                header_row.append(Paragraph(f"<b>{i}{suffix}<br/>Trial</b>", header_style))
+                if has_wind:
+                    header_row.append(Paragraph("<b>SB</b>", header_style))  # SB for wind like in image
+            
+            # Add columns for best result and final position
+            header_row.append(Paragraph(f"<b>Best<br/>of {group_data['max_attempts']}</b>", header_style))
+            header_row.append(Paragraph("<b>PB /<br/>Note</b>", header_style))
+            header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
         
         # Create data for the table
         table_data = [header_row]
@@ -444,29 +481,44 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
                 Paragraph(competitor['category'], normal_style)
             ]
             
-            # Add weight column for throwing events
-            if is_throwing:
-                # Try to find weight from any event in the group
-                weight = ""
-                for event_code in group_data['weight_by_event']:
-                    weight = group_data['weight_by_event'][event_code]
-                    break
-                if weight:
-                    weight_text = f"{weight}kg"
-                else:
-                    weight_text = ""
-                row.append(Paragraph(weight_text, normal_style))
-            
-            # Add empty cells for results and wind measurements
-            for _ in range(group_data['max_attempts']):
-                row.append("")  # Result
-                if has_wind:
-                    row.append("")  # Wind/SB
-            
-            # Add empty cells for best result, PB/Note, and final position
-            row.append("")  # Best of 3
-            row.append("")  # PB/Note
-            row.append("")  # Final Position
+            if is_high_jump:
+                # HIGH JUMP ROW LAYOUT
+                # Add empty cells for each height (3 attempts per height)
+                for i in range(num_height_columns):
+                    row.append("")  # Attempt 1
+                    row.append("")  # Attempt 2
+                    row.append("")  # Attempt 3
+                
+                # Add empty cells for best height, PB/Note, and final position
+                row.append("")  # Best Height
+                row.append("")  # PB/Note
+                row.append("")  # Final Position
+                
+            else:
+                # REGULAR FIELD EVENT ROW LAYOUT
+                # Add weight column for throwing events
+                if is_throwing:
+                    # Try to find weight from any event in the group
+                    weight = ""
+                    for event_code in group_data['weight_by_event']:
+                        weight = group_data['weight_by_event'][event_code]
+                        break
+                    if weight:
+                        weight_text = f"{weight}kg"
+                    else:
+                        weight_text = ""
+                    row.append(Paragraph(weight_text, normal_style))
+                
+                # Add empty cells for results and wind measurements
+                for _ in range(group_data['max_attempts']):
+                    row.append("")  # Result
+                    if has_wind:
+                        row.append("")  # Wind/SB
+                
+                # Add empty cells for best result, PB/Note, and final position
+                row.append("")  # Best of N
+                row.append("")  # PB/Note
+                row.append("")  # Final Position
             
             table_data.append(row)
         
@@ -483,38 +535,59 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         name_width = 3.2 * cm  
         club_width = 2.8 * cm
         age_width = 1.0 * cm  # Age - wider to prevent wrapping
-        weight_width = 1.2 * cm if is_throwing else 0  # Weight - wider to prevent wrapping
-        best_width = 1.2 * cm  # Best of 3
+        weight_width = 1.2 * cm if (is_throwing and not is_high_jump) else 0  # Weight - not used in HJ
+        best_width = 1.2 * cm  # Best result
         pb_note_width = 1.3 * cm  # PB/Note
         final_pos_width = 1.1 * cm  # Final Pos - wider for better word wrapping
         
-        # Calculate fixed width total
-        fixed_width = order_width + bib_width + name_width + club_width + age_width + weight_width + best_width + pb_note_width + final_pos_width
-        
-        # Calculate space for attempts - make trial boxes narrower and more square
-        remaining_width = available_width - fixed_width
-        
-        if has_wind:
-            # Each attempt has a result and wind column - make them narrower
-            trial_box_width = 1.5 * cm  # Narrower, more square trial boxes
-            wind_box_width = 1.0 * cm   # Narrower wind boxes
+        if is_high_jump:
+            # HIGH JUMP COLUMN LAYOUT
+            # Calculate fixed width total (no weight column for HJ)
+            fixed_width = order_width + bib_width + name_width + club_width + age_width + best_width + pb_note_width + final_pos_width
             
-            result_width = trial_box_width
-            wind_width = wind_box_width
+            # Calculate space for height columns (3 attempts per height)
+            remaining_width = available_width - fixed_width
+            total_height_columns = num_height_columns * 3  # 3 attempts per height
+            attempt_width = remaining_width / total_height_columns  # Distribute evenly among all attempt columns
+            
+            # Create column widths list
+            col_widths = [order_width, bib_width, name_width, club_width, age_width]
+            for _ in range(num_height_columns):
+                # Add 3 attempt columns for each height
+                col_widths.append(attempt_width)  # Attempt 1
+                col_widths.append(attempt_width)  # Attempt 2
+                col_widths.append(attempt_width)  # Attempt 3
+            col_widths.extend([best_width, pb_note_width, final_pos_width])
+            
         else:
-            # Only result columns, no wind columns - make them narrower and more square
-            result_width = 1.5 * cm  # Narrower, more square trial boxes
-        
-        # Create column widths list
-        col_widths = [order_width, bib_width, name_width, club_width, age_width]
-        if is_throwing:
-            col_widths.append(weight_width)
-        
-        for _ in range(group_data['max_attempts']):
-            col_widths.append(result_width)  # Result column
+            # REGULAR FIELD EVENT COLUMN LAYOUT
+            # Calculate fixed width total
+            fixed_width = order_width + bib_width + name_width + club_width + age_width + weight_width + best_width + pb_note_width + final_pos_width
+            
+            # Calculate space for attempts - make trial boxes narrower and more square
+            remaining_width = available_width - fixed_width
+            
             if has_wind:
-                col_widths.append(wind_width)    # Wind column
-        col_widths.extend([best_width, pb_note_width, final_pos_width])
+                # Each attempt has a result and wind column - make them narrower
+                trial_box_width = 1.5 * cm  # Narrower, more square trial boxes
+                wind_box_width = 1.0 * cm   # Narrower wind boxes
+                
+                result_width = trial_box_width
+                wind_width = wind_box_width
+            else:
+                # Only result columns, no wind columns - make them narrower and more square
+                result_width = 1.5 * cm  # Narrower, more square trial boxes
+            
+            # Create column widths list
+            col_widths = [order_width, bib_width, name_width, club_width, age_width]
+            if is_throwing:
+                col_widths.append(weight_width)
+            
+            for _ in range(group_data['max_attempts']):
+                col_widths.append(result_width)  # Result column
+                if has_wind:
+                    col_widths.append(wind_width)    # Wind column
+            col_widths.extend([best_width, pb_note_width, final_pos_width])
         
         # Create the table
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -553,33 +626,73 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
             ('ALIGN', (4, 1), (4, -1), 'CENTER'),  # Age centered
         ])
         
-        # Adjust alignment based on whether weight column exists
-        if is_throwing:
+        # Adjust alignment based on event type and whether weight column exists
+        if is_high_jump:
+            # Height columns (starting after age)
+            heights_start_col = 5
+            
+            # Add cell spanning for High Jump height headers
+            for height_idx in range(num_height_columns):
+                start_col = heights_start_col + (height_idx * 3)
+                end_col = start_col + 2  # Span across 3 columns
+                table_style.add('SPAN', (start_col, 0), (end_col, 0))  # Merge header cells
+            # All height columns centered
+            total_height_cols = num_height_columns * 3  # 3 attempts per height
+            heights_end_col = heights_start_col + total_height_cols - 1
+            table_style.add('ALIGN', (heights_start_col, 1), (heights_end_col, -1), 'CENTER')
+            
+            # Final columns start after height columns
+            final_results_start = heights_start_col + total_height_cols
+            
+        elif is_throwing:
             # Weight column centered
             table_style.add('ALIGN', (5, 1), (5, -1), 'CENTER')
             # Result and wind columns (starting after weight)
             trials_start_col = 6
+            # Final results start after trial columns
+            final_results_start = trials_start_col + (group_data['max_attempts'] * (2 if has_wind else 1))
+            
         else:
             # Result and wind columns (starting after age)
             trials_start_col = 5
+            # Final results start after trial columns
+            final_results_start = trials_start_col + (group_data['max_attempts'] * (2 if has_wind else 1))
         
         # Add vertical separators for table borders and trial/result columns
         # Vertical line at the left edge of the table (before first column)
         table_style.add('LINEBEFORE', (0, 0), (0, -1), 1, colors.black)
         
-        # Vertical line before first trial column
-        table_style.add('LINEBEFORE', (trials_start_col, 0), (trials_start_col, -1), 1, colors.black)
-        
-        # Vertical lines between trial columns
-        for trial_num in range(group_data['max_attempts']):
-            col_idx = trials_start_col + trial_num * (2 if has_wind else 1)
-            if trial_num > 0:  # Don't add line before first trial (already added above)
-                table_style.add('LINEBEFORE', (col_idx, 0), (col_idx, -1), 1, colors.black)
-            if has_wind and trial_num < group_data['max_attempts'] - 1:  # Add line after wind column (except last)
-                table_style.add('LINEAFTER', (col_idx + 1, 0), (col_idx + 1, -1), 1, colors.black)
+        if is_high_jump:
+            # HIGH JUMP VERTICAL LINES
+            # Vertical line before first height column
+            table_style.add('LINEBEFORE', (heights_start_col, 0), (heights_start_col, -1), 1, colors.black)
+            
+            # Vertical lines between height groups and within height groups
+            for height_idx in range(num_height_columns):
+                base_col = heights_start_col + (height_idx * 3)
+                
+                # Add vertical line before each height group (except the first one)
+                if height_idx > 0:
+                    table_style.add('LINEBEFORE', (base_col, 0), (base_col, -1), 1, colors.black)
+                
+                # Add vertical lines between attempts within each height (lighter lines)
+                table_style.add('LINEBEFORE', (base_col + 1, 0), (base_col + 1, -1), 0.5, colors.gray)
+                table_style.add('LINEBEFORE', (base_col + 2, 0), (base_col + 2, -1), 0.5, colors.gray)
+            
+        else:
+            # REGULAR FIELD EVENT VERTICAL LINES
+            # Vertical line before first trial column
+            table_style.add('LINEBEFORE', (trials_start_col, 0), (trials_start_col, -1), 1, colors.black)
+            
+            # Vertical lines between trial columns
+            for trial_num in range(group_data['max_attempts']):
+                col_idx = trials_start_col + trial_num * (2 if has_wind else 1)
+                if trial_num > 0:  # Don't add line before first trial (already added above)
+                    table_style.add('LINEBEFORE', (col_idx, 0), (col_idx, -1), 1, colors.black)
+                if has_wind and trial_num < group_data['max_attempts'] - 1:  # Add line after wind column (except last)
+                    table_style.add('LINEAFTER', (col_idx + 1, 0), (col_idx + 1, -1), 1, colors.black)
         
         # Vertical line before final result columns (Best, PB/Note, Final Pos)
-        final_results_start = trials_start_col + (group_data['max_attempts'] * (2 if has_wind else 1))
         table_style.add('LINEBEFORE', (final_results_start, 0), (final_results_start, -1), 1, colors.black)
         
         # Vertical lines between final result columns
@@ -590,8 +703,8 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None)
         table_style.add('LINEAFTER', (-1, 0), (-1, -1), 1, colors.black)
         
         # Center align all trial and result columns
-        final_col_start = trials_start_col + (group_data['max_attempts'] * (2 if has_wind else 1))
-        table_style.add('ALIGN', (trials_start_col, 1), (-1, -1), 'CENTER')  # All remaining columns centered
+        if not is_high_jump:
+            table_style.add('ALIGN', (trials_start_col, 1), (-1, -1), 'CENTER')  # All remaining columns centered
         
         # Add light shading to the 3 rightmost columns (Best, PB/Note, Final Pos)
         table_style.add('BACKGROUND', (final_results_start, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95))  # Light gray for final columns
