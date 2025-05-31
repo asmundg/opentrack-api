@@ -39,7 +39,7 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
     
     # Extract meeting name from data - require it to be present
     meeting_name = data['fullName']
-    meeting_date = data.get('date', '')
+    meeting_date = data['date']
     
     # Parse the meeting date for better formatting
     formatted_meeting_date = meeting_date
@@ -59,8 +59,8 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
     events_to_process = []
     
     for event in data['events']:
-        event_code = event.get('eventCode', '')
-        event_id = event.get('eventId', event_code)
+        event_code = event['eventCode']
+        event_id = event['eventId']
         
         # Check if this is a track event
         is_track_event = any(code in event_code for code in track_event_codes)
@@ -80,14 +80,14 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
         
         # Filter by day if specified
         if day is not None:
-            event_day = event.get('day', 1)
+            event_day = event['day']
             if event_day != day:
                 continue
         
         events_to_process.append(event)
     
     if not events_to_process:
-        available_events = [f"{event.get('eventCode', 'Unknown')} (ID: {event.get('eventId', 'N/A')})" for event in data['events']]
+        available_events = [f"{event['eventCode']} (ID: {event['eventId']})" for event in data['events']]
         raise ValueError(f"No matching track events found. Available events: {available_events}")
     
     # Generate output filename if not provided
@@ -119,8 +119,8 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
     day_filter_text = f" (filtered by day {day})" if day is not None else ""
     print(f"Creating start lists for {len(events_to_process)} events{day_filter_text}:")
     for event in events_to_process:
-        event_day = event.get('day', 1)
-        print(f"  - {event['eventCode']} (ID: {event.get('eventId', 'N/A')}) - Day {event_day}")
+        event_day = event['day']
+        print(f"  - {event['eventCode']} (ID: {event['eventId']}) - Day {event_day}")
     print(f"Meeting name: {meeting_name}")
     print(f"Output filename: {output_filename}")
     
@@ -202,10 +202,10 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
     
     for event in events_to_process:
         event_code = event['eventCode']
-        event_id = event.get('eventId', event_code)
-        event_name = event.get('name', event_code)
-        event_time = event.get('r1Time', '')
-        event_day = event.get('day', 1)
+        event_id = event['eventId']
+        event_name = event['name']
+        event_time = event['r1Time']
+        event_day = event['day']
         
         if not event_time:
             print(f"ERROR: Event {event_code} (ID: {event_id}) missing 'r1Time' field, skipping event")
@@ -227,9 +227,14 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
         time_groups[time_key]['day'] = event_day
         
         # Extract heat and lane information from units/results
-        for unit in event.get('units', []):
-            heat_id = unit.get('unitId', 'Heat 1')
-            heat_name = unit.get('name', heat_id)
+        for unit in event['units']:
+            heat_id = unit['id']
+            heat_name = unit['heatName']
+            
+            # Skip units without a proper heat ID
+            if not heat_id:
+                print(f"WARNING: Unit in event {event_code} missing id field, skipping")
+                continue
             
             # Create unique heat ID that includes event info to avoid conflicts between events
             unique_heat_id = f"{event_code}_{heat_id}"
@@ -244,17 +249,16 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
                     'original_heat_id': heat_id
                 }
             
-            for result in unit.get('results', []):
+            for result in unit['results']:
                 if 'bib' in result and 'lane' in result:
                     lane = result['lane']
                     bib = result['bib']
                     
-                    # Get competitor info
-                    competitor_info = bib_to_competitor.get(bib, {
-                        'name': 'Unknown',
-                        'club': 'Unknown',
-                        'category': 'Unknown'
-                    })
+                    # Get competitor info - fail if bib not found
+                    if bib not in bib_to_competitor:
+                        print(f"ERROR: Competitor with bib {bib} not found in competitor data")
+                        continue
+                    competitor_info = bib_to_competitor[bib]
                     
                     time_groups[time_key]['all_heats'][unique_heat_id].append({
                         'lane': lane,
@@ -314,52 +318,156 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
             except (ValueError, TypeError):
                 event_date_str = formatted_meeting_date
         
-        # Create header for this time group (multiple events if merged)
-        if len(group_data['events']) > 1:
-            group_header = events_str
-        else:
-            group_header = group_data['events'][0]['name']
-        
-        # Add event header
-        elements.append(Paragraph(f"{group_header}", event_title_style))
+        # For all events (single or merged), just show the meeting info and start time
+        # Individual event names will be shown as headers above each table
         elements.append(Paragraph(f"{meeting_name} - {event_date_str} - START TIME: {group_data['time']}", lane_style))
         elements.append(Spacer(1, 0.3*cm))
         
-        # Sort heats by heat ID/name for consistent ordering
-        sorted_heats = sorted(group_data['all_heats'].items(), key=lambda x: x[0])
-        
-        # Determine if we have multiple events (merged) to decide on heat naming
-        is_merged = len(group_data['events']) > 1
-        
-        for heat_id, heat_competitors in sorted_heats:
+        # Group heats by event code to create separate category sections
+        heats_by_event = {}
+        for heat_id, heat_competitors in group_data['all_heats'].items():
             heat_info = group_data['heat_names'][heat_id]
+            event_code = heat_info['event_code']
+            event_name = heat_info['event_name']
             
-            if not heat_competitors:
-                continue
+            if event_code not in heats_by_event:
+                heats_by_event[event_code] = {
+                    'event_name': event_name,
+                    'heats': {}
+                }
             
-            # Sort competitors by lane number
-            sorted_competitors = sorted(heat_competitors, key=lambda x: int(x['lane']) if str(x['lane']).isdigit() else 999)
+            heats_by_event[event_code]['heats'][heat_id] = heat_competitors
+        
+        # Sort events by code for consistent ordering
+        sorted_events = sorted(heats_by_event.items(), key=lambda x: x[0])
+        
+        # Process each event separately to create individual category headers
+        for event_code, event_data in sorted_events:
+            event_name = event_data['event_name']
             
-            # Create lane listings
-            for competitor_info in sorted_competitors:
-                lane = competitor_info['lane']
-                bib = competitor_info['bib']
-                competitor = competitor_info['competitor']
+            # Always add category header for each event (whether merged or single)
+            category_style = ParagraphStyle(
+                name='CategoryStyle',
+                parent=heat_title_style,
+                fontSize=11,
+                fontName='Helvetica-Bold',
+                alignment=TA_CENTER,
+                spaceAfter=4,
+                spaceBefore=6
+            )
+            
+            # Process each heat separately to maintain category separation
+            # For merged events, sort by lane ranges to ensure natural flow
+            # For single events, sort by original heat ID
+            def get_heat_sort_key(heat_item):
+                heat_id, heat_competitors = heat_item
+                heat_info = group_data['heat_names'][heat_id]
+                original_heat_id = heat_info['original_heat_id']
                 
-                # Format name (Last, First)
-                name_parts = competitor['name'].split()
-                if len(name_parts) > 1:
-                    last_name = name_parts[-1]
-                    first_name = " ".join(name_parts[:-1])
-                    formatted_name = f"{last_name.upper()}, {first_name}"
+                # Check if this is a merged event (multiple different events in same time slot)
+                all_event_names = set()
+                for _, competitors in event_data['heats'].items():
+                    for comp in competitors:
+                        all_event_names.add(comp['event_name'])
+                is_merged_event = len(all_event_names) > 1
+                
+                if is_merged_event and heat_competitors:
+                    # For merged events, sort by the lowest lane number in each heat
+                    # This ensures categories flow naturally by lane ranges
+                    min_lane = min(
+                        int(comp['lane']) if str(comp['lane']).isdigit() else 9999
+                        for comp in heat_competitors
+                    )
+                    return (0, min_lane)  # Primary sort by lane range
                 else:
-                    formatted_name = competitor['name'].upper()
-                
-                # Create lane entry
-                lane_text = f"Lane {lane}: {bib} {formatted_name} ({competitor['club']}) - {competitor['category']}"
-                elements.append(Paragraph(lane_text, lane_style))
+                    # For single events, sort by original heat ID
+                    try:
+                        return (1, int(original_heat_id))  # Secondary sort by heat ID
+                    except (ValueError, TypeError):
+                        return (1, str(original_heat_id))
             
-            elements.append(Spacer(1, 0.4*cm))
+            sorted_heats = sorted(event_data['heats'].items(), key=get_heat_sort_key)
+            
+            # Debug: Show heat ordering for merged events
+            if len(set(comp['event_name'] for _, competitors in event_data['heats'].items() for comp in competitors)) > 1:
+                print(f"  Merged event detected, heat ordering by lane ranges:")
+                for heat_id, heat_competitors in sorted_heats:
+                    if heat_competitors:
+                        heat_info = group_data['heat_names'][heat_id]
+                        lanes = [comp['lane'] for comp in heat_competitors]
+                        print(f"    {heat_info['event_name']}: lanes {min(lanes)}-{max(lanes)}")
+            
+            for heat_id, heat_competitors in sorted_heats:
+                if not heat_competitors:
+                    continue
+                
+                # Sort competitors by lane number (ensure proper numeric sorting)
+                def get_lane_sort_key(competitor_info):
+                    lane = competitor_info['lane']
+                    try:
+                        # Try to convert to integer for proper numeric sorting
+                        return int(lane)
+                    except (ValueError, TypeError):
+                        # If lane is not a number, put it at the end
+                        return 9999
+                
+                sorted_competitors = sorted(heat_competitors, key=get_lane_sort_key)
+            
+                # Only create a table if this heat has competitors
+                if sorted_competitors:
+                    # Get the specific event name for this heat/table
+                    heat_info = group_data['heat_names'][heat_id]
+                    heat_event_name = heat_info['event_name']
+                    
+                    # Show the specific event name as a header above each table
+                    elements.append(Paragraph(f"{heat_event_name}", category_style))
+                    
+                    # Create table data with headers
+                    table_data = [['Lane', 'Bib', 'Name', 'Club', 'Age Group', 'PB', 'SB']]
+                    
+                    for competitor_info in sorted_competitors:
+                        lane = str(competitor_info['lane'])
+                        bib = str(competitor_info['bib'])
+                        competitor = competitor_info['competitor']
+                        
+                        # Format name (don't convert to uppercase, keep original formatting)
+                        name = competitor['name']
+                        club = competitor['club']
+                        category = competitor['category']
+                        
+                        # Get PB and SB (season best) - these are optional
+                        pb = competitor.get('pb', '')
+                        sb = competitor.get('sb', '')
+                        
+                        table_data.append([lane, bib, name, club, category, pb, sb])
+                    
+                    # Create table with styling for this specific heat
+                    table = Table(table_data, colWidths=[1.2*cm, 1.2*cm, 5*cm, 4*cm, 2*cm, 1.5*cm, 1.5*cm])
+                    table.setStyle(TableStyle([
+                        # Header row styling
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 9),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+                        
+                        # Header outline box only
+                        ('BOX', (0, 0), (-1, 0), 1, colors.black),
+                        
+                        # Data rows styling
+                        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                        ('FONTSIZE', (0, 1), (-1, -1), 8),
+                        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.beige, colors.white]),
+                        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                        ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                        ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                        ('TOPPADDING', (0, 0), (-1, -1), 3),
+                        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+                    ]))
+                    
+                    elements.append(table)
+                    elements.append(Spacer(1, 0.4*cm))
         
         # Add page break between time groups
         elements.append(PageBreak())
@@ -397,8 +505,8 @@ def detect_track_event(data):
     
     # First, try to find events that have units with results
     events_with_competitors = set()
-    for event in data.get('events', []):
-        event_code = event.get('eventCode', '')
+    for event in data['events']:
+        event_code = event['eventCode']
         
         # Check if this is a track event
         is_track_event = False
@@ -409,8 +517,8 @@ def detect_track_event(data):
                 
         if is_track_event:
             # Check if there are units with results
-            for unit in event.get('units', []):
-                if unit.get('results', []):
+            for unit in event['units']:
+                if unit['results']:
                     events_with_competitors.add(event_code)
                     print(f"Detected track event with competitors: {event_code}")
                     break
@@ -422,8 +530,8 @@ def detect_track_event(data):
         return sorted_events[0]
     
     # Fallback: Try to find a suitable track event from the available events
-    for event in data.get('events', []):
-        event_code = event.get('eventCode', '')
+    for event in data['events']:
+        event_code = event['eventCode']
         for code in track_event_codes:
             if code in event_code:
                 print(f"Auto-detected event type: {code}")
@@ -476,7 +584,7 @@ if __name__ == "__main__":
             
             if isinstance(data, dict) and 'events' in data:
                 for event in data['events']:
-                    event_code = event.get('eventCode', '')
+                    event_code = event['eventCode']
                     for code in track_event_codes:
                         if code in event_code and event_code not in events_to_process:
                             events_to_process.append(event_code)
