@@ -47,8 +47,8 @@ def parse_opentrack_json(data):
         for unit in event['units']:
             # Process results within units
             for result in unit['results']:
-                # Skip results without athlon points or catpos
-                if 'athlonPoints' not in result or not result.get('athlonPoints') or 'catpos' not in result:
+                # Skip results without athlon points or catpos (but allow 0 points)
+                if 'athlonPoints' not in result or 'catpos' not in result:
                     continue
                 
                 bib = result['bib']
