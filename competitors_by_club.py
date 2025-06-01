@@ -10,6 +10,31 @@ from competitors_pdf import create_pdf_from_competitors
 def parse_competitors_by_club(data):
     """Parse OpenTrack JSON and create a list of competitors by club with their events."""
     
+    # First pass: collect all unique team names for each teamId to handle unicode duplicates
+    team_names_by_id = {}
+    for competitor in data['competitors']:
+        team_id = competitor['teamId']
+        team_name = competitor['teamName']
+        
+        if team_id not in team_names_by_id:
+            team_names_by_id[team_id] = set()
+        team_names_by_id[team_id].add(team_name)
+    
+    # Create mapping from teamId to preferred team name (prefer unicode over ASCII)
+    def prefer_unicode_name(names):
+        """Choose unicode version over ASCII version of team names."""
+        if len(names) == 1:
+            return list(names)[0]
+        
+        # Sort by unicode content - names with more unicode chars come first
+        sorted_names = sorted(names, key=lambda x: -sum(1 for c in x if ord(c) > 127))
+        return sorted_names[0]
+    
+    preferred_team_names = {
+        team_id: prefer_unicode_name(names) 
+        for team_id, names in team_names_by_id.items()
+    }
+    
     # Build a dictionary of competitors by bib number
     competitors = {}
     
@@ -19,8 +44,9 @@ def parse_competitors_by_club(data):
         last_name = competitor['lastName']
         name = f"{first_name} {last_name}".strip()
         
-        # Get club information from teamName field
-        club = competitor['teamName']
+        # Get preferred club name using teamId
+        team_id = competitor['teamId']
+        club = preferred_team_names[team_id]
         category = competitor['category']
         
         # Use sortBib as the key for the competitor dictionary if available

@@ -106,12 +106,49 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
         club_competitors_list = club_competitors[club_name]
         competitor_count = len(club_competitors_list)
         
-        # Sort this club's competitors by family name (last part of the name)
-        # With a secondary sort by first name if last names are equal
-        club_competitors_list.sort(key=lambda x: (x['name'].split()[-1], " ".join(x['name'].split()[:-1]) if len(x['name'].split()) > 1 else ""))
+        # Sort this club's competitors by first name (all parts except the last)
+        # With a secondary sort by last name if first names are equal
+        club_competitors_list.sort(key=lambda x: (" ".join(x['name'].split()[:-1]) if len(x['name'].split()) > 1 else "", x['name'].split()[-1]))
         
-        # Add club header with competitor count
-        elements.append(Paragraph(f"{club_name} ({competitor_count} competitor{'s' if competitor_count != 1 else ''})", club_style))
+        # Calculate bib list for this club and compress contiguous ranges
+        bib_numbers = sorted([int(competitor['bib']) for competitor in club_competitors_list])
+        
+        def compress_bib_ranges(bibs: list[int]) -> str:
+            """Compress a list of bib numbers into ranges like '1-5, 8, 10-12'"""
+            if not bibs:
+                return ""
+            
+            ranges = []
+            start = bibs[0]
+            end = bibs[0]
+            
+            for i in range(1, len(bibs)):
+                if bibs[i] == end + 1:
+                    # Contiguous, extend the current range
+                    end = bibs[i]
+                else:
+                    # Gap found, finalize current range
+                    if start == end:
+                        ranges.append(str(start))
+                    else:
+                        ranges.append(f"{start}-{end}")
+                    start = end = bibs[i]
+            
+            # Add the final range
+            if start == end:
+                ranges.append(str(start))
+            else:
+                ranges.append(f"{start}-{end}")
+            
+            return ", ".join(ranges)
+        
+        bib_range_text = compress_bib_ranges(bib_numbers)
+        if len(bib_numbers) == 1:
+            bib_label = "bib"
+        else:
+            bib_label = "bibs"
+        
+        elements.append(Paragraph(f"{club_name} ({competitor_count} competitor{'s' if competitor_count != 1 else ''}, {bib_label} {bib_range_text})", club_style))
         
         # Create styles for list items
         competitor_name_style = ParagraphStyle(
@@ -134,15 +171,8 @@ def create_pdf_from_competitors(competitors_data, output_filename, meeting_name=
         
         # Create a list item for each competitor
         for competitor in club_competitors_list:
-            # Format competitor info with name as LASTNAME, FIRSTNAME
-            name_parts = competitor['name'].split()
-            if len(name_parts) > 1:
-                last_name = name_parts[-1]
-                first_name = " ".join(name_parts[:-1])
-                formatted_name = f"{last_name.upper()}, {first_name}"
-            else:
-                # Just one name part
-                formatted_name = competitor['name'].upper()
+            # Format competitor info with name as firstname lastname
+            formatted_name = competitor['name']
                 
             competitor_info = f"{competitor['bib']} - {formatted_name} ({competitor['category']})"
             
