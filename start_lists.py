@@ -244,6 +244,7 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
                 # Store both event code and heat name for flexible formatting later
                 time_groups[time_key]['heat_names'][unique_heat_id] = {
                     'event_code': event_code,
+                    'event_id': event_id,
                     'event_name': event_name,
                     'heat_name': heat_name,
                     'original_heat_id': heat_id
@@ -418,9 +419,10 @@ def create_start_lists(data, output_filename=None, event_type=None, events=None,
                     # Get the specific event name for this heat/table
                     heat_info = group_data['heat_names'][heat_id]
                     heat_event_name = heat_info['event_name']
+                    heat_event_id = heat_info['event_id']
                     
-                    # Show the specific event name as a header above each table
-                    elements.append(Paragraph(f"{heat_event_name}", category_style))
+                    # Show the specific event name with ID as a header above each table
+                    elements.append(Paragraph(f"{heat_event_name} (ID: {heat_event_id})", category_style))
                     
                     # Create table data with headers
                     table_data = [['Lane', 'Bib', 'Name', 'Club', 'Age Group', 'PB', 'SB']]
