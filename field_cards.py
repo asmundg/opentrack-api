@@ -719,6 +719,10 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                 table_style.add('LINEBEFORE', (base_col + 1, 0), (base_col + 1, -1), 0.5, colors.gray)
                 table_style.add('LINEBEFORE', (base_col + 2, 0), (base_col + 2, -1), 0.5, colors.gray)
             
+            # Add thick vertical line after the last height column (before Best Height column)
+            last_height_col = heights_start_col + (num_height_columns * 3) - 1  # Last attempt of last height
+            table_style.add('LINEAFTER', (last_height_col, 0), (last_height_col, -1), 2, colors.black)
+            
         else:
             # REGULAR FIELD EVENT VERTICAL LINES
             # Vertical line before first trial column
@@ -735,9 +739,18 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                     # Add line after wind column (except for the last wind column)
                     if trial_num < group_data['max_attempts'] - 1:
                         table_style.add('LINEAFTER', (col_idx + 1, 0), (col_idx + 1, -1), 1, colors.black)
+            
+            # Add vertical line after the last trial column (before Best of N column)
+            last_trial_col = trials_start_col + (group_data['max_attempts'] - 1) * (2 if has_wind else 1)
+            if has_wind:
+                # For wind events, add thick line after the last wind column
+                table_style.add('LINEAFTER', (last_trial_col + 1, 0), (last_trial_col + 1, -1), 2, colors.black)
+            else:
+                # For non-wind events, add thick line after the last trial column
+                table_style.add('LINEAFTER', (last_trial_col, 0), (last_trial_col, -1), 2, colors.black)
         
-        # Vertical line before final result columns (Best, PB/Note, Final Pos)
-        table_style.add('LINEBEFORE', (final_results_start, 0), (final_results_start, -1), 1, colors.black)
+        # Note: We don't add LINEBEFORE at final_results_start since we already added LINEAFTER above
+        # This prevents double lines and ensures a single strong separator
         
         # Vertical lines between final result columns
         table_style.add('LINEBEFORE', (final_results_start + 1, 0), (final_results_start + 1, -1), 1, colors.black)
