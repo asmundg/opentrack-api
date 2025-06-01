@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 # filepath: /Volumes/src/priv/opentrack/start_lists.py
 import argparse
-import json
 import sys
-import os
-import re
-import urllib.request
-import urllib.error
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm, mm
+from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 from datetime import datetime
 
 # Import required functions from local modules - no fallbacks

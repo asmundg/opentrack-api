@@ -1,18 +1,13 @@
 #!/usr/bin/env python3
 # filepath: /Volumes/src/priv/opentrack/field_cards.py
 import argparse
-import json
 import sys
-import os
-import re
-import urllib.request
-import urllib.error
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import cm, mm
+from reportlab.lib.units import cm
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 from datetime import datetime
 
 # Import required functions from local modules - no fallbacks
@@ -762,6 +757,14 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         # Center align all trial and result columns
         if not is_high_jump:
             table_style.add('ALIGN', (trials_start_col, 1), (-1, -1), 'CENTER')  # All remaining columns centered
+        
+        # Add white background to height boxes for High Jump/Pole Vault events
+        if is_high_jump:
+            # Override alternating row colors for height columns with white background
+            heights_start_col = 5
+            total_height_cols = num_height_columns * 3  # 3 attempts per height
+            heights_end_col = heights_start_col + total_height_cols - 1
+            table_style.add('BACKGROUND', (heights_start_col, 1), (heights_end_col, -1), colors.white)
         
         # Add light shading to the 3 rightmost columns (Best, PB/Note, Final Pos)
         table_style.add('BACKGROUND', (final_results_start, 1), (-1, -1), colors.Color(0.95, 0.95, 0.95))  # Light gray for final columns

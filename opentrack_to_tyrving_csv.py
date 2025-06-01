@@ -96,7 +96,7 @@ def main():
         json_data = load_opentrack_data(input_source)
         meeting_name = get_meeting_name(json_data)
         safe_meeting_name = create_safe_filename(meeting_name)
-        output_file = f"opentrack_{safe_meeting_name}.csv"
+        output_file = f"tyrvingpoeng_{safe_meeting_name}.csv"
         
         # Override with command line argument if provided
         if len(sys.argv) > 2:
