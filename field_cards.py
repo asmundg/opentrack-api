@@ -280,8 +280,15 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
         event_groups[group_key]['ordered_bibs_by_event'].append({
             'event_code': event_code,
             'event_name': event_name,
-            'bibs': event_bibs_in_order
+            'bibs': event_bibs_in_order,
+            'max_attempts': max_attempts  # Store specific max attempts for this event
         })
+        
+        # Store max attempts by competitor bib for cross-out logic
+        if 'max_attempts_by_competitor' not in event_groups[group_key]:
+            event_groups[group_key]['max_attempts_by_competitor'] = {}
+        for bib in event_bibs_in_order:
+            event_groups[group_key]['max_attempts_by_competitor'][bib] = max_attempts
     
     print(f"Phase 2: Processing {len(event_groups)} event groups...")
     
@@ -350,12 +357,15 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                     if bib in bib_to_competitor:
                         competitor = bib_to_competitor[bib].copy()
                         competitor['event_name'] = event_info['event_name']  # Track which event this competitor belongs to
+                        competitor['max_attempts'] = event_info['max_attempts']  # Track max attempts for this specific competitor
                         all_competitors.append(competitor)
         else:
             # Fallback: use all_bibs set (though this shouldn't happen with new logic)
             for bib in sorted(group_data['all_bibs']):
                 if bib in bib_to_competitor:
                     competitor = bib_to_competitor[bib].copy()
+                    # Use the max attempts stored per competitor, fallback to group max
+                    competitor['max_attempts'] = group_data['max_attempts_by_competitor'].get(bib, group_data['max_attempts'])
                     all_competitors.append(competitor)
         
         print(f"  Total competitors resolved: {len([c for c in all_competitors if not (isinstance(c, dict) and c.get('is_separator'))])}")
@@ -548,10 +558,20 @@ def create_field_cards(data, output_filename=None, event_type=None, events=None,
                     row.append(Paragraph(weight_text, normal_style))
                 
                 # Add empty cells for results and wind measurements
-                for _ in range(group_data['max_attempts']):
-                    row.append("")  # Result
+                competitor_max_attempts = competitor.get('max_attempts', group_data['max_attempts'])
+                for attempt_num in range(1, group_data['max_attempts'] + 1):
+                    if attempt_num <= competitor_max_attempts:
+                        # Regular attempt cell - competitor can use this attempt
+                        row.append("")  # Result
+                    else:
+                        # Cross out this cell - competitor has fewer attempts available
+                        row.append(Paragraph("<strike>—</strike>", normal_style))  # Crossed out
+                    
                     if has_wind:
-                        row.append("")  # Wind/SB
+                        if attempt_num <= competitor_max_attempts:
+                            row.append("")  # Wind measurement
+                        else:
+                            row.append(Paragraph("<strike>—</strike>", normal_style))  # Crossed out wind
                 
                 # Add empty cells for best result, PB/Note, and final position
                 row.append("")  # Best of N
