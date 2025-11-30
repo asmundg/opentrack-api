@@ -77,3 +77,13 @@ opentrack_admin/
 - Prefer text-based selectors (`text=Submit`) over CSS when stable
 - Use `page.locator()` with `.wait_for()` for dynamic content
 - Set `OPENTRACK_SLOW_MO=100` to slow down for debugging
+
+# Claude screenshot converter
+
+I have a Norwegian athletics competition timetable image. Please extract the event schedule and create a CSV with three columns: category, event, start_time.
+Requirements:
+
+Expand all slash-separated categories (like G16/G17/J15) into individual rows, one per category
+Use standard event codes: 60 (for 60m sprint), LJ (long jump), HJ (high jump), SP (shot put), TJ (triple jump)
+Use 24-hour time format (HH:MM) for start times
+Include all events from the schedule"

@@ -1,11 +1,60 @@
 """Browser management for OpenTrack automation."""
 
 from contextlib import contextmanager
-from typing import Generator
+from datetime import datetime
+from functools import wraps
+from pathlib import Path
+from typing import Callable, Generator, ParamSpec, TypeVar
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 
 from .config import OpenTrackConfig
+
+# Directory for error screenshots
+SCREENSHOT_DIR = Path("screenshots")
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+
+def save_screenshot(page: Page, name: str) -> Path:
+    """Save a screenshot to the screenshots directory.
+    
+    Args:
+        page: Playwright page to screenshot
+        name: Name for the screenshot (timestamp will be prepended)
+        
+    Returns:
+        Path to the saved screenshot
+    """
+    SCREENSHOT_DIR.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime("%H%M%S")
+    path = SCREENSHOT_DIR / f"{timestamp}_{name}.png"
+    page.screenshot(path=str(path))
+    print(f"Screenshot: {path}")
+    return path
+
+
+def screenshot_on_error(func: Callable[P, T]) -> Callable[P, T]:
+    """Decorator that takes a screenshot when an exception occurs.
+    
+    Expects the first argument (self) to have a `page` attribute.
+    """
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            # Try to get page from self (first arg)
+            if args and hasattr(args[0], "page"):
+                page = args[0].page
+                try:
+                    save_screenshot(page, f"error_{func.__name__}")
+                    print(f"URL: {page.url}")
+                except Exception:
+                    pass
+            raise
+    return wrapper
 
 
 @contextmanager
@@ -100,5 +149,4 @@ class OpenTrackSession:
 
     def is_logged_in(self) -> bool:
         """Check if currently logged in."""
-        # This selector will need adjustment based on actual page structure
         return self.page.locator("text=Log out").count() > 0 or self.page.locator("text=Logout").count() > 0

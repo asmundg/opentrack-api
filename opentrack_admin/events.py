@@ -10,7 +10,7 @@ from typing import Literal
 
 from playwright.sync_api import Page
 
-from .browser import OpenTrackSession
+from .browser import OpenTrackSession, screenshot_on_error
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -64,6 +64,18 @@ def get_event_name(code: str) -> str:
     return EVENT_NAMES[code]
 
 
+def normalize_category(category: str) -> str:
+    """Normalize category name for OpenTrack search.
+    
+    Converts 'G-rekrutt' -> 'G10', 'J-rekrutt' -> 'J10', etc.
+    """
+    if category.endswith("-rekrutt"):
+        # G-rekrutt -> G10, J-rekrutt -> J10
+        prefix = category.replace("-rekrutt", "")
+        return f"{prefix}10"
+    return category
+
+
 @dataclass
 class EventSchedule:
     """A scheduled event with category, event code, and start time.
@@ -83,9 +95,14 @@ class EventSchedule:
         return get_event_name(self.event)
     
     @property
+    def search_category(self) -> str:
+        """Get the normalized category for searching."""
+        return normalize_category(self.category)
+    
+    @property
     def search_term(self) -> str:
         """Generate search term for finding this event."""
-        return f"{self.category} {self.event_name}"
+        return f"{self.search_category} {self.event_name}"
 
 
 class EventScheduler:
@@ -100,18 +117,15 @@ class EventScheduler:
         page = self.page
         
         # Navigate through Manage -> Events and scoring -> Events Table
-        logger.info("Clicking 'Manage' link...")
+        logger.info("Navigating to Events Table...")
         page.get_by_role("link", name=" Manage").click()
-        
-        logger.info("Clicking 'Events and scoring' link...")
         page.get_by_role("link", name="Events and scoring").click()
-        
-        logger.info("Clicking 'Events Table' tab...")
         page.get_by_role("tab", name=" Events Table").click()
         page.wait_for_load_state("networkidle")
         
         logger.info("Events table ready")
 
+    @screenshot_on_error
     def find_and_click_event(self, schedule: EventSchedule) -> bool:
         """Find an event by category and code, then click to open it.
         
@@ -131,11 +145,9 @@ class EventScheduler:
         search_box.fill(schedule.search_term)
         
         # Click the search button
-        logger.debug("Clicking search button...")
         page.locator("#search_advanced_btn").click()
         
         # Wait for table to filter
-        logger.debug("Waiting for search results...")
         page.wait_for_load_state("networkidle")
         
         # Find event links (T01, T02, etc. for track, F01, F02, etc. for field) in the filtered results
@@ -143,22 +155,19 @@ class EventScheduler:
         event_link = page.locator("a").filter(has_text=re.compile(r"^[TF]\d+$"))
         
         count = event_link.count()
-        logger.info(f"Found {count} event link(s) matching pattern")
+        logger.info(f"Found {count} event link(s)")
         
         if count > 0:
             first_link = event_link.first
-            link_text = first_link.text_content()
-            logger.info(f"Clicking event link: {link_text}")
+            logger.info(f"Clicking event link: {first_link.text_content()}")
             first_link.click()
             page.wait_for_load_state("networkidle")
             return True
         
-        # No event found - take screenshot and raise error
-        screenshot_path = f"error_not_found_{schedule.category}_{schedule.event}.png"
-        page.screenshot(path=screenshot_path)
-        logger.error(f"No event found for: {schedule.search_term} (screenshot: {screenshot_path})")
+        # No event found - raise error (screenshot taken by wrapper)
         raise RuntimeError(f"No event found for: {schedule.search_term}")
 
+    @screenshot_on_error
     def set_event_start_time(self, start_time: time) -> None:
         """Set the start time for the currently open event.
         
@@ -171,23 +180,17 @@ class EventScheduler:
         logger.info(f"Setting start time to: {time_str}")
         
         # Find and fill the start time field
-        logger.debug("Looking for 'Round 1 Time:' field...")
         time_field = page.get_by_role("textbox", name="Round 1 Time:")
         
         if time_field.count() == 0:
-            # Take screenshot for debugging
-            page.screenshot(path="error_no_time_field.png")
-            logger.error("Could not find 'Round 1 Time:' field!")
-            logger.error(f"Current URL: {page.url}")
-            raise RuntimeError("'Round 1 Time:' field not found - see error_no_time_field.png")
+            raise RuntimeError("'Round 1 Time:' field not found")
         
         time_field.click()
         time_field.fill(time_str)
         
-        # Save
-        logger.info("Clicking Save...")
+        # Save and wait for confirmation banner
         page.get_by_role("button", name="Save").click()
-        page.wait_for_load_state("networkidle")
+        page.get_by_text("Event data saved").wait_for(state="visible", timeout=10000)
         logger.info("Event saved")
 
     def schedule_event(self, schedule: EventSchedule) -> bool:
@@ -211,7 +214,7 @@ class EventScheduler:
     def _navigate_back_to_events_table(self) -> None:
         """Navigate back to the Events Table tab."""
         logger.info("Navigating back to Events Table...")
-        self.page.get_by_role("tab", name=" Events Table").click()
+        self.page.get_by_role("tab", name="Events Table").click()
         self.page.wait_for_load_state("networkidle")
 
     def schedule_events(self, schedules: list[EventSchedule]) -> dict[str, bool]:
