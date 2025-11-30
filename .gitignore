@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Environment (contains secrets)
+.env
+
+# Recordings (may contain sensitive data)
+recordings/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDE
+.idea/
+*.swp
+*.swo
