@@ -184,10 +184,16 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
             session.page.wait_for_load_state("networkidle")
         
         scheduler = EventScheduler(session)
-        results = scheduler.schedule_events(schedules)
         
-        # Report results
-        success_count = sum(1 for v in results.values() if v)
+        try:
+            scheduler.schedule_events(schedules)
+            print()
+            print(f"✅ All {len(schedules)} events scheduled successfully!")
+            return 0
+        except Exception as e:
+            print()
+            print(f"❌ Failed: {e}")
+            return 1
         fail_count = len(results) - success_count
         
         print()

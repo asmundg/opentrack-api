@@ -2,6 +2,7 @@
 
 import csv
 import logging
+import re
 from dataclasses import dataclass
 from datetime import time
 from io import StringIO
@@ -14,6 +15,54 @@ from .browser import OpenTrackSession
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# Event code to Norwegian name mapping
+EVENT_NAMES = {
+    # Jumps
+    "HJ": "Høyde",
+    "LJ": "Lengde",
+    "TJ": "Tresteg",
+    "PV": "Stav",
+    
+    # Throws
+    "SP": "Kule",
+    "DT": "Diskos",
+    "JT": "Spyd",
+    "HT": "Slegge",
+    
+    # Sprints
+    "60m": "60m",
+    "100m": "100m",
+    "200m": "200m",
+    "400m": "400m",
+    
+    # Middle/Long distance
+    "800m": "800m",
+    "1500m": "1500m",
+    "3000m": "3000m",
+    "5000m": "5000m",
+    
+    # Hurdles
+    "60H": "60m hekk",
+    "100H": "100m hekk",
+    "110H": "110m hekk",
+    "400H": "400m hekk",
+    
+    # Relays
+    "4x100m": "4x100m",
+    "4x400m": "4x400m",
+}
+
+
+def get_event_name(code: str) -> str:
+    """Get the Norwegian event name for an event code.
+    
+    Raises:
+        KeyError: If the event code is not in the mapping.
+    """
+    if code not in EVENT_NAMES:
+        raise KeyError(f"Unknown event code: '{code}'. Add it to EVENT_NAMES in events.py")
+    return EVENT_NAMES[code]
+
 
 @dataclass
 class EventSchedule:
@@ -21,17 +70,22 @@ class EventSchedule:
     
     Examples:
         EventSchedule("G10", "60m", time(10, 0))     # G10 60m at 10:00
-        EventSchedule("J15", "HJ", time(10, 30))     # J15 High Jump at 10:30
-        EventSchedule("M", "SP", time(11, 0))        # Men Shot Put at 11:00
+        EventSchedule("J15", "HJ", time(10, 30))     # J15 Høyde at 10:30
+        EventSchedule("M", "SP", time(11, 0))        # Men Kule at 11:00
     """
     category: str  # e.g., "G10", "J15", "M", "W", "G-rekrutt"
     event: str     # e.g., "60m", "HJ", "SP", "LJ"
     start_time: time
     
     @property
+    def event_name(self) -> str:
+        """Get the Norwegian name for the event."""
+        return get_event_name(self.event)
+    
+    @property
     def search_term(self) -> str:
         """Generate search term for finding this event."""
-        return f"{self.category} {self.event}"
+        return f"{self.category} {self.event_name}"
 
 
 class EventScheduler:
@@ -76,13 +130,17 @@ class EventScheduler:
         search_box.click()
         search_box.fill(schedule.search_term)
         
+        # Click the search button
+        logger.debug("Clicking search button...")
+        page.locator("#search_advanced_btn").click()
+        
         # Wait for table to filter
         logger.debug("Waiting for search results...")
-        page.wait_for_timeout(500)  # Brief wait for filtering
+        page.wait_for_load_state("networkidle")
         
-        # Find the first event link (T01, T02, etc.) in the filtered results
-        # These are in the first column and link to the event detail page
-        event_link = page.get_by_role("link").filter(has_text=lambda t: t and t.startswith("T"))
+        # Find event links (T01, T02, etc. for track, F01, F02, etc. for field) in the filtered results
+        # These are links starting with "T" or "F" followed by digits
+        event_link = page.locator("a").filter(has_text=re.compile(r"^[TF]\d+$"))
         
         count = event_link.count()
         logger.info(f"Found {count} event link(s) matching pattern")
@@ -95,8 +153,11 @@ class EventScheduler:
             page.wait_for_load_state("networkidle")
             return True
         
-        logger.warning(f"No event found for: {schedule.search_term}")
-        return False
+        # No event found - take screenshot and raise error
+        screenshot_path = f"error_not_found_{schedule.category}_{schedule.event}.png"
+        page.screenshot(path=screenshot_path)
+        logger.error(f"No event found for: {schedule.search_term} (screenshot: {screenshot_path})")
+        raise RuntimeError(f"No event found for: {schedule.search_term}")
 
     def set_event_start_time(self, start_time: time) -> None:
         """Set the start time for the currently open event.
@@ -110,17 +171,15 @@ class EventScheduler:
         logger.info(f"Setting start time to: {time_str}")
         
         # Find and fill the start time field
-        # This selector may need adjustment based on actual page structure
-        logger.debug("Looking for start time field...")
-        time_field = page.get_by_role("textbox", name="Start time")
-        if time_field.count() == 0:
-            logger.debug("Trying alternate selector: input[name='start_time']")
-            time_field = page.locator("input[name='start_time']")
+        logger.debug("Looking for 'Round 1 Time:' field...")
+        time_field = page.get_by_role("textbox", name="Round 1 Time:")
         
         if time_field.count() == 0:
-            logger.error("Could not find start time field!")
-            logger.debug(f"Current URL: {page.url}")
-            raise RuntimeError("Start time field not found")
+            # Take screenshot for debugging
+            page.screenshot(path="error_no_time_field.png")
+            logger.error("Could not find 'Round 1 Time:' field!")
+            logger.error(f"Current URL: {page.url}")
+            raise RuntimeError("'Round 1 Time:' field not found - see error_no_time_field.png")
         
         time_field.click()
         time_field.fill(time_str)
@@ -138,22 +197,22 @@ class EventScheduler:
             schedule: Event with category, code, and start time
             
         Returns:
-            True if successful, False if event not found
+            True if successful
+            
+        Raises:
+            RuntimeError: If event not found or other error
         """
         logger.info(f"=== Scheduling: {schedule.search_term} @ {schedule.start_time} ===")
-        try:
-            if self.find_and_click_event(schedule):
-                self.set_event_start_time(schedule.start_time)
-                return True
-        except Exception as e:
-            logger.error(f"Error scheduling {schedule.search_term}: {e}")
-            # Take a screenshot for debugging
-            try:
-                self.page.screenshot(path=f"error_{schedule.category}_{schedule.event}.png")
-                logger.info(f"Screenshot saved: error_{schedule.category}_{schedule.event}.png")
-            except:
-                pass
-        return False
+        self.find_and_click_event(schedule)
+        self.set_event_start_time(schedule.start_time)
+        self._navigate_back_to_events_table()
+        return True
+
+    def _navigate_back_to_events_table(self) -> None:
+        """Navigate back to the Events Table tab."""
+        logger.info("Navigating back to Events Table...")
+        self.page.get_by_role("tab", name=" Events Table").click()
+        self.page.wait_for_load_state("networkidle")
 
     def schedule_events(self, schedules: list[EventSchedule]) -> dict[str, bool]:
         """Schedule multiple events.
@@ -171,15 +230,8 @@ class EventScheduler:
         
         for i, schedule in enumerate(schedules, 1):
             logger.info(f"Processing event {i}/{len(schedules)}")
-            success = self.schedule_event(schedule)
-            results[schedule.search_term] = success
-            
-            # Navigate back to events table for next event
-            if success:
-                logger.info("Navigating back to Events Table...")
-                page = self.page
-                page.get_by_role("tab", name=" Events Table").click()
-                page.wait_for_load_state("networkidle")
+            self.schedule_event(schedule)
+            results[schedule.search_term] = True
         
         logger.info(f"Finished scheduling. Success: {sum(results.values())}/{len(results)}")
         return results
