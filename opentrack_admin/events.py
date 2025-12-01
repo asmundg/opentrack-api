@@ -434,14 +434,15 @@ class EventScheduler:
         logger.info("Attempts saved")
 
     @screenshot_on_error
-    def set_implement_weight(self, weight: str, num_competitors: int = 10) -> None:
+    def set_implement_weight(self, weight: str, num_competitors: int = 20) -> None:
         """Set the implement weight for all competitors in a throwing event.
         
         Navigates to the attempts/heights editor and fills in the weight for all rows.
+        Uses Handsontable grid - finds Weight column by header, then fills each row.
         
         Args:
             weight: The weight string (e.g., "2", "0,75", "400g")
-            num_competitors: Max number of competitor rows to fill (default 10)
+            num_competitors: Max number of competitor rows to fill (default 20)
         """
         page = self.page
         
@@ -449,15 +450,56 @@ class EventScheduler:
         
         # Click View to see competitors, then Edit to edit weights
         page.get_by_role("link", name="View").click()
-        page.get_by_role("link", name="Edit  Edit").click()
+        page.wait_for_load_state("networkidle")
+        # Edit button has complex structure, use the URL pattern
+        page.locator("a[href*='/edit/']").filter(has_text="Edit").click()
         page.wait_for_load_state("networkidle")
         
-        # Fill weight for each competitor row using the attempts_ht table
-        weight_input = page.locator("#attempts_ht").get_by_role("textbox")
+        # Find the Weight column header and click it to select the column
+        table = page.locator("#attempts_ht .ht_master table.htCore")
         
-        for i in range(num_competitors):
-            weight_input.fill(weight)
-            weight_input.press("ArrowDown")
+        # Find Weight header - click on first row's Weight cell to start
+        weight_header = table.locator("thead th").filter(has_text="Weight")
+        if weight_header.count() == 0:
+            raise RuntimeError("Could not find 'Weight' column in table")
+        
+        # Get the bounding box of the Weight header to find the column position
+        weight_header_box = weight_header.bounding_box()
+        if not weight_header_box:
+            raise RuntimeError("Could not get Weight column position")
+        
+        # X position is the center of the Weight column
+        weight_x = weight_header_box["x"] + weight_header_box["width"] / 2
+        
+        # Get all data rows
+        rows = table.locator("tbody tr")
+        row_count = rows.count()
+        logger.info(f"Found {row_count} rows in table")
+        
+        for i in range(min(row_count, num_competitors)):
+            row = rows.nth(i)
+            # Check if this row has data (first cell has content)
+            first_cell = row.locator("td").first
+            if not first_cell.text_content():
+                logger.info(f"Row {i+1} is empty, stopping")
+                break
+            
+            # Get the row's Y position
+            row_box = row.bounding_box()
+            if not row_box:
+                continue
+            
+            row_y = row_box["y"] + row_box["height"] / 2
+            
+            # Click at the Weight column position for this row
+            page.mouse.click(weight_x, row_y)
+            page.wait_for_timeout(100)
+            
+            # Type the weight (will replace cell content when cell is active)
+            page.keyboard.type(weight)
+            page.keyboard.press("Enter")
+            
+            logger.debug(f"Set weight for row {i+1}")
         
         # Save
         page.get_by_role("button", name="Save").first.click()
