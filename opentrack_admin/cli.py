@@ -114,7 +114,7 @@ def cmd_create_competition(args: argparse.Namespace) -> int:
         external_entry_link=args.entry_link or "",
         hide_from_public=not args.public,
         show_individual_points=args.show_points,
-        combined_events_table="tyrving" if args.tyrving_scoring else None,
+        combined_events_table="tyrving",
         auto_number_competitors=args.number_competitors,
         random_seeding=args.random_seeding,
     )
@@ -172,6 +172,12 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
         print(f"   {s.category} {s.event} @ {s.start_time.strftime('%H:%M')}")
     print()
     
+    # Extract checkpoint name from competition URL (use slug)
+    # e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/ -> ser9-25
+    checkpoint_name = args.competition_url.rstrip("/").split("/")[-1] if not args.no_checkpoint else None
+    if checkpoint_name:
+        print(f"📍 Using checkpoint: {checkpoint_name}")
+    
     with OpenTrackSession(config) as session:
         # Navigate to competition
         session.page.goto(args.competition_url)
@@ -186,7 +192,7 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
         scheduler = EventScheduler(session)
         
         try:
-            scheduler.schedule_events(schedules)
+            scheduler.schedule_events(schedules, checkpoint_name=checkpoint_name)
             print()
             print(f"✅ All {len(schedules)} events scheduled successfully!")
             return 0
@@ -194,18 +200,6 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
             print()
             print(f"❌ Failed: {e}")
             return 1
-        fail_count = len(results) - success_count
-        
-        print()
-        if fail_count == 0:
-            print(f"✅ All {success_count} events scheduled successfully!")
-        else:
-            print(f"⚠️  {success_count} events scheduled, {fail_count} failed:")
-            for term, success in results.items():
-                if not success:
-                    print(f"   ❌ {term}")
-        
-        return 0 if fail_count == 0 else 1
 
 
 def main() -> int:
@@ -263,11 +257,6 @@ def main() -> int:
         help="Disable individual points display",
     )
     create_parser.add_argument(
-        "--tyrving-scoring",
-        action="store_true",
-        help="Use Tyrving combined events scoring tables instead of World Athletics",
-    )
-    create_parser.add_argument(
         "--no-numbering",
         dest="number_competitors",
         action="store_false",
@@ -300,6 +289,11 @@ def main() -> int:
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose/debug logging",
+    )
+    schedule_parser.add_argument(
+        "--no-checkpoint",
+        action="store_true",
+        help="Disable checkpoint (re-process all events even if previously done)",
     )
     schedule_parser.set_defaults(func=cmd_schedule_events)
 

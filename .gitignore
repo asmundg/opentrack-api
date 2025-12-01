@@ -14,6 +14,7 @@ wheels/
 
 # Recordings (may contain sensitive data)
 recordings/
+screenshots/
 
 # Testing
 .pytest_cache/

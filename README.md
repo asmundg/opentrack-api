@@ -84,6 +84,6 @@ I have a Norwegian athletics competition timetable image. Please extract the eve
 Requirements:
 
 Expand all slash-separated categories (like G16/G17/J15) into individual rows, one per category
-Use standard event codes: 60 (for 60m sprint), LJ (long jump), HJ (high jump), SP (shot put), TJ (triple jump)
+Use standard event codes: 60m (for 60m sprint), LJ (long jump), HJ (high jump), SP (shot put), TJ (triple jump)
 Use 24-hour time format (HH:MM) for start times
 Include all events from the schedule"

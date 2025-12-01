@@ -79,7 +79,7 @@ class CompetitionCreator:
         if not self.session.is_logged_in():
             self.session.login()
 
-        # Step 1: Navigate and create basic competition
+        # Step 1: Navigate and create basic competition (includes initial entry setup)
         self._create_basic_competition(details)
         
         # Step 2: Configure advanced settings (hide from public)
@@ -92,14 +92,11 @@ class CompetitionCreator:
         if details.combined_events_table:
             self._configure_scoring(details)
         
-        # Step 5: Enable entries
-        self._enable_entries()
-        
-        # Step 6: Number competitors (if requested)
+        # Step 5: Number competitors (if requested)
         if details.auto_number_competitors:
             self._number_competitors()
         
-        # Step 7: Apply random seeding (if requested)
+        # Step 6: Apply random seeding (if requested)
         if details.random_seeding:
             self._apply_random_seeding()
         
@@ -141,12 +138,21 @@ class CompetitionCreator:
         
         # Organiser (uses Select2 search widget)
         page.locator("#select2-id_organiser-container").click()
-        page.get_by_role("searchbox").fill(details.organiser_search)
-        # Wait for and click the first matching option
-        page.get_by_role("option").first.click()
+        searchbox = page.get_by_role("searchbox")
+        searchbox.fill(details.organiser_search)
+        # Wait for the highlighted option to appear and click it
+        highlighted_option = page.locator("li.select2-results__option--highlighted")
+        highlighted_option.wait_for(state="visible")
+        highlighted_option.click()
         
         # Create the competition
         page.get_by_role("button", name="Create").nth(1).click()
+        page.wait_for_load_state("networkidle")
+        
+        # Immediately enable entries after creation
+        page.get_by_role("link", name="Manage entries").click()
+        page.get_by_text("I confirm that I have read").click()
+        page.get_by_role("button", name="Go").click()
         page.wait_for_load_state("networkidle")
 
     def _configure_advanced_settings(self, details: CompetitionDetails) -> None:
@@ -207,25 +213,6 @@ class CompetitionCreator:
             page.get_by_label("Combined Events tables:").select_option(table_value)
         
         page.get_by_role("button", name="Save").click()
-        page.wait_for_load_state("networkidle")
-
-    def _enable_entries(self) -> None:
-        """Enable the entries system for the competition."""
-        page = self.page
-        
-        # Navigate back to competition home
-        page.get_by_role("link", name="Home", exact=True).click()
-        
-        # Go to manage entries
-        page.get_by_role("link", name="Competition details").click()
-        page.get_by_role("link", name="Manage entries").click()
-        
-        # Enable entries (first Go button)
-        page.get_by_role("button", name="Go").click()
-        
-        # Accept terms
-        page.get_by_text("I confirm that I have read").click()
-        page.get_by_role("button", name="Go").click()
         page.wait_for_load_state("networkidle")
 
     def _number_competitors(self) -> None:
