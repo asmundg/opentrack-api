@@ -1296,6 +1296,14 @@ def create_field_cards(
             canvas.setFont("Helvetica-Oblique", 8)
             canvas.drawString(doc.leftMargin, sig_y_position + 0.5 * cm, timestamp)
 
+            # Add annotation hints on the right side
+            canvas.setFont("Helvetica", 7)
+            hints_x = doc.width + doc.leftMargin - 2 * cm
+            canvas.drawString(hints_x, sig_y_position + 2.0 * cm, "Annotations:")
+            canvas.drawString(hints_x, sig_y_position + 1.5 * cm, "X  fail")
+            canvas.drawString(hints_x, sig_y_position + 1.1 * cm, "–  pass")
+            canvas.drawString(hints_x, sig_y_position + 0.7 * cm, "r  retired")
+
         canvas.restoreState()
 
     # Build the PDF with signature on every page
