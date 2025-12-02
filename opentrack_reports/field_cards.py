@@ -363,6 +363,7 @@ def create_field_cards(
         event_groups[group_key]["ordered_bibs_by_event"].append(
             {
                 "event_code": event_code,
+                "event_id": event_id,
                 "event_name": event_name,
                 "bibs": event_bibs_in_order,
                 "max_attempts": max_attempts,  # Store specific max attempts for this event
@@ -463,6 +464,9 @@ def create_field_cards(
                         competitor["max_attempts"] = event_info[
                             "max_attempts"
                         ]  # Track max attempts for this specific competitor
+                        competitor["event_id"] = event_info.get(
+                            "event_id", ""
+                        )  # Track event ID for PB/SB lookup
                         all_competitors.append(competitor)
         else:
             # Fallback: use all_bibs set (though this shouldn't happen with new logic)
@@ -586,6 +590,8 @@ def create_field_cards(
                 Paragraph("<b>Name</b>", header_style),
                 Paragraph("<b>Club</b>", header_style),
                 Paragraph("<b>Age</b>", header_style),
+                Paragraph("<b>PB</b>", header_style),
+                Paragraph("<b>SB</b>", header_style),
             ]
 
             # Add blank height columns - judges will fill in the actual heights
@@ -602,7 +608,7 @@ def create_field_cards(
                 header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
             elif base_event_type == "PV":
                 header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
-            header_row.append(Paragraph("<b>PB /<br/>Note</b>", header_style))
+            header_row.append(Paragraph("<b>Note</b>", header_style))
             header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
 
         else:
@@ -614,6 +620,8 @@ def create_field_cards(
                 Paragraph("<b>Name</b>", header_style),
                 Paragraph("<b>Club</b>", header_style),
                 Paragraph("<b>Age</b>", header_style),
+                Paragraph("<b>PB</b>", header_style),
+                Paragraph("<b>SB</b>", header_style),
             ]
 
             # Add weight column for throwing events
@@ -646,7 +654,7 @@ def create_field_cards(
                     f"<b>Best<br/>of {group_data['max_attempts']}</b>", header_style
                 )
             )
-            header_row.append(Paragraph("<b>PB /<br/>Note</b>", header_style))
+            header_row.append(Paragraph("<b>Note</b>", header_style))
             header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
 
         # Create data for the table
@@ -685,12 +693,21 @@ def create_field_cards(
             else:
                 formatted_name = competitor["name"].upper()
 
+            # Get PB and SB for this competitor from their event-specific data
+            event_id = competitor.get("event_id", "")
+            pb_by_event = competitor.get("pb_by_event", {})
+            sb_by_event = competitor.get("sb_by_event", {})
+            pb = pb_by_event.get(event_id, "")
+            sb = sb_by_event.get(event_id, "")
+
             row = [
                 str(competitor_counter),  # Order/Position
                 competitor["bib"],
                 Paragraph(formatted_name, normal_style),
                 Paragraph(competitor["club"], normal_style),
                 Paragraph(competitor["category"], normal_style),
+                Paragraph(str(pb), normal_style),
+                Paragraph(str(sb), normal_style),
             ]
 
             if is_high_jump:
@@ -701,9 +718,9 @@ def create_field_cards(
                     row.append("")  # Attempt 2
                     row.append("")  # Attempt 3
 
-                # Add empty cells for best height, PB/Note, and final position
+                # Add empty cells for best height, note, and final position
                 row.append("")  # Best Height
-                row.append("")  # PB/Note
+                row.append("")  # Note
                 row.append("")  # Final Position
 
             else:
@@ -757,9 +774,9 @@ def create_field_cards(
                                 Paragraph("<strike>—</strike>", normal_style)
                             )  # Crossed out wind
 
-                # Add empty cells for best result, PB/Note, and final position
+                # Add empty cells for best result, note, and final position
                 row.append("")  # Best of N
-                row.append("")  # PB/Note
+                row.append("")  # Note
                 row.append("")  # Final Position
 
             table_data.append(row)
@@ -776,16 +793,18 @@ def create_field_cards(
         # Fixed columns for competitor details - adjusted for new layout
         order_width = 1.0 * cm  # Order - wider to prevent wrapping
         bib_width = 0.8 * cm
-        name_width = 3.2 * cm
-        club_width = 2.8 * cm
-        age_width = 1.0 * cm  # Age - wider to prevent wrapping
+        name_width = 3.0 * cm
+        club_width = 2.6 * cm
+        age_width = 0.9 * cm  # Age
+        pb_width = 1.1 * cm  # PB column
+        sb_width = 1.1 * cm  # SB column
         weight_width = (
             1.2 * cm if (is_throwing and not is_high_jump) else 0
         )  # Weight - not used in HJ/PV
         zone_width = 1.0 * cm if is_horizontal_jump else 0  # Zone column for LJ/TJ
         best_width = 1.2 * cm  # Best result
-        pb_note_width = 1.3 * cm  # PB/Note
-        final_pos_width = 1.1 * cm  # Final Pos - wider for better word wrapping
+        note_width = 1.1 * cm  # Note
+        final_pos_width = 1.0 * cm  # Final Pos
 
         if is_high_jump:
             # HIGH JUMP/POLE VAULT COLUMN LAYOUT
@@ -796,8 +815,10 @@ def create_field_cards(
                 + name_width
                 + club_width
                 + age_width
+                + pb_width
+                + sb_width
                 + best_width
-                + pb_note_width
+                + note_width
                 + final_pos_width
             )
 
@@ -809,13 +830,13 @@ def create_field_cards(
             )  # Distribute evenly among all attempt columns
 
             # Create column widths list
-            col_widths = [order_width, bib_width, name_width, club_width, age_width]
+            col_widths = [order_width, bib_width, name_width, club_width, age_width, pb_width, sb_width]
             for _ in range(num_height_columns):
                 # Add 3 attempt columns for each height
                 col_widths.append(attempt_width)  # Attempt 1
                 col_widths.append(attempt_width)  # Attempt 2
                 col_widths.append(attempt_width)  # Attempt 3
-            col_widths.extend([best_width, pb_note_width, final_pos_width])
+            col_widths.extend([best_width, note_width, final_pos_width])
 
         else:
             # REGULAR FIELD EVENT COLUMN LAYOUT
@@ -826,10 +847,12 @@ def create_field_cards(
                 + name_width
                 + club_width
                 + age_width
+                + pb_width
+                + sb_width
                 + weight_width
                 + zone_width
                 + best_width
-                + pb_note_width
+                + note_width
                 + final_pos_width
             )
 
@@ -845,7 +868,7 @@ def create_field_cards(
                 result_width = 1.5 * cm  # Fixed width for trial boxes
 
             # Create column widths list
-            col_widths = [order_width, bib_width, name_width, club_width, age_width]
+            col_widths = [order_width, bib_width, name_width, club_width, age_width, pb_width, sb_width]
             if is_throwing:
                 col_widths.append(weight_width)
             if is_horizontal_jump:
@@ -855,7 +878,7 @@ def create_field_cards(
                 col_widths.append(result_width)  # Result column
                 if has_wind:
                     col_widths.append(wind_width)  # Wind column
-            col_widths.extend([best_width, pb_note_width, final_pos_width])
+            col_widths.extend([best_width, note_width, final_pos_width])
 
         # Create the table
         table = Table(table_data, colWidths=col_widths, repeatRows=1)
@@ -920,9 +943,12 @@ def create_field_cards(
         )
 
         # Adjust alignment based on event type and whether weight column exists
+        # PB and SB columns are at indices 5 and 6 (after Order, Bib, Name, Club, Age)
+        table_style.add("ALIGN", (5, 1), (6, -1), "CENTER")  # PB and SB centered
+
         if is_high_jump:
-            # Height columns (starting after age)
-            heights_start_col = 5
+            # Height columns (starting after age, PB, SB)
+            heights_start_col = 7  # After Order, Bib, Name, Club, Age, PB, SB
 
             # Add cell spanning for High Jump height headers
             for height_idx in range(num_height_columns):
@@ -942,10 +968,10 @@ def create_field_cards(
             final_results_start = heights_start_col + total_height_cols
 
         elif is_throwing:
-            # Weight column centered
-            table_style.add("ALIGN", (5, 1), (5, -1), "CENTER")
+            # Weight column centered (after PB, SB)
+            table_style.add("ALIGN", (7, 1), (7, -1), "CENTER")
             # Result and wind columns (starting after weight)
-            trials_start_col = 6
+            trials_start_col = 8  # After Order, Bib, Name, Club, Age, PB, SB, Weight
             # Final results start after trial columns
             final_results_start = trials_start_col + (
                 group_data["max_attempts"] * (2 if has_wind else 1)
@@ -953,18 +979,18 @@ def create_field_cards(
 
         elif is_horizontal_jump:
             # Zone column centered - SONE indicator will appear in data rows for young competitors
-            zone_col = 5
+            zone_col = 7  # After Order, Bib, Name, Club, Age, PB, SB
             table_style.add("ALIGN", (zone_col, 1), (zone_col, -1), "CENTER")
             # Result and wind columns (starting after zone)
-            trials_start_col = 6
+            trials_start_col = 8  # After Order, Bib, Name, Club, Age, PB, SB, Zone
             # Final results start after trial columns
             final_results_start = trials_start_col + (
                 group_data["max_attempts"] * (2 if has_wind else 1)
             )
 
         else:
-            # Result and wind columns (starting after age)
-            trials_start_col = 5
+            # Result and wind columns (starting after age, PB, SB)
+            trials_start_col = 7  # After Order, Bib, Name, Club, Age, PB, SB
             # Final results start after trial columns
             final_results_start = trials_start_col + (
                 group_data["max_attempts"] * (2 if has_wind else 1)
@@ -1187,7 +1213,7 @@ def create_field_cards(
 
         # Add bright yellow background to zone cells for horizontal jump competitors using the zone
         if is_horizontal_jump:
-            zone_col = 5  # Zone column is after Order, Bib, Name, Club, Age
+            zone_col = 7  # Zone column is after Order, Bib, Name, Club, Age, PB, SB
             row_idx = 0
             for item in all_competitors:
                 row_idx += 1  # Start from row 1 (row 0 is header)

@@ -56,6 +56,15 @@ def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
         club = preferred_team_names[team_id]
         category = competitor["category"]
 
+        # Extract PB and SB per event from eventsEntered
+        pb_by_event = {}
+        sb_by_event = {}
+        for event_entry in competitor.get("eventsEntered", []):
+            event_id = event_entry.get("eventId", "")
+            if event_id:
+                pb_by_event[event_id] = event_entry.get("pb", "")
+                sb_by_event[event_id] = event_entry.get("sb", "")
+
         # Use sortBib as the key for the competitor dictionary if available
         if "sortBib" in competitor:
             bib = competitor["sortBib"].lstrip("0")  # Remove leading zeros
@@ -65,6 +74,8 @@ def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
                 "category": category,
                 "bib": bib,
                 "events": set(),  # Use set to avoid duplicates
+                "pb_by_event": pb_by_event,
+                "sb_by_event": sb_by_event,
             }
 
     # Process events to find which competitors are in which events

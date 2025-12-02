@@ -302,6 +302,7 @@ def create_start_lists(
                             "bib": bib,
                             "competitor": competitor_info,
                             "event_name": event_name,
+                            "event_id": event_id,  # Store event_id for PB/SB lookup
                         }
                     )
 
@@ -479,7 +480,7 @@ def create_start_lists(
 
                     # Create table data with headers
                     table_data = [
-                        ["Lane", "Bib", "Name", "Club", "Age Group", "PB", "SB"]
+                        ["Lane", "Bib", "Name", "Club", "Age", "PB", "SB"]
                     ]
 
                     for competitor_info in sorted_competitors:
@@ -492,9 +493,13 @@ def create_start_lists(
                         club = competitor["club"]
                         category = competitor["category"]
 
-                        # Get PB and SB (season best) - these are optional
-                        pb = competitor.get("pb", "")
-                        sb = competitor.get("sb", "")
+                        # Get PB and SB (season best) for this specific event
+                        # Look up from the competitor's event-specific data using event_id
+                        event_id = competitor_info.get("event_id", "")
+                        pb_by_event = competitor.get("pb_by_event", {})
+                        sb_by_event = competitor.get("sb_by_event", {})
+                        pb = pb_by_event.get(event_id, "")
+                        sb = sb_by_event.get(event_id, "")
 
                         table_data.append([lane, bib, name, club, category, pb, sb])
 
