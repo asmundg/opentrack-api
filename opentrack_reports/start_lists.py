@@ -233,38 +233,41 @@ def create_start_lists(
         event_code = event["eventCode"]
         event_id = event["eventId"]
         event_name = event["name"]
-        event_time = event["r1Time"]
         event_day = event["day"]
 
-        if not event_time:
-            print(
-                f"ERROR: Event {event_code} (ID: {event_id}) missing 'r1Time' field, skipping event"
-            )
-            continue
-
         print(
-            f"Processing event: {event_name} ({event_code}, ID: {event_id}) - Day {event_day}, Time: {event_time}"
+            f"Processing event: {event_name} ({event_code}, ID: {event_id}) - Day {event_day}"
         )
-
-        # Create time group key - just use time for grouping (allowing category merging)
-        time_key = f"day{event_day}_{event_time}"
-
-        # Add event info to time group
-        time_groups[time_key]["events"].append(
-            {"code": event_code, "id": event_id, "name": event_name, "day": event_day}
-        )
-        time_groups[time_key]["time"] = event_time
-        time_groups[time_key]["day"] = event_day
 
         # Extract heat and lane information from units/results
+        # Use each unit's scheduledStartTime for grouping (not event-level r1Time)
         for unit in event["units"]:
             heat_id = unit["id"]
             heat_name = unit["heatName"]
+
+            # Get the unit's scheduled start time, fall back to event's r1Time if not present
+            unit_time = unit.get("scheduledStartTime") or event.get("r1Time")
+
+            if not unit_time:
+                print(
+                    f"WARNING: Unit {heat_id} in event {event_code} has no scheduledStartTime, skipping"
+                )
+                continue
 
             # Skip units without a proper heat ID
             if not heat_id:
                 print(f"WARNING: Unit in event {event_code} missing id field, skipping")
                 continue
+
+            # Create time group key using the unit's scheduled start time
+            time_key = f"day{event_day}_{unit_time}"
+
+            # Add event info to time group (avoid duplicates)
+            event_entry = {"code": event_code, "id": event_id, "name": event_name, "day": event_day}
+            if event_entry not in time_groups[time_key]["events"]:
+                time_groups[time_key]["events"].append(event_entry)
+            time_groups[time_key]["time"] = unit_time
+            time_groups[time_key]["day"] = event_day
 
             # Create unique heat ID that includes event info to avoid conflicts between events
             unique_heat_id = f"{event_code}_{heat_id}"
