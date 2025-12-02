@@ -2,6 +2,12 @@
 import re
 from typing import Dict, Set, List, Optional
 
+from shared.implement_weights import (
+    extract_weight_from_event_name,
+    get_target_weight_kg,
+    NORWEGIAN_TO_EVENT_CODE,
+)
+
 # Event name mappings from various formats to standardized names
 EVENT_MAPPINGS: Dict[str, str] = {
     # Norwegian to English track events
@@ -121,16 +127,27 @@ def extract_base_event_name(event: str) -> str:
     return base_event.strip()
 
 
-def find_best_event_match(target_event: str, available_events: List[str]) -> Optional[str]:
+def _get_event_code_from_name(event_name: str) -> Optional[str]:
+    """Get event code (SP, DT, HT, JT) from event name."""
+    base = extract_base_event_name(event_name)
+    return NORWEGIAN_TO_EVENT_CODE.get(base)
+
+
+def find_best_event_match(
+    target_event: str,
+    available_events: List[str],
+    category: str = ""
+) -> Optional[str]:
     """
     Find the best matching event from available events.
     
     For throwing events with implement specifications, finds the closest match
-    based on the base event name.
+    based on the base event name and category-appropriate implement weight.
     
     Args:
-        target_event: The event we're looking for (e.g., "slegge", "hammer")
+        target_event: The event we're looking for (e.g., "slegge", "hammer", "shot_put")
         available_events: List of actual events available for the athlete
+        category: Age category like 'G12', 'J15' for weight matching (optional)
         
     Returns:
         The best matching event name, or None if no good match found
@@ -171,27 +188,38 @@ def find_best_event_match(target_event: str, available_events: List[str]) -> Opt
     if not throwing_matches:
         return None
     
-    # If we have multiple matches, prefer the one with higher weight/newer specification
-    # This is a heuristic - in practice, you might want to choose based on age category
+    # Remove duplicates while preserving order
+    throwing_matches = list(dict.fromkeys(throwing_matches))
+    
+    # If we have only one match, return it
     if len(throwing_matches) == 1:
         return throwing_matches[0]
     
-    # Sort by the numeric values in the event name (weight, size, etc.)
-    # Higher weights typically represent senior/older age categories
-    def extract_weight(event_name: str) -> float:
-        """Extract numeric weight from event name for sorting."""
-        match = re.search(r'(\d+[,.]?\d*)\s*(kg|gram|g)', event_name.lower())
-        if match:
-            weight_str = match.group(1).replace(',', '.')
-            weight = float(weight_str)
-            # Convert grams to kg for comparison
-            if match.group(2).lower() in ['gram', 'g']:
-                weight = weight / 1000
-            return weight
-        return 0.0
+    # Get the event code for target weight lookup
+    event_code = _get_event_code_from_name(target_event)
+    target_weight = None
+    if event_code and category:
+        target_weight = get_target_weight_kg(event_code, category)
     
-    # Sort by weight (descending) - prefer heavier implements
-    throwing_matches.sort(key=extract_weight, reverse=True)
+    if target_weight is not None:
+        # Sort by closeness to the target weight for the category
+        def weight_distance(event_name: str) -> float:
+            """Calculate distance from target weight (lower is better)."""
+            weight = extract_weight_from_event_name(event_name)
+            if weight is None:
+                return float('inf')  # No weight info, deprioritize
+            return abs(weight - target_weight)
+        
+        throwing_matches.sort(key=weight_distance)
+        return throwing_matches[0]
+    
+    # No category provided - fall back to preferring heavier implements (senior weights)
+    def get_weight(event_name: str) -> float:
+        """Extract weight for sorting (higher is better for seniors)."""
+        weight = extract_weight_from_event_name(event_name)
+        return weight if weight is not None else 0.0
+    
+    throwing_matches.sort(key=get_weight, reverse=True)
     return throwing_matches[0]
 
 

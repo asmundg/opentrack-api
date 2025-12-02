@@ -14,6 +14,10 @@ from playwright.sync_api import Page
 
 from .browser import OpenTrackSession, screenshot_on_error
 
+# Import pblookup for PB/SB lookups
+from pblookup.lookup import PBLookupService
+from pblookup.events import standardize_event_name as pblookup_standardize_event
+
 # Set up logging
 logger = logging.getLogger(__name__)
 
@@ -505,6 +509,254 @@ class EventScheduler:
         page.get_by_role("button", name="Save").first.click()
         page.wait_for_load_state("networkidle")
         logger.info("Implement weights saved")
+
+    @screenshot_on_error
+    def navigate_to_competitors_tab(self) -> None:
+        """Navigate to the Competitors tab from the event detail page.
+        
+        Assumes we're on an event detail page. Clicks View then Competitors tab.
+        """
+        page = self.page
+        
+        # Navigate to View, then Competitors tab
+        page.get_by_role("link", name="View").click()
+        page.wait_for_load_state("networkidle")
+        
+        # Click Competitors tab (has count in name like "Competitors (9)")
+        competitors_tab = page.get_by_role("tab").filter(has_text="Competitors")
+        competitors_tab.click()
+        page.wait_for_load_state("networkidle")
+
+    @screenshot_on_error
+    def extract_competitors_from_table(self) -> list[dict[str, str]]:
+        """Extract competitor information from the current Competitors table.
+        
+        Assumes we're on the Competitors tab of an event.
+        
+        Returns:
+            List of dicts with keys: name, club, birth_date (may be empty)
+        """
+        page = self.page
+        competitors = []
+        
+        # Find the performances table
+        table = page.locator("table.performances_table")
+        if table.count() == 0:
+            logger.warning("No performances_table found")
+            return competitors
+        
+        rows = table.locator("tbody tr")
+        row_count = rows.count()
+        logger.info(f"Found {row_count} rows in competitors table")
+        
+        for i in range(row_count):
+            row = rows.nth(i)
+            
+            # Get competitor name from the link
+            name_link = row.locator("a.competitor-name")
+            if name_link.count() == 0:
+                continue
+            
+            name = name_link.text_content().strip()
+            
+            # Try to get club from the row (varies by table structure)
+            # Club is often in a cell with class "club" or similar
+            club_cell = row.locator("td.club, td:has-text('IF'), td:has-text('IL'), td:has-text('TIF')")
+            club = ""
+            if club_cell.count() > 0:
+                club = club_cell.first.text_content().strip()
+            
+            # Birth date is usually not in the table, but we can try
+            birth_date = ""
+            
+            competitors.append({
+                "name": name,
+                "club": club,
+                "birth_date": birth_date,
+            })
+        
+        logger.info(f"Extracted {len(competitors)} competitors")
+        return competitors
+
+    @screenshot_on_error
+    def fill_pb_sb_values(self, pb_lookup: dict[str, dict[str, str]]) -> int:
+        """Fill in PB/SB values for competitors in the current table.
+        
+        Assumes we're on the Competitors tab of an event.
+        
+        Args:
+            pb_lookup: Dict mapping competitor name to {"pb": value, "sb": value}
+                       e.g., {"Aurora Molund Tangen": {"pb": "39.50", "sb": "38.20"}}
+        
+        Returns:
+            Number of competitors updated
+        """
+        page = self.page
+        
+        # Find the performances table
+        table = page.locator("table.performances_table")
+        if table.count() == 0:
+            logger.warning("No performances_table found")
+            return 0
+        
+        rows = table.locator("tbody tr")
+        row_count = rows.count()
+        
+        updated = 0
+        for i in range(row_count):
+            row = rows.nth(i)
+            
+            # Get competitor name from the link
+            name_link = row.locator("a.competitor-name")
+            if name_link.count() == 0:
+                continue
+            
+            name = name_link.text_content().strip()
+            
+            # Look up PB/SB for this competitor
+            if name not in pb_lookup:
+                logger.debug(f"No PB/SB data for: {name}")
+                continue
+            
+            data = pb_lookup[name]
+            
+            # Find PB and SB input fields (they're in cells with specific classes)
+            # PB input usually has name like "pb" or is in a td with header "PB"
+            pb_input = row.locator("input[name*='pb'], input.pb-input").first
+            sb_input = row.locator("input[name*='sb'], input.sb-input").first
+            
+            # Fallback: use positional form-control inputs
+            if pb_input.count() == 0 or sb_input.count() == 0:
+                inputs = row.locator("input.form-control")
+                if inputs.count() >= 2:
+                    pb_input = inputs.nth(0)
+                    sb_input = inputs.nth(1)
+            
+            if "pb" in data and data["pb"] and pb_input.count() > 0:
+                pb_value = str(data["pb"]) if data["pb"] else ""
+                pb_input.click()
+                pb_input.fill(pb_value)
+            
+            if "sb" in data and data["sb"] and sb_input.count() > 0:
+                sb_value = str(data["sb"]) if data["sb"] else ""
+                sb_input.click()
+                sb_input.fill(sb_value)
+            
+            updated += 1
+            logger.debug(f"Filled PB/SB for: {name}")
+        
+        # Save - look for Save button on the page
+        save_btn = page.get_by_role("button", name="Save")
+        if save_btn.count() > 0:
+            save_btn.first.click()
+            page.wait_for_load_state("networkidle")
+        
+        logger.info(f"Updated PB/SB for {updated}/{row_count} competitors")
+        return updated
+
+    def lookup_competitor_pbs(
+        self,
+        competitors: list[dict[str, str]],
+        event: str,
+        category: str = "",
+        default_club: str = "",
+        debug: bool = False,
+    ) -> dict[str, dict[str, str]]:
+        """Look up PBs for a list of competitors using the pblookup service.
+        
+        Args:
+            competitors: List of dicts with keys: name, club, birth_date
+            event: Event code (e.g., "SP", "LJ", "100m")
+            category: Age category like 'J15', 'G12' for validation
+            default_club: Club to use if competitor has no club listed
+            debug: Enable debug output from pblookup
+        
+        Returns:
+            Dict mapping competitor name to {"pb": value, "sb": value}
+        """
+        # Convert event code to pblookup format
+        event_name = EVENT_NAMES.get(event, event)
+        pblookup_event = pblookup_standardize_event(event_name)
+        
+        logger.info(f"Looking up PBs for {len(competitors)} competitors, event: {pblookup_event}, category: {category}")
+        
+        pb_lookup = {}
+        service = PBLookupService(debug=debug)
+        
+        for comp in competitors:
+            name = comp["name"]
+            club = comp.get("club") or default_club
+            birth_date = comp.get("birth_date", "")
+            
+            try:
+                result = service.lookup_pb(name, club, birth_date, pblookup_event, category=category)
+                
+                if result:
+                    # Get PB as float (handles Norwegian locale comma decimal)
+                    pb_value = result.get_result_as_float()
+                    if pb_value is not None:
+                        pb_lookup[name] = {
+                            "pb": pb_value,  # Float value (e.g., 10.54, 6.32)
+                            "sb": "",  # SB would require looking at current season results
+                        }
+                        logger.info(f"Found PB for {name}: {pb_value}")
+                    else:
+                        logger.debug(f"Could not parse PB for {name}: {result.result}")
+                else:
+                    logger.debug(f"No PB found for {name}")
+                    
+            except Exception as e:
+                logger.warning(f"Error looking up PB for {name}: {e}")
+        
+        logger.info(f"Found PBs for {len(pb_lookup)}/{len(competitors)} competitors")
+        return pb_lookup
+
+    @screenshot_on_error
+    def update_event_pbs(
+        self,
+        schedule: "EventSchedule",
+        default_club: str = "",
+        debug: bool = False,
+    ) -> int:
+        """Update PB values for all competitors in an event.
+        
+        Full flow: Navigate to View -> Competitors tab, extract names,
+        look up PBs via pblookup, and fill them in.
+        
+        Args:
+            schedule: The event schedule containing event code
+            default_club: Club to use for lookups if not found in table
+            debug: Enable debug output from pblookup
+            
+        Returns:
+            Number of competitors updated
+        """
+        logger.info(f"=== Updating PBs for {schedule.search_term} ===")
+        
+        # Navigate to Competitors tab
+        self.navigate_to_competitors_tab()
+        
+        # Extract competitor info
+        competitors = self.extract_competitors_from_table()
+        if not competitors:
+            logger.warning("No competitors found")
+            return 0
+        
+        # Look up PBs using pblookup service
+        pb_lookup = self.lookup_competitor_pbs(
+            competitors=competitors,
+            event=schedule.event,
+            category=schedule.category,
+            default_club=default_club,
+            debug=debug,
+        )
+        
+        if not pb_lookup:
+            logger.warning("No PBs found for any competitors")
+            return 0
+        
+        # Fill in the PB values
+        return self.fill_pb_sb_values(pb_lookup)
 
     def schedule_event(self, schedule: EventSchedule) -> bool:
         """Find an event, set its start time, and configure attempts/weights for field events.

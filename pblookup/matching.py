@@ -1,5 +1,6 @@
 """Name matching and normalization utilities."""
 import re
+from datetime import date
 from typing import List, Optional, Tuple
 from rapidfuzz import fuzz
 
@@ -85,8 +86,14 @@ def parse_birth_date(date_str: str) -> Tuple[int, int, int]:
     if not date_str:
         return 0, 0, 0
     
+    date_str = date_str.strip()
+    
+    # Handle year-only format (e.g., "2009")
+    if re.match(r'^\d{4}$', date_str):
+        return 0, 0, int(date_str)
+    
     # Handle DD.MM.YYYY or DD.MM.YY format
-    match = re.match(r'(\d{1,2})\.(\d{1,2})\.(\d{2,4})', date_str.strip())
+    match = re.match(r'(\d{1,2})\.(\d{1,2})\.(\d{2,4})', date_str)
     if not match:
         return 0, 0, 0
     
@@ -135,12 +142,129 @@ def calculate_birth_date_similarity(candidate_date: str, target_date: str) -> fl
     return 0.0
 
 
+def get_birth_year_from_date(date_str: str) -> Optional[int]:
+    """Extract birth year from date string."""
+    _, _, year = parse_birth_date(date_str)
+    return year if year > 0 else None
+
+
+def calculate_age_in_year(birth_year: int, competition_year: int) -> int:
+    """Calculate athlete's age in a given competition year.
+    
+    In athletics, age category is determined by the year you turn that age,
+    not your actual age on competition day.
+    """
+    return competition_year - birth_year
+
+
+def parse_age_category(category: str) -> Optional[int]:
+    """Parse age from category string like 'J15', 'G12', 'M17', 'K15'.
+    
+    Returns the expected age, or None if not parseable.
+    Norwegian categories:
+    - J = Jenter (girls), G = Gutter (boys) for youth
+    - M = Menn (men), K = Kvinner (women) for adults (but M17/K17 etc exist)
+    - Numbers indicate age (10-19) or special categories (U20, U23, Senior)
+    - G-rekrutt / J-rekrutt = age 10 (recruitment class)
+    """
+    if not category:
+        return None
+    
+    category = category.upper().strip()
+    
+    # Handle rekrutt (recruitment) categories - these are age 10
+    if category in ('G-REKRUTT', 'J-REKRUTT', 'REKRUTT'):
+        return 10
+    
+    # Handle U20, U23
+    if category in ('U20', 'U-20'):
+        return 19  # U20 means under 20
+    if category in ('U23', 'U-23'):
+        return 22  # U23 means under 23
+    
+    # Handle Senior/Veteran (no specific age)
+    if category in ('SENIOR', 'SEN', 'VETERAN', 'VET'):
+        return None
+    
+    # Extract age from patterns like J15, G12, M17, K15
+    match = re.match(r'^[JGMK](\d{1,2})$', category)
+    if match:
+        return int(match.group(1))
+    
+    # Try just a number
+    match = re.match(r'^(\d{1,2})$', category)
+    if match:
+        return int(match.group(1))
+    
+    return None
+
+
+def validate_age_category(
+    candidate_birth_date: str,
+    expected_category: str,
+    competition_year: Optional[int] = None
+) -> Tuple[bool, float]:
+    """Validate if candidate's birth year matches expected age category.
+    
+    Args:
+        candidate_birth_date: Candidate's birth date (DD.MM.YYYY)
+        expected_category: Expected category like 'J15', 'G12'
+        competition_year: Year of competition (defaults to current year)
+        
+    Returns:
+        Tuple of (is_valid, score) where:
+        - is_valid: True if age matches category (exact or off-by-one)
+        - score: 1.0 for exact match, 0.5 for off-by-one, 0.0 for mismatch
+    """
+    if not candidate_birth_date or not expected_category:
+        return False, 0.0  # Can't validate without both, reject match
+    
+    expected_age = parse_age_category(expected_category)
+    if expected_age is None:
+        return True, 0.5  # Can't parse category (e.g., Senior), allow match
+    
+    birth_year = get_birth_year_from_date(candidate_birth_date)
+    if birth_year is None:
+        return False, 0.0  # Can't parse birth date, reject match
+    
+    if competition_year is None:
+        competition_year = date.today().year
+    
+    actual_age = calculate_age_in_year(birth_year, competition_year)
+    
+    # Exact match
+    if actual_age == expected_age:
+        return True, 1.0
+    
+    # Off by one year (could be edge case or data issue)
+    if abs(actual_age - expected_age) == 1:
+        return True, 0.5
+    
+    # More than one year off - wrong person
+    return False, 0.0
+
+
 def find_best_match(candidates: List[SearchCandidate], 
                    target_name: str,
                    target_club: str = "",
                    target_birth_date: str = "",
+                   expected_category: str = "",
+                   competition_year: Optional[int] = None,
                    min_score: float = 0.6) -> Optional[SearchCandidate]:
-    """Find the best matching candidate athlete."""
+    """Find the best matching candidate athlete.
+    
+    Args:
+        candidates: List of candidate athletes from search
+        target_name: Full name to match
+        target_club: Club affiliation (optional)
+        target_birth_date: Birth date in DD.MM.YYYY format (optional)
+        expected_category: Age category like 'J15', 'G12' for validation (optional)
+        competition_year: Year of competition for age validation (defaults to current year)
+        min_score: Minimum similarity score to accept a match
+        
+    Returns:
+        Best matching candidate or None if no good match found
+    """
     if not candidates:
         return None
     
@@ -148,16 +272,33 @@ def find_best_match(candidates: List[SearchCandidate],
     best_score = 0.0
     
     for candidate in candidates:
+        # First, validate age category if provided - this is a hard filter
+        if expected_category:
+            age_valid, age_score = validate_age_category(
+                candidate.birth_date or "",
+                expected_category,
+                competition_year
+            )
+            # Hard reject: skip candidates that don't match age category
+            if not age_valid:
+                candidate.similarity_score = 0.0
+                continue  # Skip to next candidate - do not consider this one
+        else:
+            age_score = 0.5  # Neutral if no category provided
+        
+        # Only reach here if age validation passed (or no category was provided)
+        
         # Calculate component scores
         name_score = calculate_name_similarity(candidate.name, target_name)
         club_score = calculate_club_similarity(candidate.club or "", target_club)
         birth_date_score = calculate_birth_date_similarity(candidate.birth_date or "", target_birth_date)
         
         # Weighted overall score
-        # Name is most important, followed by birth date, then club
+        # Name is most important, followed by birth date/age, then club
         overall_score = (
-            name_score * 0.6 +
-            birth_date_score * 0.3 +
+            name_score * 0.5 +
+            birth_date_score * 0.2 +
+            age_score * 0.2 +
             club_score * 0.1
         )
         
@@ -167,6 +308,10 @@ def find_best_match(candidates: List[SearchCandidate],
             
         # Bonus for exact club match
         if club_score == 1.0:
+            overall_score += 0.05
+            
+        # Bonus for exact age category match
+        if age_score == 1.0:
             overall_score += 0.05
         
         # Update candidate with calculated score

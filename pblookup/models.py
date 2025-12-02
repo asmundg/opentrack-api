@@ -28,6 +28,43 @@ class Result:
         venue_info = f" at {self.venue}" if self.venue else ""
         return f"{self.result}{wind_info}{date_info}{venue_info}"
 
+    def get_result_as_float(self) -> Optional[float]:
+        """
+        Get the result as a float value.
+        
+        Handles Norwegian locale (comma as decimal separator) and various formats:
+        - "4,23" -> 4.23 (field events)
+        - "10.54" -> 10.54 (time events)
+        - "1:23.45" or "1:23,45" -> 83.45 (time events with minutes)
+        
+        Returns None if the result cannot be parsed.
+        """
+        if not self.result:
+            return None
+            
+        try:
+            result_str = self.result.strip()
+            
+            # Handle time format with minutes (e.g., "1:23.45" or "1:23,45")
+            if ':' in result_str:
+                parts = result_str.split(':')
+                if len(parts) == 2:
+                    minutes = float(parts[0])
+                    seconds = float(parts[1].replace(',', '.'))
+                    return minutes * 60 + seconds
+                elif len(parts) == 3:
+                    # Hours:minutes:seconds (unlikely for athletics PBs)
+                    hours = float(parts[0])
+                    minutes = float(parts[1])
+                    seconds = float(parts[2].replace(',', '.'))
+                    return hours * 3600 + minutes * 60 + seconds
+            
+            # Handle regular decimal (comma or dot)
+            return float(result_str.replace(',', '.'))
+            
+        except (ValueError, AttributeError):
+            return None
+
 
 @dataclass
 class Athlete:
@@ -48,8 +85,14 @@ class Athlete:
         if self.indoor_pbs is None:
             self.indoor_pbs = {}
 
-    def get_pb(self, event: str, indoor: bool = False) -> Optional[Result]:
-        """Get personal best for a specific event."""
+    def get_pb(self, event: str, indoor: bool = False, category: str = "") -> Optional[Result]:
+        """Get personal best for a specific event.
+        
+        Args:
+            event: Event name to look up
+            indoor: If True, look in indoor PBs
+            category: Age category like 'G12', 'J15' for implement weight matching
+        """
         from .events import find_best_event_match, standardize_event_name
         
         records = self.indoor_pbs if indoor else self.outdoor_pbs
@@ -69,7 +112,7 @@ class Athlete:
         
         # Use fuzzy matching for throwing events with implement specifications
         available_events = list(records.keys())
-        best_match = find_best_event_match(event, available_events)
+        best_match = find_best_event_match(event, available_events, category=category)
         
         if best_match:
             return records[best_match]

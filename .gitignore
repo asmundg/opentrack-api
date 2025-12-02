@@ -15,6 +15,7 @@ wheels/
 # Recordings (may contain sensitive data)
 recordings/
 screenshots/
+checkpoints/
 
 # Testing
 .pytest_cache/
@@ -25,3 +26,4 @@ htmlcov/
 .idea/
 *.swp
 *.swo
+.envrc

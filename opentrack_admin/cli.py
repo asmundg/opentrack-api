@@ -10,7 +10,7 @@ from pathlib import Path
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig, RECORDINGS_DIR
-from .events import EventScheduler, parse_schedule_csv
+from .events import EventScheduler, parse_schedule_csv, Checkpoint
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -202,6 +202,122 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
             return 1
 
 
+def cmd_update_pbs(args: argparse.Namespace) -> int:
+    """Update PB/SB values for competitors in events."""
+    setup_logging(verbose=args.verbose)
+    logger = logging.getLogger(__name__)
+    
+    config = OpenTrackConfig.from_env()
+    
+    if not config.username or not config.password:
+        print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
+        return 1
+
+    # Parse events from CSV file
+    schedule_path = Path(args.file)
+    if not schedule_path.exists():
+        print(f"❌ Schedule file not found: {args.file}")
+        return 1
+    
+    schedules = parse_schedule_csv(schedule_path.read_text())
+    
+    if not schedules:
+        print("❌ No valid events found in schedule file.")
+        print("   Expected CSV format: category,event,start_time")
+        return 1
+
+    print(f"📊 Updating PBs for {len(schedules)} events...")
+    if args.club:
+        print(f"   Default club: {args.club}")
+    print()
+    
+    # Extract checkpoint name from competition URL (use slug with -pbs suffix)
+    checkpoint_name = None
+    if not args.no_checkpoint:
+        slug = args.competition_url.rstrip("/").split("/")[-1]
+        checkpoint_name = f"{slug}-pbs"
+        print(f"📍 Using checkpoint: {checkpoint_name}")
+    
+    checkpoint = Checkpoint(checkpoint_name) if checkpoint_name else None
+    
+    # Count how many we'll skip
+    if checkpoint:
+        skip_count = sum(1 for s in schedules if checkpoint.is_done(s.search_term))
+        if skip_count > 0:
+            print(f"   Skipping {skip_count} already-completed events")
+    
+    with OpenTrackSession(config) as session:
+        # Navigate to competition
+        session.page.goto(args.competition_url)
+        session.page.wait_for_load_state("networkidle")
+        
+        # Ensure logged in
+        if not session.is_logged_in():
+            session.login()
+            session.page.goto(args.competition_url)
+            session.page.wait_for_load_state("networkidle")
+        
+        scheduler = EventScheduler(session)
+        scheduler.navigate_to_events_table()
+        
+        total_updated = 0
+        errors = []
+        
+        for i, schedule in enumerate(schedules, 1):
+            # Skip FIFA category (not defined in OpenTrack)
+            if schedule.category.upper() == "FIFA":
+                logger.info(f"Skipping {i}/{len(schedules)}: {schedule.search_term} (FIFA category)")
+                continue
+            
+            # Skip if already done
+            if checkpoint and checkpoint.is_done(schedule.search_term):
+                print(f"⏭️  Skipping {i}/{len(schedules)}: {schedule.search_term} (already done)")
+                continue
+            
+            print(f"🔍 Processing {i}/{len(schedules)}: {schedule.search_term}")
+            
+            try:
+                # Find and click the event
+                scheduler.find_and_click_event(schedule)
+                
+                # Update PBs
+                updated = scheduler.update_event_pbs(
+                    schedule=schedule,
+                    default_club=args.club,
+                    debug=args.debug_pblookup,
+                )
+                total_updated += updated
+                print(f"   ✅ Updated {updated} competitors")
+                
+                # Mark as done in checkpoint
+                if checkpoint:
+                    checkpoint.mark_done(schedule.search_term)
+                
+                # Navigate back to events table for next event
+                scheduler.navigate_to_events_table()
+                
+            except Exception as e:
+                logger.error(f"Error processing {schedule.search_term}: {e}")
+                errors.append((schedule.search_term, str(e)))
+                # Try to recover by navigating back to events table
+                try:
+                    scheduler.navigate_to_events_table()
+                except Exception:
+                    pass
+        
+        print()
+        print(f"✅ Updated PBs for {total_updated} total competitors")
+        
+        if errors:
+            print()
+            print(f"⚠️  {len(errors)} events had errors:")
+            for event, error in errors:
+                print(f"   - {event}: {error}")
+            return 1
+        
+        return 0
+
+
 def main() -> int:
     """Main entry point for CLI."""
     parser = argparse.ArgumentParser(
@@ -296,6 +412,41 @@ def main() -> int:
         help="Disable checkpoint (re-process all events even if previously done)",
     )
     schedule_parser.set_defaults(func=cmd_schedule_events)
+
+    # Update PBs command
+    pb_parser = subparsers.add_parser(
+        "update-pbs",
+        help="Update PB/SB values for competitors in events",
+    )
+    pb_parser.add_argument(
+        "competition_url",
+        help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)",
+    )
+    pb_parser.add_argument(
+        "file",
+        help="CSV file with events (columns: category,event,start_time)",
+    )
+    pb_parser.add_argument(
+        "--club",
+        default="",
+        help="Default club name for PB lookups (e.g., 'Tyrving')",
+    )
+    pb_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Enable verbose/debug logging",
+    )
+    pb_parser.add_argument(
+        "--debug-pblookup",
+        action="store_true",
+        help="Enable debug output from pblookup service",
+    )
+    pb_parser.add_argument(
+        "--no-checkpoint",
+        action="store_true",
+        help="Disable checkpoint (re-process all events even if previously done)",
+    )
+    pb_parser.set_defaults(func=cmd_update_pbs)
 
     args = parser.parse_args()
     return args.func(args)

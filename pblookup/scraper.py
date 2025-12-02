@@ -73,63 +73,64 @@ class MinfriidrettsScraper:
         candidates = []
         soup = BeautifulSoup(html, 'html.parser')
         
-        # Find the results table
+        # Find the results div
         results_div = soup.find('div', id='resultat')
         if not results_div:
             return candidates
             
-        # Find the table with athlete results
-        table = results_div.find('table')
-        if not table:
+        # Find ALL tables with athlete results (page has multiple tables, one per letter section)
+        tables = results_div.find_all('table')
+        if not tables:
             return candidates
-            
-        # Skip the header row and process data rows
-        rows = table.find_all('tr')[1:]  # Skip header row
         
-        for row in rows:
-            cells = row.find_all('td')
-            if len(cells) < 2:
-                continue
+        for table in tables:
+            # Skip the header row and process data rows
+            rows = table.find_all('tr')[1:]  # Skip header row
+            
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) < 2:
+                    continue
+                    
+                # First cell contains the link and name
+                link_cell = cells[0]
+                birth_cell = cells[1]
                 
-            # First cell contains the link and name
-            link_cell = cells[0]
-            birth_cell = cells[1]
-            
-            # Extract link
-            link = link_cell.find('a')
-            if not link:
-                continue
+                # Extract link
+                link = link_cell.find('a')
+                if not link:
+                    continue
+                    
+                # Extract athlete ID from URL - using correct parameter name
+                href = link.get('href', '')
+                match = re.search(r'showathl=(\d+)', href)
+                if not match:
+                    continue
+                    
+                athlete_id = int(match.group(1))
+                athlete_name = link.text.strip()
                 
-            # Extract athlete ID from URL - using correct parameter name
-            href = link.get('href', '')
-            match = re.search(r'showathl=(\d+)', href)
-            if not match:
-                continue
+                if not athlete_name:
+                    continue
+                    
+                # Extract birth date from second cell
+                birth_date = birth_cell.text.strip()
                 
-            athlete_id = int(match.group(1))
-            athlete_name = link.text.strip()
-            
-            if not athlete_name:
-                continue
+                # Validate birth date format
+                if not re.match(r'\d{2}\.\d{2}\.\d{4}', birth_date) and not re.match(r'^\d{4}$', birth_date):
+                    birth_date = None
                 
-            # Extract birth date from second cell
-            birth_date = birth_cell.text.strip()
-            
-            # Validate birth date format
-            if not re.match(r'\d{2}\.\d{2}\.\d{4}', birth_date) and not re.match(r'^\d{4}$', birth_date):
-                birth_date = None
-            
-            # For now, we don't have club info in the search results
-            # This would need to be fetched from the individual profile
-            
-            candidate = SearchCandidate(
-                id=athlete_id,
-                name=athlete_name,
-                club=None,  # Not available in search results
-                birth_date=birth_date,
-                url=f"{self.PROFILE_URL}?showathlete={athlete_id}"
-            )
-            candidates.append(candidate)
+                # For now, we don't have club info in the search results
+                # This would need to be fetched from the individual profile
+                
+                candidate = SearchCandidate(
+                    id=athlete_id,
+                    name=athlete_name,
+                    club=None,  # Not available in search results
+                    birth_date=birth_date,
+                    url=f"{self.PROFILE_URL}?showathlete={athlete_id}"
+                )
+                candidates.append(candidate)
             
         return candidates
     

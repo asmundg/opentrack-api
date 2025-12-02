@@ -15,7 +15,15 @@ class PBLookupService:
         self.scraper = MinfriidrettsScraper(debug=debug)
         self.debug = debug
         
-    def lookup_pb(self, name: str, club: str, birth_date: str, event: str) -> Optional[Result]:
+    def lookup_pb(
+        self,
+        name: str,
+        club: str,
+        birth_date: str,
+        event: str,
+        category: str = "",
+        competition_year: Optional[int] = None
+    ) -> Optional[Result]:
         """
         Look up personal best for an athlete in a specific event.
         
@@ -24,6 +32,8 @@ class PBLookupService:
             club: Current or historical club affiliation
             birth_date: Date of birth in DD.MM.YYYY format (for disambiguation)
             event: Track and field event (e.g., "100m", "Long Jump", "Shot Put")
+            category: Age category like 'J15', 'G12' for validation (optional)
+            competition_year: Year of competition for age validation (defaults to current year)
         
         Returns:
             Result object with PB details or None if no result found
@@ -66,7 +76,9 @@ class PBLookupService:
             candidate_athletes,
             target_name=name,
             target_club=club,
-            target_birth_date=birth_date
+            target_birth_date=birth_date,
+            expected_category=category,
+            competition_year=competition_year,
         )
         
         if self.debug and candidate_athletes:
@@ -76,7 +88,7 @@ class PBLookupService:
         
         if not matched_athlete:
             if self.debug:
-                print(f"No good match found for {name} (club: {club}, birth: {birth_date})", file=sys.stderr)
+                print(f"No good match found for {name} (club: {club}, birth: {birth_date}, category: {category})", file=sys.stderr)
             return None
         
         if self.debug:
@@ -97,17 +109,17 @@ class PBLookupService:
                 print(f"Could not fetch profile for athlete {matched_athlete.id}", file=sys.stderr)
             return None
         
-        # Extract PB for the requested event
-        pb_result = athlete_profile.get_pb(standardized_event, indoor=False)
+        # Extract PB for the requested event, passing category for implement weight matching
+        pb_result = athlete_profile.get_pb(standardized_event, indoor=False, category=category)
         if not pb_result:
-            pb_result = athlete_profile.get_pb(standardized_event, indoor=True)
+            pb_result = athlete_profile.get_pb(standardized_event, indoor=True, category=category)
         
         if pb_result:
             if self.debug:
                 print(f"Found PB: {pb_result}", file=sys.stderr)
         else:
             if self.debug:
-                print(f"No PB found for {standardized_event}", file=sys.stderr)
+                print(f"No PB found for {standardized_event} (category: {category})", file=sys.stderr)
         
         return pb_result
     
@@ -155,7 +167,15 @@ class PBLookupService:
             return None
 
 # Convenience function for simple lookups
-def lookup_pb(name: str, club: str, birth_date: str, event: str, debug: bool = False) -> Optional[Result]:
+def lookup_pb(
+    name: str,
+    club: str,
+    birth_date: str,
+    event: str,
+    category: str = "",
+    competition_year: Optional[int] = None,
+    debug: bool = False
+) -> Optional[Result]:
     """
     Simple function interface for PB lookup.
     
@@ -164,10 +184,42 @@ def lookup_pb(name: str, club: str, birth_date: str, event: str, debug: bool = F
         club: Current or historical club affiliation
         birth_date: Date of birth in DD.MM.YYYY format (for disambiguation and age category)
         event: Track and field event (e.g., "100m", "Long Jump", "Shot Put")
+        category: Age category like 'J15', 'G12' for validation (optional)
+        competition_year: Year of competition for age validation (defaults to current year)
         debug: Enable debug output showing URLs and responses
     
     Returns:
         Result object with PB details or None if no result found
     """
     service = PBLookupService(debug=debug)
-    return service.lookup_pb(name, club, birth_date, event)
+    return service.lookup_pb(name, club, birth_date, event, category, competition_year)
+
+
+def lookup_pb_value(
+    name: str,
+    club: str,
+    birth_date: str,
+    event: str,
+    category: str = "",
+    competition_year: Optional[int] = None,
+    debug: bool = False
+) -> Optional[float]:
+    """
+    Simple function interface for PB lookup that returns a float value.
+    
+    Args:
+        name: Athlete's full name
+        club: Current or historical club affiliation
+        birth_date: Date of birth in DD.MM.YYYY format (for disambiguation and age category)
+        event: Track and field event (e.g., "100m", "Long Jump", "Shot Put")
+        category: Age category like 'J15', 'G12' for validation (optional)
+        competition_year: Year of competition for age validation (defaults to current year)
+        debug: Enable debug output showing URLs and responses
+    
+    Returns:
+        PB as a float value or None if no result found
+    """
+    result = lookup_pb(name, club, birth_date, event, category, competition_year, debug=debug)
+    if result:
+        return result.get_result_as_float()
+    return None

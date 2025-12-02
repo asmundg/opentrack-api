@@ -5,8 +5,12 @@ description = "Playwright-based automation for administering OpenTrack events"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "bs4>=0.0.2",
     "playwright>=1.40.0",
     "python-dotenv>=1.0.0",
+    "rapidfuzz>=3.14.3",
+    "reportlab>=4.4.1",
+    "requests>=2.32.5",
 ]
 
 [project.scripts]
@@ -16,4 +20,5 @@ opentrack = "opentrack_admin.cli:main"
 dev-dependencies = [
     "pytest>=8.0.0",
     "pytest-playwright>=0.4.4",
+    "types-reportlab>=4.4.1.20250822"
 ]
