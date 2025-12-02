@@ -1,16 +1,24 @@
 """Command-line interface for OpenTrack automation."""
 
-import argparse
 import logging
-import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+from typing import Annotated, Optional
+
+import typer
 
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
-from .config import OpenTrackConfig, RECORDINGS_DIR
+from .config import OpenTrackConfig
 from .events import EventScheduler, parse_schedule_csv, Checkpoint
+
+# Create the typer app for admin commands
+app = typer.Typer(
+    name="admin",
+    help="OpenTrack event administration automation",
+    no_args_is_help=True,
+)
 
 
 def setup_logging(verbose: bool = False) -> None:
@@ -23,35 +31,8 @@ def setup_logging(verbose: bool = False) -> None:
     )
 
 
-def cmd_record(args: argparse.Namespace) -> int:
-    """Launch Playwright codegen to record interactions."""
-    config = OpenTrackConfig.from_env()
-    
-    print("🎬 Launching Playwright recorder...")
-    print(f"   Target: {config.base_url}")
-    print()
-    print("Instructions:")
-    print("  1. Log in to OpenTrack")
-    print("  2. Navigate through the competition creation flow")
-    print("  3. The recorder will generate Python code for each action")
-    print("  4. Copy the generated code to update competition.py")
-    print()
-    
-    # Ensure recordings directory exists
-    RECORDINGS_DIR.mkdir(exist_ok=True)
-    
-    # Launch codegen
-    cmd = [
-        sys.executable, "-m", "playwright", "codegen",
-        config.base_url,
-        "--target", "python",
-        "-o", str(RECORDINGS_DIR / "recorded_flow.py"),
-    ]
-    
-    return subprocess.call(cmd)
-
-
-def cmd_test_login(args: argparse.Namespace) -> int:
+@app.command("test-login")
+def test_login() -> None:
     """Test login to OpenTrack."""
     config = OpenTrackConfig.from_env()
     
@@ -61,7 +42,7 @@ def cmd_test_login(args: argparse.Namespace) -> int:
         print("Create a .env file with:")
         print("  OPENTRACK_USERNAME=your_username")
         print("  OPENTRACK_PASSWORD=your_password")
-        return 1
+        raise typer.Exit(1)
 
     print(f"🔐 Testing login to {config.base_url}...")
     
@@ -71,52 +52,67 @@ def cmd_test_login(args: argparse.Namespace) -> int:
         
         if session.is_logged_in():
             print("✅ Login successful!")
-            return 0
         else:
             print("❌ Login failed - check credentials")
-            return 1
+            raise typer.Exit(1)
 
 
-def cmd_create_competition(args: argparse.Namespace) -> int:
+@app.command()
+def create(
+    name: Annotated[str, typer.Argument(help="Full competition name (e.g., 'Seriestevne 9-2025')")],
+    slug: Annotated[str, typer.Argument(help="URL slug (e.g., 'ser9-25')")],
+    start_date: Annotated[str, typer.Argument(help="Start date (YYYY-MM-DD)", metavar="DATE")],
+    contact_email: Annotated[str, typer.Argument(help="Contact email for the competition")],
+    organiser: Annotated[str, typer.Argument(help="Organiser search term (e.g., 'BULTF')")],
+    end_date: Annotated[Optional[str], typer.Option("--end-date", help="End date if multi-day (YYYY-MM-DD)")] = None,
+    short_name: Annotated[Optional[str], typer.Option("--short-name", help="Short name (optional)")] = None,
+    competition_type: Annotated[str, typer.Option("--type", help="Competition type (track, indoor, road, cross_country, trail)")] = "track",
+    website: Annotated[Optional[str], typer.Option("--website", help="Competition/club website URL")] = None,
+    entry_link: Annotated[Optional[str], typer.Option("--entry-link", help="External entry link (e.g., Isonen URL)")] = None,
+    public: Annotated[bool, typer.Option("--public", help="Make competition public immediately (default: hidden)")] = False,
+    show_points: Annotated[bool, typer.Option("--no-points/--points", help="Enable/disable individual points display")] = True,
+    number_competitors: Annotated[bool, typer.Option("--no-numbering/--numbering", help="Enable/disable automatic bib number assignment")] = True,
+    random_seeding: Annotated[bool, typer.Option("--no-seeding/--seeding", help="Enable/disable random seeding of start lists")] = True,
+) -> None:
     """Create a new competition."""
     config = OpenTrackConfig.from_env()
     
     if not config.username or not config.password:
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
-        return 1
+        raise typer.Exit(1)
 
     # Parse date
     try:
-        start_date = date.fromisoformat(args.date)
+        parsed_start_date = date.fromisoformat(start_date)
     except ValueError:
-        print(f"❌ Invalid date format: {args.date}")
+        print(f"❌ Invalid date format: {start_date}")
         print("   Use YYYY-MM-DD format")
-        return 1
+        raise typer.Exit(1)
 
-    end_date = None
-    if args.end_date:
+    parsed_end_date = None
+    if end_date:
         try:
-            end_date = date.fromisoformat(args.end_date)
+            parsed_end_date = date.fromisoformat(end_date)
         except ValueError:
-            print(f"❌ Invalid end date format: {args.end_date}")
-            return 1
+            print(f"❌ Invalid end date format: {end_date}")
+            raise typer.Exit(1)
 
     details = CompetitionDetails(
-        name=args.name,
-        slug=args.slug,
-        start_date=start_date,
-        end_date=end_date,
-        contact_email=args.contact_email,
-        organiser_search=args.organiser,
-        short_name=args.short_name or "",
-        competition_type=args.type,
-        website=args.website or "",
-        external_entry_link=args.entry_link or "",
-        hide_from_public=not args.public,
-        show_individual_points=args.show_points,
+        name=name,
+        slug=slug,
+        start_date=parsed_start_date,
+        end_date=parsed_end_date,
+        contact_email=contact_email,
+        organiser_search=organiser,
+        short_name=short_name or "",
+        competition_type=competition_type,
+        website=website or "",
+        external_entry_link=entry_link or "",
+        hide_from_public=not public,
+        show_individual_points=show_points,
         combined_events_table="tyrving",
-        auto_number_competitors=args.number_competitors,
-        random_seeding=args.random_seeding,
+        auto_number_competitors=number_competitors,
+        random_seeding=random_seeding,
     )
 
     print(f"🏃 Creating competition: {details.name}")
@@ -133,39 +129,38 @@ def cmd_create_competition(args: argparse.Namespace) -> int:
         try:
             url = creator.create_competition(details)
             print(f"✅ Competition created: {url}")
-            return 0
         except Exception as e:
             print(f"❌ Error creating competition: {e}")
-            return 1
+            raise typer.Exit(1)
 
 
-def cmd_schedule_events(args: argparse.Namespace) -> int:
-    """Schedule events for a competition."""
-    setup_logging(verbose=args.verbose)
+@app.command()
+def schedule(
+    competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
+    file: Annotated[Path, typer.Argument(help="CSV file with schedule (columns: category,event,start_time)")],
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
+    no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
+) -> None:
+    """Schedule events (set start times) for a competition."""
+    setup_logging(verbose=verbose)
     logger = logging.getLogger(__name__)
     
     config = OpenTrackConfig.from_env()
     
     if not config.username or not config.password:
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
-        return 1
+        raise typer.Exit(1)
 
-    # Collect schedules from CSV file
-    if not args.file:
-        print("❌ Schedule file required. Use --file or -f.")
-        return 1
+    if not file.exists():
+        print(f"❌ Schedule file not found: {file}")
+        raise typer.Exit(1)
     
-    schedule_path = Path(args.file)
-    if not schedule_path.exists():
-        print(f"❌ Schedule file not found: {args.file}")
-        return 1
-    
-    schedules = parse_schedule_csv(schedule_path.read_text())
+    schedules = parse_schedule_csv(file.read_text())
     
     if not schedules:
         print("❌ No valid events found in schedule file.")
         print("   Expected CSV format: category,event,start_time")
-        return 1
+        raise typer.Exit(1)
 
     print(f"📅 Scheduling {len(schedules)} events...")
     for s in schedules:
@@ -174,19 +169,19 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
     
     # Extract checkpoint name from competition URL (use slug)
     # e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/ -> ser9-25
-    checkpoint_name = args.competition_url.rstrip("/").split("/")[-1] if not args.no_checkpoint else None
+    checkpoint_name = competition_url.rstrip("/").split("/")[-1] if not no_checkpoint else None
     if checkpoint_name:
         print(f"📍 Using checkpoint: {checkpoint_name}")
     
     with OpenTrackSession(config) as session:
         # Navigate to competition
-        session.page.goto(args.competition_url)
+        session.page.goto(competition_url)
         session.page.wait_for_load_state("networkidle")
         
         # Ensure logged in
         if not session.is_logged_in():
             session.login()
-            session.page.goto(args.competition_url)
+            session.page.goto(competition_url)
             session.page.wait_for_load_state("networkidle")
         
         scheduler = EventScheduler(session)
@@ -195,46 +190,51 @@ def cmd_schedule_events(args: argparse.Namespace) -> int:
             scheduler.schedule_events(schedules, checkpoint_name=checkpoint_name)
             print()
             print(f"✅ All {len(schedules)} events scheduled successfully!")
-            return 0
         except Exception as e:
             print()
             print(f"❌ Failed: {e}")
-            return 1
+            raise typer.Exit(1)
 
 
-def cmd_update_pbs(args: argparse.Namespace) -> int:
+@app.command("update-pbs")
+def update_pbs(
+    competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
+    file: Annotated[Path, typer.Argument(help="CSV file with events (columns: category,event,start_time)")],
+    club: Annotated[str, typer.Option("--club", help="Default club name for PB lookups (e.g., 'Tyrving')")] = "",
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
+    debug_pblookup: Annotated[bool, typer.Option("--debug-pblookup", help="Enable debug output from pblookup service")] = False,
+    no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
+) -> None:
     """Update PB/SB values for competitors in events."""
-    setup_logging(verbose=args.verbose)
+    setup_logging(verbose=verbose)
     logger = logging.getLogger(__name__)
     
     config = OpenTrackConfig.from_env()
     
     if not config.username or not config.password:
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
-        return 1
+        raise typer.Exit(1)
 
-    # Parse events from CSV file
-    schedule_path = Path(args.file)
-    if not schedule_path.exists():
-        print(f"❌ Schedule file not found: {args.file}")
-        return 1
+    if not file.exists():
+        print(f"❌ Schedule file not found: {file}")
+        raise typer.Exit(1)
     
-    schedules = parse_schedule_csv(schedule_path.read_text())
+    schedules = parse_schedule_csv(file.read_text())
     
     if not schedules:
         print("❌ No valid events found in schedule file.")
         print("   Expected CSV format: category,event,start_time")
-        return 1
+        raise typer.Exit(1)
 
     print(f"📊 Updating PBs for {len(schedules)} events...")
-    if args.club:
-        print(f"   Default club: {args.club}")
+    if club:
+        print(f"   Default club: {club}")
     print()
     
     # Extract checkpoint name from competition URL (use slug with -pbs suffix)
     checkpoint_name = None
-    if not args.no_checkpoint:
-        slug = args.competition_url.rstrip("/").split("/")[-1]
+    if not no_checkpoint:
+        slug = competition_url.rstrip("/").split("/")[-1]
         checkpoint_name = f"{slug}-pbs"
         print(f"📍 Using checkpoint: {checkpoint_name}")
     
@@ -248,13 +248,13 @@ def cmd_update_pbs(args: argparse.Namespace) -> int:
     
     with OpenTrackSession(config) as session:
         # Navigate to competition
-        session.page.goto(args.competition_url)
+        session.page.goto(competition_url)
         session.page.wait_for_load_state("networkidle")
         
         # Ensure logged in
         if not session.is_logged_in():
             session.login()
-            session.page.goto(args.competition_url)
+            session.page.goto(competition_url)
             session.page.wait_for_load_state("networkidle")
         
         scheduler = EventScheduler(session)
@@ -263,42 +263,42 @@ def cmd_update_pbs(args: argparse.Namespace) -> int:
         total_updated = 0
         errors = []
         
-        for i, schedule in enumerate(schedules, 1):
+        for i, sched in enumerate(schedules, 1):
             # Skip FIFA category (not defined in OpenTrack)
-            if schedule.category.upper() == "FIFA":
-                logger.info(f"Skipping {i}/{len(schedules)}: {schedule.search_term} (FIFA category)")
+            if sched.category.upper() == "FIFA":
+                logger.info(f"Skipping {i}/{len(schedules)}: {sched.search_term} (FIFA category)")
                 continue
             
             # Skip if already done
-            if checkpoint and checkpoint.is_done(schedule.search_term):
-                print(f"⏭️  Skipping {i}/{len(schedules)}: {schedule.search_term} (already done)")
+            if checkpoint and checkpoint.is_done(sched.search_term):
+                print(f"⏭️  Skipping {i}/{len(schedules)}: {sched.search_term} (already done)")
                 continue
             
-            print(f"🔍 Processing {i}/{len(schedules)}: {schedule.search_term}")
+            print(f"🔍 Processing {i}/{len(schedules)}: {sched.search_term}")
             
             try:
                 # Find and click the event
-                scheduler.find_and_click_event(schedule)
+                scheduler.find_and_click_event(sched)
                 
                 # Update PBs
                 updated = scheduler.update_event_pbs(
-                    schedule=schedule,
-                    default_club=args.club,
-                    debug=args.debug_pblookup,
+                    schedule=sched,
+                    default_club=club,
+                    debug=debug_pblookup,
                 )
                 total_updated += updated
                 print(f"   ✅ Updated {updated} competitors")
                 
                 # Mark as done in checkpoint
                 if checkpoint:
-                    checkpoint.mark_done(schedule.search_term)
+                    checkpoint.mark_done(sched.search_term)
                 
                 # Navigate back to events table for next event
                 scheduler.navigate_to_events_table()
                 
             except Exception as e:
-                logger.error(f"Error processing {schedule.search_term}: {e}")
-                errors.append((schedule.search_term, str(e)))
+                logger.error(f"Error processing {sched.search_term}: {e}")
+                errors.append((sched.search_term, str(e)))
                 # Try to recover by navigating back to events table
                 try:
                     scheduler.navigate_to_events_table()
@@ -313,144 +313,15 @@ def cmd_update_pbs(args: argparse.Namespace) -> int:
             print(f"⚠️  {len(errors)} events had errors:")
             for event, error in errors:
                 print(f"   - {event}: {error}")
-            return 1
-        
-        return 0
+            raise typer.Exit(1)
 
 
+# Legacy entry point for backwards compatibility
 def main() -> int:
-    """Main entry point for CLI."""
-    parser = argparse.ArgumentParser(
-        prog="opentrack",
-        description="OpenTrack event administration automation",
-    )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    # Record command
-    record_parser = subparsers.add_parser(
-        "record",
-        help="Launch Playwright recorder to capture interactions",
-    )
-    record_parser.set_defaults(func=cmd_record)
-
-    # Test login command
-    login_parser = subparsers.add_parser(
-        "test-login",
-        help="Test login to OpenTrack",
-    )
-    login_parser.set_defaults(func=cmd_test_login)
-
-    # Create competition command
-    create_parser = subparsers.add_parser(
-        "create",
-        help="Create a new competition",
-    )
-    create_parser.add_argument("name", help="Full competition name (e.g., 'Seriestevne 9-2025')")
-    create_parser.add_argument("slug", help="URL slug (e.g., 'ser9-25')")
-    create_parser.add_argument("date", help="Start date (YYYY-MM-DD)")
-    create_parser.add_argument("contact_email", help="Contact email for the competition")
-    create_parser.add_argument("organiser", help="Organiser search term (e.g., 'BULTF')")
-    create_parser.add_argument("--end-date", help="End date if multi-day (YYYY-MM-DD)")
-    create_parser.add_argument("--short-name", help="Short name (optional)")
-    create_parser.add_argument(
-        "--type",
-        choices=["track", "indoor", "road", "cross_country", "trail"],
-        default="track",
-        help="Competition type (default: track)",
-    )
-    create_parser.add_argument("--website", help="Competition/club website URL")
-    create_parser.add_argument("--entry-link", help="External entry link (e.g., Isonen URL)")
-    create_parser.add_argument(
-        "--public",
-        action="store_true",
-        help="Make competition public immediately (default: hidden)",
-    )
-    create_parser.add_argument(
-        "--no-points",
-        dest="show_points",
-        action="store_false",
-        default=True,
-        help="Disable individual points display",
-    )
-    create_parser.add_argument(
-        "--no-numbering",
-        dest="number_competitors",
-        action="store_false",
-        default=True,
-        help="Skip automatic bib number assignment",
-    )
-    create_parser.add_argument(
-        "--no-seeding",
-        dest="random_seeding",
-        action="store_false",
-        default=True,
-        help="Skip random seeding of start lists",
-    )
-    create_parser.set_defaults(func=cmd_create_competition)
-
-    # Schedule events command
-    schedule_parser = subparsers.add_parser(
-        "schedule",
-        help="Schedule events (set start times) for a competition",
-    )
-    schedule_parser.add_argument(
-        "competition_url",
-        help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)",
-    )
-    schedule_parser.add_argument(
-        "file",
-        help="CSV file with schedule (columns: category,event,start_time)",
-    )
-    schedule_parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose/debug logging",
-    )
-    schedule_parser.add_argument(
-        "--no-checkpoint",
-        action="store_true",
-        help="Disable checkpoint (re-process all events even if previously done)",
-    )
-    schedule_parser.set_defaults(func=cmd_schedule_events)
-
-    # Update PBs command
-    pb_parser = subparsers.add_parser(
-        "update-pbs",
-        help="Update PB/SB values for competitors in events",
-    )
-    pb_parser.add_argument(
-        "competition_url",
-        help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)",
-    )
-    pb_parser.add_argument(
-        "file",
-        help="CSV file with events (columns: category,event,start_time)",
-    )
-    pb_parser.add_argument(
-        "--club",
-        default="",
-        help="Default club name for PB lookups (e.g., 'Tyrving')",
-    )
-    pb_parser.add_argument(
-        "-v", "--verbose",
-        action="store_true",
-        help="Enable verbose/debug logging",
-    )
-    pb_parser.add_argument(
-        "--debug-pblookup",
-        action="store_true",
-        help="Enable debug output from pblookup service",
-    )
-    pb_parser.add_argument(
-        "--no-checkpoint",
-        action="store_true",
-        help="Disable checkpoint (re-process all events even if previously done)",
-    )
-    pb_parser.set_defaults(func=cmd_update_pbs)
-
-    args = parser.parse_args()
-    return args.func(args)
+    """Legacy entry point - redirects to typer app."""
+    app()
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    app()
