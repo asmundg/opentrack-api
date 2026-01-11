@@ -5,6 +5,7 @@ import typer
 # Import CLI subcommands from plugins
 from opentrack_admin.cli import app as admin_app
 from opentrack_reports.cli import app as reports_app
+from scheduler.cli import app as scheduler_app
 
 # Create main application
 app = typer.Typer(
@@ -16,6 +17,7 @@ app = typer.Typer(
 # Register plugin subcommands
 app.add_typer(admin_app, name="admin", help="Event administration commands")
 app.add_typer(reports_app, name="reports", help="Generate reports and documents")
+app.add_typer(scheduler_app, name="scheduler", help="Track meet scheduling")
 
 
 def main():
