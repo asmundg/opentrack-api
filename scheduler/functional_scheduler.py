@@ -4,6 +4,8 @@ Functional, stateless implementation of the track meet scheduler.
 This module provides pure functions for creating Z3 scheduling constraints
 and solving the track meet scheduling problem without any class-based state.
 All data is passed explicitly as function arguments and returned as results.
+
+See CONSTRAINTS.md for the scheduling rules and optimization goals.
 """
 
 import time
@@ -18,6 +20,7 @@ from .models import (
     EventType,
     EventVenueMapping,
     Venue,
+    get_venue_for_event,
     is_young_category,
     is_youngest_category,
     get_category_age_order,
@@ -236,6 +239,14 @@ def add_basic_constraints(
                 )
             )
 
+            # Force invalid start slots to be False
+            # This is critical for Sum expressions used in spacing constraints
+            for slot in range(
+                problem.config.max_time_slots - duration_slots + 1,
+                problem.config.max_time_slots,
+            ):
+                solver.add(z3.Not(variables.event_start_slot_vars[event_id][slot]))
+
             # If event starts at slot s, it's active for duration_slots consecutive slots
             for start_slot in valid_start_slots:
                 for active_slot in range(problem.config.max_time_slots):
@@ -286,8 +297,8 @@ def add_basic_constraints(
     ]
 
     if track_groups:
-        # Sort by (distance, hurdles, age) - same as precedence constraints
-        sorted_groups = sorted(track_groups, key=_get_event_group_sort_key)
+        # Sort with same ordering as precedence constraints (including flexible gender)
+        sorted_groups = _sort_track_groups_for_spacing(track_groups, problem.athletes)
         first_track_event = sorted_groups[0].id
         solver.add(variables.event_start_slot_vars[first_track_event][0])
 
@@ -306,6 +317,101 @@ def _get_event_group_sort_key(group: EventGroup) -> tuple[int, int, int]:
     return (distance_order, hurdles_order, min_age)
 
 
+def _sort_track_groups_for_spacing(
+    track_groups: list[EventGroup],
+    athletes: list[Athlete],
+) -> list[EventGroup]:
+    """Sort track groups with flexible gender ordering for better spacing.
+
+    Base ordering: distance → hurdles → age (youngest first)
+
+    Within each (distance, hurdles, age_tier), we may swap gender order
+    to give multi-event athletes more spacing. The gender with more
+    multi-event athletes goes later (more time from their field events).
+    """
+    if not track_groups:
+        return []
+
+    # Initial sort by base criteria
+    sorted_groups = sorted(track_groups, key=_get_event_group_sort_key)
+
+    # Build mapping: athlete -> their track groups
+    athlete_track_groups: dict[str, set[str]] = {}
+    for athlete in athletes:
+        track_event_ids = {
+            e.id for e in athlete.events
+            if EventVenueMapping.get(e.event_type) == Venue.TRACK
+        }
+        for group in sorted_groups:
+            for event in group.events:
+                if event.id in track_event_ids:
+                    if athlete.name not in athlete_track_groups:
+                        athlete_track_groups[athlete.name] = set()
+                    athlete_track_groups[athlete.name].add(group.id)
+
+    # Count multi-event athletes per track group
+    # (athletes who have both track and non-track events)
+    multi_event_count: dict[str, int] = {g.id: 0 for g in sorted_groups}
+    for athlete in athletes:
+        has_track = any(EventVenueMapping.get(e.event_type) == Venue.TRACK for e in athlete.events)
+        has_field = any(EventVenueMapping.get(e.event_type) != Venue.TRACK for e in athlete.events)
+        if has_track and has_field:
+            for group_id in athlete_track_groups.get(athlete.name, set()):
+                multi_event_count[group_id] += 1
+
+    # Find swappable pairs: same distance, hurdles, age tier, different gender
+    # Age tiers: 10, 11-12, 13-14, 15+
+    def get_age_tier(min_age: int) -> int:
+        if min_age <= 10:
+            return 0
+        elif min_age <= 12:
+            return 1
+        elif min_age <= 14:
+            return 2
+        else:
+            return 3
+
+    def is_boys_group(group: EventGroup) -> bool:
+        # Check if all events are boys/men categories
+        return all(
+            e.age_category.value.startswith("G") or e.age_category.value.startswith("Menn")
+            for e in group.events
+        )
+
+    # Process consecutive pairs and swap if beneficial
+    result = sorted_groups.copy()
+    i = 0
+    while i < len(result) - 1:
+        g1, g2 = result[i], result[i + 1]
+
+        # Check if they're swappable (same distance, hurdles, age tier, different gender)
+        key1 = _get_event_group_sort_key(g1)
+        key2 = _get_event_group_sort_key(g2)
+
+        dist1, hurdles1, age1 = key1
+        dist2, hurdles2, age2 = key2
+
+        tier1 = get_age_tier(age1)
+        tier2 = get_age_tier(age2)
+        same_block = (dist1 == dist2 and hurdles1 == hurdles2 and tier1 == tier2)
+        different_gender = is_boys_group(g1) != is_boys_group(g2)
+        # Only swap for 15+ tier (tier 3) - younger athletes need to finish first
+        is_15plus = tier1 == 3
+
+        if same_block and different_gender and is_15plus:
+            # Swap if g1 has MORE multi-event athletes (should go later)
+            count1 = multi_event_count[g1.id]
+            count2 = multi_event_count[g2.id]
+
+            if count1 > count2:
+                # Swap: put the one with more multi-event athletes later
+                result[i], result[i + 1] = result[i + 1], result[i]
+
+        i += 1
+
+    return result
+
+
 def add_track_precedence_constraints(
     solver: z3.Solver, problem: SchedulingProblem, variables: SchedulingVariables
 ) -> int:
@@ -315,6 +421,7 @@ def add_track_precedence_constraints(
     1. Shortest distance to longest (60m → 100m → 200m → ...)
     2. Non-hurdles before hurdles of same/similar distance
     3. Youngest to oldest within each distance/hurdles block
+    4. Within same block, gender order is flexible for multi-event spacing
     """
     constraint_count = 0
 
@@ -328,8 +435,8 @@ def add_track_precedence_constraints(
         print("  No track events to order")
         return 0
 
-    # Sort by (distance, hurdles, age)
-    sorted_groups = sorted(track_groups, key=_get_event_group_sort_key)
+    # Sort with flexible gender ordering for better multi-event spacing
+    sorted_groups = _sort_track_groups_for_spacing(track_groups, problem.athletes)
 
     print(f"  Track event ordering ({len(sorted_groups)} groups):")
     for i, group in enumerate(sorted_groups):
@@ -434,12 +541,15 @@ def add_venue_conflict_constraints(
     """Ensure only one event per venue per slot."""
     # Group events by venue
     venue_events: dict[Venue, list[str]] = {}
-    for event in problem.events.values():
-        venue = EventVenueMapping.get(event.event_type)
+    for event_group in problem.events.values():
+        # For EventGroup, use category from first event (all events in group share age tier)
+        first_event = event_group.events[0] if event_group.events else None
+        category = first_event.age_category if first_event else None
+        venue = get_venue_for_event(event_group.event_type, category)
         if venue is not None:
             if venue not in venue_events:
                 venue_events[venue] = []
-            venue_events[venue].append(event.id)
+            venue_events[venue].append(event_group.id)
 
     constraint_count = 0
 
@@ -514,12 +624,9 @@ def _is_young_track_group(group: EventGroup) -> bool:
 def add_track_spacing_constraints(
     solver: z3.Solver, problem: SchedulingProblem, variables: SchedulingVariables
 ) -> int:
-    """Ensure proper spacing between track events.
+    """Ensure proper spacing between consecutive track events.
 
-    Spacing rules:
-    - Young athletes (≤12) in 60m: Can run back-to-back (no gap needed)
-    - Older athletes (13+): Minimum 1 slot (5 min) gap
-    - Minimum 2 slots (10 min) when switching position or to hurdles
+    See CONSTRAINTS.md for spacing rules.
     """
     constraint_count = 0
 
@@ -533,8 +640,8 @@ def add_track_spacing_constraints(
         print("  Less than 2 track events, no spacing constraints needed")
         return 0
 
-    # Sort by the same ordering as precedence
-    sorted_groups = sorted(track_groups, key=_get_event_group_sort_key)
+    # Sort by the same ordering as precedence (including flexible gender swap)
+    sorted_groups = _sort_track_groups_for_spacing(track_groups, problem.athletes)
 
     print(f"  Adding track spacing constraints ({len(sorted_groups)} groups):")
 
@@ -668,9 +775,9 @@ def add_older_athlete_spacing_constraints(
     variables: SchedulingVariables,
     min_gap_slots: int,
 ) -> int:
-    """Add constraints for older athlete recovery gaps between their events.
+    """Add recovery gap constraints for older athletes (13+) with multiple events.
 
-    For each older athlete (13+) with multiple events, ensures minimum gap between events.
+    See CONSTRAINTS.md for the merging vs spacing conflict.
     """
     older_athletes = get_older_athletes_with_multiple_events(problem.events, problem.athletes)
 
@@ -726,13 +833,13 @@ def add_older_athlete_spacing_constraints(
     return constraint_count
 
 
-def verify_track_precedence_in_solution(solution: SchedulingSolution) -> None:
+def verify_track_precedence_in_solution(
+    solution: SchedulingSolution, athletes: list[Athlete]
+) -> None:
     """Debug function to verify track precedence constraints are satisfied in the solution.
 
     Verifies the strict ordering: distance → hurdles → age
-    - Shortest distance to longest
-    - Non-hurdles before hurdles of same distance block
-    - Youngest to oldest within each distance/hurdles block
+    (with flexible gender ordering for multi-event spacing in 15+ tier)
     """
     # Extract all track event groups and their start slots
     track_events_with_slots: list[tuple[str, int, EventGroup]] = []
@@ -748,19 +855,24 @@ def verify_track_precedence_in_solution(solution: SchedulingSolution) -> None:
         print("🔍 No track events to verify")
         return
 
-    # Sort by the same key used in constraints
-    expected_order = sorted(
-        track_events_with_slots,
-        key=lambda x: _get_event_group_sort_key(x[2])
-    )
+    # Extract just the groups for sorting
+    track_groups = [item[2] for item in track_events_with_slots]
+    # Sort using the same function as constraints (includes flexible gender swap)
+    sorted_groups = _sort_track_groups_for_spacing(track_groups, athletes)
+
+    # Build slot lookup for each group
+    group_to_slot = {item[2].id: item[1] for item in track_events_with_slots}
+
+    # Rebuild expected order with slots
+    expected_order = [(g.id, group_to_slot[g.id], g) for g in sorted_groups]
 
     # Check that actual start slots match expected order
     print("🔍 Verifying track precedence (distance → hurdles → age):")
     violations: list[str] = []
 
     for i in range(len(expected_order) - 1):
-        earlier_id, earlier_slot, earlier_group = expected_order[i]
-        later_id, later_slot, later_group = expected_order[i + 1]
+        _, earlier_slot, earlier_group = expected_order[i]
+        _, later_slot, later_group = expected_order[i + 1]
 
         earlier_cats = "/".join(e.age_category.value for e in earlier_group.events)
         later_cats = "/".join(e.age_category.value for e in later_group.events)
@@ -918,7 +1030,7 @@ def solve_scheduling_problem(
 def solve_with_optimization(
     problem: SchedulingProblem,
     timeout_ms: int = 10000,
-    optimization_timeout_ms: int = 10000,
+    optimization_timeout_ms: int = 10000,  # noqa: ARG001 - reserved for future use
     print_schedules: bool = True,
 ) -> SchedulingSolution:
     """Four-phase solving with age-based spacing optimization.
@@ -1029,27 +1141,40 @@ def solve_with_optimization(
     phase2_time = phase2a_time + phase2b_time
 
     # Phase 3: Maximize older athlete recovery gaps
+    # Use the full time budget (max_time_slots) to allow spreading events for better recovery
     print(f"\n🏃 Phase 3: Maximizing older athlete recovery gaps...")
+    print(f"   Time budget: {problem.config.max_time_slots} slots ({problem.config.max_time_slots * problem.config.slot_duration_minutes} min)")
+    print(f"   Minimum needed: {best_slots} slots ({best_slots * problem.config.slot_duration_minutes} min)")
     phase3_start = time.time()
 
     best_gap = 0
     # Get baseline solution with young athlete constraints (no gap constraint yet)
     best_solution = solve_scheduling_problem(
         problem, timeout_ms,
-        max_slots=best_slots,
+        max_slots=problem.config.max_time_slots,  # Allow full time budget
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,
     )
     if older_athletes:
-        # Binary search for maximum feasible gap
-        max_possible_gap = best_slots // 2
+        # Binary search for maximum feasible gap within time budget
+        # Max gap is limited by available slots: if we have 24 slots and minimum is 20,
+        # we have 4 extra slots that could be used for gaps
+        available_extra_slots = problem.config.max_time_slots - best_slots
+        # Each gap between events requires 1 slot, and athletes may have 2-4 events
+        # A reasonable upper bound is the extra slots + some baseline
+        max_possible_gap = min(
+            (available_extra_slots + best_slots) // 3,  # Rough estimate
+            problem.config.max_time_slots // 4,  # Don't go crazy
+        )
+        max_possible_gap = max(max_possible_gap, best_slots // 2)  # At least try half the slots
+
         low, high = 1, max_possible_gap
 
         while low <= high:
             mid = (low + high) // 2
             solution = solve_scheduling_problem(
                 problem, timeout_ms,
-                max_slots=best_slots,
+                max_slots=problem.config.max_time_slots,  # Allow full time budget
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=best_young_finish if young_only_groups else None,
                 older_min_gap_slots=mid,
@@ -1134,7 +1259,7 @@ def schedule_track_meet(
 
     # Verify track precedence constraints in the solution
     if solution.status == "solved":
-        verify_track_precedence_in_solution(solution)
+        verify_track_precedence_in_solution(solution, athletes)
 
     # Convert to SchedulingResult dataclass
     return SchedulingResult(

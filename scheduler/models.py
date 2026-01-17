@@ -8,6 +8,7 @@ class Venue(Enum):
     TRACK = "track"
     THROWING_CIRCLE = "throwing_circle"
     SHOT_PUT_CIRCLE = "shot_put_circle"
+    SHOT_PUT_CIRCLE_2 = "shot_put_circle_2"  # Secondary circle for young athletes
     JUMPING_PIT = "jumping_pit"
     HIGH_JUMP_AREA = "high_jump_area"
     JAVELIN_AREA = "javelin_area"
@@ -174,6 +175,37 @@ EventVenueMapping: dict[EventType, Venue] = {
     EventType.hj: Venue.HIGH_JUMP_AREA,
     EventType.pv: Venue.HIGH_JUMP_AREA,
 }
+
+# Secondary venue configuration: maps (event_type, secondary_venue) to the categories
+# that should use the secondary venue instead of the primary one.
+# Set to None to disable secondary venue usage.
+SecondaryVenueConfig: dict[EventType, tuple[Venue, frozenset[Category]] | None] = {
+    EventType.sp: (Venue.SHOT_PUT_CIRCLE_2, YOUNGEST_CATEGORIES),  # J/G10 use secondary circle
+}
+
+# Control flag to enable/disable secondary venue assignments globally
+USE_SECONDARY_VENUES: bool = True
+
+
+def get_venue_for_event(event_type: EventType, category: Category | None = None) -> Venue | None:
+    """Get the venue for an event, considering secondary venue assignments.
+
+    If category is provided and a secondary venue is configured for that
+    event type and category, returns the secondary venue. Otherwise returns
+    the primary venue from EventVenueMapping.
+    """
+    primary_venue = EventVenueMapping.get(event_type)
+
+    if not USE_SECONDARY_VENUES or category is None:
+        return primary_venue
+
+    secondary_config = SecondaryVenueConfig.get(event_type)
+    if secondary_config is not None:
+        secondary_venue, eligible_categories = secondary_config
+        if category in eligible_categories:
+            return secondary_venue
+
+    return primary_venue
 
 
 @dataclass

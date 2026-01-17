@@ -7,9 +7,11 @@ import typer
 
 from .functional_scheduler import schedule_track_meet
 from .html_schedule_generator import save_html_schedule
+from .csv_exporter import export_schedule_csv
 from .isonen_parser import parse_isonen_csv
 from .__main__ import group_events_by_type
 from .models import Event
+from . import models
 
 app = typer.Typer(
     name="scheduler",
@@ -60,9 +62,22 @@ def schedule(
         bool,
         typer.Option("--quiet", "-q", help="Suppress detailed output"),
     ] = False,
+    secondary_venues: Annotated[
+        bool,
+        typer.Option(
+            "--secondary-venues/--no-secondary-venues",
+            help="Use secondary venues for young athletes (J/G10)",
+        ),
+    ] = True,
 ) -> None:
     """Generate a track meet schedule from an Isonen CSV file."""
+    # Configure secondary venues
+    models.USE_SECONDARY_VENUES = secondary_venues
     if not quiet:
+        if secondary_venues:
+            typer.echo("Secondary venues: enabled (J/G10 use separate areas)")
+        else:
+            typer.echo("Secondary venues: disabled")
         typer.echo(f"Parsing {input_file}...")
 
     events, athletes = parse_isonen_csv(str(input_file))
@@ -115,6 +130,16 @@ def schedule(
     )
 
     typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
+
+    # Export CSV for opentrack_admin
+    csv_output = output.with_suffix(".csv")
+    export_schedule_csv(
+        result=result,
+        output_path=str(csv_output),
+        start_hour=start_hour,
+        start_minute=start_minute,
+    )
+    typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
 
 
 @app.command("info")

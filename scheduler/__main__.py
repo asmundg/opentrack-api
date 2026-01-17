@@ -53,30 +53,30 @@ def print_full_schedule(solution: SchedulingResult, title: str = "Full Schedule"
 
 def group_events_by_type(events: list[Event], athletes: list[Athlete]) -> list[EventGroup]:
     """Group individual events by type into EventGroups for scheduling with smart merging."""
-    
+
     # Count actual athletes per event
     athlete_counts = _count_athletes_per_event_real(events, athletes)
-    
-    # First, organize events by type
+
+    # Organize events by type
     events_by_type: dict[EventType, list[Event]] = {}
     for event in events:
         if event.event_type not in events_by_type:
             events_by_type[event.event_type] = []
         events_by_type[event.event_type].append(event)
-    
+
     event_groups = []
     for event_type, events_of_type in events_by_type.items():
         venue = EventVenueMapping.get(event_type)
-        
+
         if venue == Venue.TRACK:
             # Track events: smart merging by age groups
             groups = _create_track_groups(event_type, events_of_type, athlete_counts)
         else:
-            # Field events: merge if individual categories have <= 2 people
+            # Field events: merge to get 3-8 athletes per group
             groups = _create_field_groups(event_type, events_of_type, athlete_counts)
-        
+
         event_groups.extend(groups)
-    
+
     return event_groups
 
 
@@ -93,34 +93,6 @@ def _count_athletes_per_event_real(events: list[Event], athletes: list[Athlete])
         for event in athlete.events:
             if event.id in athlete_counts:
                 athlete_counts[event.id] += 1
-    
-    return athlete_counts
-
-
-def _count_athletes_per_event(events: list[Event]) -> dict[str, int]:
-    """Count how many athletes are registered for each individual event."""
-    # This is the fallback simulation function - should be replaced by _count_athletes_per_event_real
-    athlete_counts = {}
-    
-    # Simulate athlete counts based on event type and category
-    for event in events:
-        # Base counts by category popularity (rough estimates)
-        category_base_counts = {
-            "G-Rekrutt": 8, "J-Rekrutt": 6,
-            "G11": 6, "J11": 5, "G12": 7, "J12": 6,
-            "G13": 5, "J13": 4, "G14": 4, "J14": 3,
-            "G15": 3, "J15": 3, "G16": 4, "J16": 3,
-            "G17": 2, "J17": 2, "G18-19": 1, "J18-19": 1,
-            "Menn Senior": 2, "Kvinner Senior": 1
-        }
-        
-        base_count = category_base_counts.get(event.age_category.value, 3)
-        
-        # Track events tend to have more participants
-        if EventVenueMapping.get(event.event_type) == Venue.TRACK:
-            athlete_counts[event.id] = min(base_count + 2, 8)  # Cap at 8 for track
-        else:
-            athlete_counts[event.id] = max(1, base_count - 1)  # Field events have fewer
     
     return athlete_counts
 
@@ -226,24 +198,26 @@ def _create_track_groups(event_type: EventType, events: list[Event], athlete_cou
     return groups
 
 
-def _create_field_groups(event_type: EventType, events: list[Event], athlete_counts: dict[str, int]) -> list[EventGroup]:
-    """Create field event groups targeting 4-8 athletes per group for adequate rest between attempts.
+def _create_field_groups(
+    event_type: EventType,
+    events: list[Event],
+    athlete_counts: dict[str, int],
+) -> list[EventGroup]:
+    """Create field event groups, merging categories within age tiers.
 
-    Merges within age tiers to avoid tiny groups, but respects age boundaries:
-    - 10 year olds (Rekrutt) stay separate (must finish first)
-    - 11/12 year olds can merge together (must finish second)
-    - 13+ can merge freely (need spacing between events anyway)
+    Goals:
+    - At least MIN_TARGET (3) athletes per group for rest between attempts
+    - At most MAX_TARGET (8) athletes to avoid events being too long
+    - Merge within age tiers to keep similar ability levels together
+
+    See CONSTRAINTS.md for merging rationale.
     """
-    MIN_TARGET = 4  # Minimum athletes for good rest between attempts
+    MIN_TARGET = 3  # Minimum athletes for rest between attempts
     MAX_TARGET = 8  # Maximum before event gets too long
 
     if not events:
         return []
 
-    # Define age tiers:
-    # - Rekrutt (10 year olds) stay separate (must finish first)
-    # - 11-14 can merge together
-    # - 15+ can merge together, but merge with 11-14 if only one 15+ athlete
     rekrutt_categories = ["G-Rekrutt", "J-Rekrutt"]
     under15_categories = ["G11", "J11", "G12", "J12", "G13", "J13", "G14", "J14"]
     over15_categories = ["G15", "J15", "G16", "J16", "G17", "J17", "G18-19", "J18-19",
@@ -253,8 +227,8 @@ def _create_field_groups(event_type: EventType, events: list[Event], athlete_cou
     over15_events = [e for e in events if e.age_category.value in over15_categories]
     over15_athlete_count = sum(athlete_counts.get(e.id, 0) for e in over15_events)
 
-    # If only one 15+ athlete, merge with 11-14 (so they don't compete alone)
-    if over15_athlete_count <= 1:
+    # If very few 15+ athletes, merge with 11-14 (so they don't compete alone)
+    if over15_athlete_count < MIN_TARGET:
         age_tiers: list[tuple[list[str], str]] = [
             (rekrutt_categories, "Rekrutt"),
             (under15_categories + over15_categories, "11+"),
@@ -268,16 +242,16 @@ def _create_field_groups(event_type: EventType, events: list[Event], athlete_cou
 
     groups: list[EventGroup] = []
 
-    for tier_categories, tier_name in age_tiers:
+    for tier_categories, _ in age_tiers:
         tier_events = [e for e in events if e.age_category.value in tier_categories]
         if not tier_events:
             continue
 
-        # Sort within tier by category for consistent ordering
+        # Sort by category for consistent ordering within merged groups
         tier_events.sort(key=lambda e: tier_categories.index(e.age_category.value)
                          if e.age_category.value in tier_categories else 999)
 
-        # Build groups greedily within this tier
+        # Build groups greedily, targeting MIN_TARGET to MAX_TARGET athletes
         current_group: list[Event] = []
         current_count = 0
 
@@ -293,24 +267,24 @@ def _create_field_groups(event_type: EventType, events: list[Event], athlete_cou
             current_group.append(event)
             current_count += event_count
 
-        # Handle remaining events in current_group
+        # Finalize last group
         if current_group:
-            # If current group is small and we have previous groups IN THIS TIER, try to merge
-            # Find the last group that belongs to this tier
-            tier_groups = [g for g in groups if any(
-                e.age_category.value in tier_categories for e in g.events
-            )]
+            # If too small, try to merge with previous group in same tier
+            if current_count < MIN_TARGET and groups:
+                # Find last group from this tier
+                tier_groups = [g for g in groups if any(
+                    e.age_category.value in tier_categories for e in g.events
+                )]
+                if tier_groups:
+                    last_group = tier_groups[-1]
+                    last_count = sum(athlete_counts.get(e.id, 0) for e in last_group.events)
 
-            if current_count < MIN_TARGET and tier_groups:
-                last_tier_group = tier_groups[-1]
-                last_count = sum(athlete_counts.get(e.id, 0) for e in last_tier_group.events)
-
-                # Can we merge with the last tier group without exceeding max?
-                if last_count + current_count <= MAX_TARGET:
-                    # Find and replace last tier group
-                    idx = groups.index(last_tier_group)
-                    merged_events = last_tier_group.events + current_group
-                    groups[idx] = _make_field_group(event_type, merged_events)
+                    if last_count + current_count <= MAX_TARGET:
+                        idx = groups.index(last_group)
+                        merged_events = last_group.events + current_group
+                        groups[idx] = _make_field_group(event_type, merged_events)
+                    else:
+                        groups.append(_make_field_group(event_type, current_group))
                 else:
                     groups.append(_make_field_group(event_type, current_group))
             else:
@@ -334,7 +308,7 @@ def test_isonen_parser() -> tuple[list[EventGroup], list[Athlete]]:
     print("Testing Isonen CSV parser...")
 
     try:
-        events, athletes = parse_isonen_csv("/Volumes/src/priv/scheduler-2/example.csv")
+        events, athletes = parse_isonen_csv("/Users/asgramme/Downloads/Deltakerliste - Seriestevne 1.csv")
 
         print(f"\n📊 Parsed Results:")
         print(f"Events: {len(events)}")
@@ -390,7 +364,7 @@ def solve_isonen_test() -> SchedulingResult:
         events=events,
         athletes=athletes,
         total_personnel=30,  # Increased for larger event set
-        max_time_slots=48,  # Increased to accommodate more events with hard constraints
+        max_time_slots=24,  # 2 hours - spread events to use available time
         timeout_ms=10000,
         optimization_timeout_ms=10000,
     )
@@ -417,6 +391,16 @@ def solve_isonen_test() -> SchedulingResult:
             solution_dict=solution,
             title="Track Meet Schedule - Isonen Data",
             filename="isonen_schedule.html",
+        )
+
+        # Generate CSV for opentrack_admin
+        from .csv_exporter import export_schedule_csv
+
+        export_schedule_csv(
+            result=solution,
+            output_path="isonen_schedule.csv",
+            start_hour=9,
+            start_minute=0,
         )
 
         # Full schedule will be printed in main
@@ -467,7 +451,7 @@ if __name__ == "__main__":
         print_full_schedule(isonen_solution, "Isonen Data Schedule")
 
     print("\n" + "=" * 50)
-    print("🎉 Testing complete!")
+    print("Testing complete!")
     if isonen_solution.status == "solved":
-        print("📊 HTML report generated: isonen_schedule.html")
-    print("🌐 Open the HTML files in your browser to view the schedule visualizations!")
+        print("HTML report generated: isonen_schedule.html")
+    print("Open the HTML files in your browser to view the schedule visualizations!")

@@ -6,7 +6,7 @@ from a SchedulingResult, providing a visual grid layout of the schedule.
 """
 
 from typing import Any
-from .models import EventVenueMapping, Venue, Category, EventGroup
+from .models import Venue, Category, EventGroup, get_venue_for_event
 from .functional_scheduler import SchedulingResult
 
 
@@ -82,17 +82,24 @@ def _generate_empty_schedule_html(title: str) -> str:
     """
 
 
+def _get_venue_for_event_group(event_group: EventGroup) -> Venue | None:
+    """Get the venue for an EventGroup, considering secondary venue assignments."""
+    first_event = event_group.events[0] if event_group.events else None
+    category = first_event.age_category if first_event else None
+    return get_venue_for_event(event_group.event_type, category)
+
+
 def _get_venues_used_from_schedule(schedule: dict[int, list[dict[str, Any]]]) -> set[Venue]:
     """Get all venues that have events scheduled."""
     venues_used: set[Venue] = set()
-    
+
     for slot_events in schedule.values():
         for event_info in slot_events:
-            event = event_info['event']
-            venue = EventVenueMapping.get(event.event_type)
+            event_group: EventGroup = event_info['event']
+            venue = _get_venue_for_event_group(event_group)
             if venue is not None:
                 venues_used.add(venue)
-    
+
     return venues_used
 
 
@@ -104,10 +111,11 @@ def _order_venues(venues_used: set[Venue]) -> list[Venue]:
         Venue.JUMPING_PIT,
         Venue.HIGH_JUMP_AREA,
         Venue.SHOT_PUT_CIRCLE,
+        Venue.SHOT_PUT_CIRCLE_2,
         Venue.THROWING_CIRCLE,
         Venue.JAVELIN_AREA,
     ]
-    
+
     # Return only venues that are actually used, in preferred order
     return [venue for venue in venue_order if venue in venues_used]
 
@@ -262,30 +270,30 @@ def _build_venue_grid_with_spans_from_result(
     # Process events and populate the grid
     for slot in sorted(schedule.keys()):
         for event_info in schedule[slot]:
-            event = event_info['event']
-            venue = EventVenueMapping.get(event.event_type)
+            event_group: EventGroup = event_info['event']
+            venue = _get_venue_for_event_group(event_group)
 
             if venue is not None and venue in venue_grid[slot]:
                 # Only process each event once (at its starting slot)
-                if event_info['is_start'] and event.id not in processed_events:
-                    processed_events.add(event.id)
+                if event_info['is_start'] and event_group.id not in processed_events:
+                    processed_events.add(event_group.id)
 
                     # Calculate span duration for this event
-                    event_duration_slots = _calculate_event_slots(event, slot_duration_minutes)
-                    participant_count = participants_by_event.get(event.id, 0)
+                    event_duration_slots = _calculate_event_slots(event_group, slot_duration_minutes)
+                    participant_count = participants_by_event.get(event_group.id, 0)
 
                     # Get per-category counts for this event group
                     category_counts: dict[str, int] = {}
-                    for sub_event in event.events:
+                    for sub_event in event_group.events:
                         count = participants_by_category.get(sub_event.id, 0)
                         category_counts[sub_event.age_category.value] = count
 
                     # For EventGroup, get a representative color based on the contained events
-                    category_color = _get_group_category_color(event)
+                    category_color = _get_group_category_color(event_group)
 
                     # Create enhanced event info
                     enhanced_event_info = {
-                        'event': event,
+                        'event': event_group,
                         'is_start': True,
                         'slot_offset': 0,
                         'participant_count': participant_count,
@@ -298,7 +306,7 @@ def _build_venue_grid_with_spans_from_result(
 
                     # Store span information
                     spans[(slot, venue)] = {
-                        'event_id': event.id,
+                        'event_id': event_group.id,
                         'rowspan': event_duration_slots,
                         'event_info': enhanced_event_info,
                     }
@@ -479,21 +487,23 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
     category_color = event_info.get('category_color', '#757575')
 
     # Format event name with per-category athlete counts
+    categories_line = ""  # Only used for multi-category events
     if len(event.events) == 1:
         # Single event in group - show specific category with count
         single_event = event.events[0]
         count = category_counts.get(single_event.age_category.value, 0)
         event_name = f"{event.event_type.value} {single_event.age_category.value}({count})"
     else:
-        # Multiple events in group - show all categories with counts
-        category_parts = []
-        for e in sorted(event.events, key=lambda x: x.age_category.value):
-            count = category_counts.get(e.age_category.value, 0)
-            category_parts.append(f"{e.age_category.value}({count})")
-        categories_str = " ".join(category_parts)
+        # Multiple events in group - show categories with counts summary
+        # Format: "G17 / G18-19 / J16 / J17 (2+1+1+2)"
+        sorted_events = sorted(event.events, key=lambda x: x.age_category.value)
+        category_names = [e.age_category.value for e in sorted_events]
+        counts = [str(category_counts.get(e.age_category.value, 0)) for e in sorted_events]
+        categories_str = " / ".join(category_names)
+        counts_str = "+".join(counts)
         event_name = f"{event.event_type.value}"
         # Put categories on separate line for readability
-        categories_line = categories_str
+        categories_line = f"{categories_str} ({counts_str})"
 
     duration_text = f"{event.duration_minutes}min • {participant_count} total"
 
