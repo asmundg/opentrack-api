@@ -209,6 +209,7 @@ def _create_field_groups(
     - At least MIN_TARGET (3) athletes per group for rest between attempts
     - At most MAX_TARGET (8) athletes to avoid events being too long
     - Merge within age tiers to keep similar ability levels together
+    - Prefer same-gender grouping within tiers
 
     See CONSTRAINTS.md for merging rationale.
     """
@@ -247,48 +248,85 @@ def _create_field_groups(
         if not tier_events:
             continue
 
-        # Sort by category for consistent ordering within merged groups
-        tier_events.sort(key=lambda e: tier_categories.index(e.age_category.value)
-                         if e.age_category.value in tier_categories else 999)
+        # Split by gender first, then merge within gender
+        boys_events = [e for e in tier_events if _is_boys_category(e.age_category.value)]
+        girls_events = [e for e in tier_events if not _is_boys_category(e.age_category.value)]
 
-        # Build groups greedily, targeting MIN_TARGET to MAX_TARGET athletes
-        current_group: list[Event] = []
-        current_count = 0
+        boys_groups = _merge_field_events_greedy(
+            event_type, boys_events, athlete_counts, tier_categories, MIN_TARGET, MAX_TARGET
+        )
+        girls_groups = _merge_field_events_greedy(
+            event_type, girls_events, athlete_counts, tier_categories, MIN_TARGET, MAX_TARGET
+        )
 
-        for event in tier_events:
-            event_count = athlete_counts.get(event.id, 0)
+        # If either gender group is too small, try cross-gender merge
+        if boys_events and girls_events:
+            boys_count = sum(athlete_counts.get(e.id, 0) for e in boys_events)
+            girls_count = sum(athlete_counts.get(e.id, 0) for e in girls_events)
+            combined_count = boys_count + girls_count
 
-            # If adding this event would exceed max, finalize current group first
-            if current_group and current_count + event_count > MAX_TARGET:
-                groups.append(_make_field_group(event_type, current_group))
-                current_group = []
-                current_count = 0
+            # Cross-gender merge if either is too small AND combined fits
+            either_too_small = boys_count < MIN_TARGET or girls_count < MIN_TARGET
+            if either_too_small and combined_count <= MAX_TARGET:
+                # Merge all into one group
+                all_events = boys_events + girls_events
+                all_events.sort(key=lambda e: tier_categories.index(e.age_category.value)
+                                if e.age_category.value in tier_categories else 999)
+                groups.append(_make_field_group(event_type, all_events))
+                continue
 
-            current_group.append(event)
-            current_count += event_count
+        groups.extend(boys_groups)
+        groups.extend(girls_groups)
 
-        # Finalize last group
-        if current_group:
-            # If too small, try to merge with previous group in same tier
-            if current_count < MIN_TARGET and groups:
-                # Find last group from this tier
-                tier_groups = [g for g in groups if any(
-                    e.age_category.value in tier_categories for e in g.events
-                )]
-                if tier_groups:
-                    last_group = tier_groups[-1]
-                    last_count = sum(athlete_counts.get(e.id, 0) for e in last_group.events)
+    return groups
 
-                    if last_count + current_count <= MAX_TARGET:
-                        idx = groups.index(last_group)
-                        merged_events = last_group.events + current_group
-                        groups[idx] = _make_field_group(event_type, merged_events)
-                    else:
-                        groups.append(_make_field_group(event_type, current_group))
-                else:
-                    groups.append(_make_field_group(event_type, current_group))
+
+def _merge_field_events_greedy(
+    event_type: EventType,
+    events: list[Event],
+    athlete_counts: dict[str, int],
+    tier_categories: list[str],
+    min_target: int,
+    max_target: int,
+) -> list[EventGroup]:
+    """Merge field events greedily within a single gender."""
+    if not events:
+        return []
+
+    # Sort by category for consistent ordering within merged groups
+    events.sort(key=lambda e: tier_categories.index(e.age_category.value)
+                if e.age_category.value in tier_categories else 999)
+
+    groups: list[EventGroup] = []
+    current_group: list[Event] = []
+    current_count = 0
+
+    for event in events:
+        event_count = athlete_counts.get(event.id, 0)
+
+        # If adding this event would exceed max, finalize current group first
+        if current_group and current_count + event_count > max_target:
+            groups.append(_make_field_group(event_type, current_group))
+            current_group = []
+            current_count = 0
+
+        current_group.append(event)
+        current_count += event_count
+
+    # Finalize last group
+    if current_group:
+        # If too small, try to merge with previous group
+        if current_count < min_target and groups:
+            last_group = groups[-1]
+            last_count = sum(athlete_counts.get(e.id, 0) for e in last_group.events)
+
+            if last_count + current_count <= max_target:
+                merged_events = last_group.events + current_group
+                groups[-1] = _make_field_group(event_type, merged_events)
             else:
                 groups.append(_make_field_group(event_type, current_group))
+        else:
+            groups.append(_make_field_group(event_type, current_group))
 
     return groups
 
@@ -393,11 +431,12 @@ def solve_isonen_test() -> SchedulingResult:
             filename="isonen_schedule.html",
         )
 
-        # Generate CSV for opentrack_admin
+        # Generate updated CSV with computed start times
         from .csv_exporter import export_schedule_csv
 
         export_schedule_csv(
             result=solution,
+            original_csv_path="/Users/asgramme/Downloads/Deltakerliste - Seriestevne 1.csv",
             output_path="isonen_schedule.csv",
             start_hour=9,
             start_minute=0,

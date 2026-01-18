@@ -769,6 +769,48 @@ def add_young_athlete_finish_constraint(
     return constraint_count
 
 
+def add_track_finish_constraint(
+    solver: z3.Solver,
+    problem: SchedulingProblem,
+    variables: SchedulingVariables,
+    max_finish_slot: int,
+) -> int:
+    """Add constraints that all track events must finish by a given slot.
+
+    This allows track events to end earlier than field events, which is
+    common when track officials need to leave earlier than field officials.
+    """
+    track_groups = [
+        group for group in problem.events.values()
+        if group.event_type in TRACK_DISTANCE_ORDER
+    ]
+
+    if not track_groups:
+        print("  No track event groups found")
+        return 0
+
+    constraint_count = 0
+    print(f"  Found {len(track_groups)} track event groups")
+
+    for group in track_groups:
+        group_id = group.id
+        duration_slots = problem.event_duration_slots[group_id]
+        max_start = max_finish_slot - duration_slots + 1
+
+        if max_start < 0:
+            print(f"    WARNING: {group_id} cannot fit before slot {max_finish_slot}")
+            continue
+
+        for slot in range(max_start + 1, problem.config.max_time_slots):
+            solver.add(z3.Not(variables.event_start_slot_vars[group_id][slot]))
+            constraint_count += 1
+
+        print(f"    {group_id}: must finish by slot {max_finish_slot}")
+
+    print(f"  Total track finish constraints added: {constraint_count}")
+    return constraint_count
+
+
 def add_older_athlete_spacing_constraints(
     solver: z3.Solver,
     problem: SchedulingProblem,
@@ -963,6 +1005,7 @@ def solve_scheduling_problem(
     youngest_finish_slot: int | None = None,
     young_finish_slot: int | None = None,
     older_min_gap_slots: int = 0,
+    track_finish_slot: int | None = None,
 ) -> SchedulingSolution:
     """Solve the scheduling problem with timeout, optional slot limit, and spacing constraints.
 
@@ -973,6 +1016,7 @@ def solve_scheduling_problem(
         youngest_finish_slot: If set, 10 year olds must finish by this slot (highest priority)
         young_finish_slot: If set, 11/12 year olds must finish by this slot
         older_min_gap_slots: Minimum gap in slots between events for older athletes (13+)
+        track_finish_slot: If set, all track events must finish by this slot
     """
     # Use the problem's max_time_slots if no specific limit is provided
     if max_slots is None:
@@ -997,6 +1041,7 @@ def solve_scheduling_problem(
         youngest_finish_slot=youngest_finish_slot,
         young_finish_slot=young_finish_slot,
         older_min_gap_slots=older_min_gap_slots,
+        track_finish_slot=track_finish_slot,
     )
 
     # Add the slot limit constraint
@@ -1032,6 +1077,7 @@ def solve_with_optimization(
     timeout_ms: int = 10000,
     optimization_timeout_ms: int = 10000,  # noqa: ARG001 - reserved for future use
     print_schedules: bool = True,
+    track_finish_slot: int | None = None,
 ) -> SchedulingSolution:
     """Four-phase solving with age-based spacing optimization.
 
@@ -1039,6 +1085,9 @@ def solve_with_optimization(
     Phase 2a: Binary search for 10 year old finish slot (highest priority)
     Phase 2b: Binary search for 11/12 year old finish slot
     Phase 3: Binary search for older athlete min gap (maximize recovery time)
+
+    Args:
+        track_finish_slot: If set, all track events must finish by this slot
     """
     total_start_time = time.time()
 
@@ -1057,7 +1106,9 @@ def solve_with_optimization(
     print("\n🚀 Phase 1: Finding minimum slot count...")
     phase1_start = time.time()
 
-    initial_solution = solve_scheduling_problem(problem, timeout_ms)
+    initial_solution = solve_scheduling_problem(
+        problem, timeout_ms, track_finish_slot=track_finish_slot
+    )
     if initial_solution.status != "solved":
         print(f"❌ Phase 1 failed: {initial_solution.status}")
         return initial_solution
@@ -1071,7 +1122,9 @@ def solve_with_optimization(
     low, high = 1, initial_slots - 1
     while low <= high:
         mid = (low + high) // 2
-        solution = solve_scheduling_problem(problem, timeout_ms, max_slots=mid)
+        solution = solve_scheduling_problem(
+            problem, timeout_ms, max_slots=mid, track_finish_slot=track_finish_slot
+        )
         if solution.status == "solved":
             best_slots = mid
             high = mid - 1
@@ -1096,6 +1149,7 @@ def solve_with_optimization(
                 problem, timeout_ms,
                 max_slots=best_slots,
                 youngest_finish_slot=mid,
+                track_finish_slot=track_finish_slot,
             )
             if solution.status == "solved":
                 best_youngest_finish = mid
@@ -1126,6 +1180,7 @@ def solve_with_optimization(
                 max_slots=best_slots,
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=mid,
+                track_finish_slot=track_finish_slot,
             )
             if solution.status == "solved":
                 best_young_finish = mid
@@ -1154,6 +1209,7 @@ def solve_with_optimization(
         max_slots=problem.config.max_time_slots,  # Allow full time budget
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,
+        track_finish_slot=track_finish_slot,
     )
     if older_athletes:
         # Binary search for maximum feasible gap within time budget
@@ -1178,6 +1234,7 @@ def solve_with_optimization(
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=best_young_finish if young_only_groups else None,
                 older_min_gap_slots=mid,
+                track_finish_slot=track_finish_slot,
             )
             if solution.status == "solved":
                 best_gap = mid
@@ -1214,6 +1271,7 @@ def solve_with_optimization(
         "youngest_finish_slot": best_youngest_finish,
         "young_finish_slot": best_young_finish,
         "older_min_gap_slots": best_gap,
+        "track_finish_slot": track_finish_slot,
         "phase1_time": phase1_time,
         "phase2_time": phase2_time,
         "phase3_time": phase3_time,
@@ -1241,9 +1299,13 @@ def schedule_track_meet(
     timeout_ms: int = 10000,
     optimization_timeout_ms: int = 10000,
     print_schedules: bool = False,
+    max_track_duration: int | None = None,
 ) -> SchedulingResult:
     """
     Main entry point for scheduling a track meet.
+
+    Args:
+        max_track_duration: If set, track events must finish within this many minutes
 
     Returns a SchedulingResult dataclass containing events, athletes, and solution.
     """
@@ -1253,8 +1315,15 @@ def schedule_track_meet(
 
     problem = create_scheduling_problem(events, athletes, config)
 
+    # Convert max_track_duration (minutes) to slots
+    track_finish_slot: int | None = None
+    if max_track_duration is not None:
+        track_finish_slot = max_track_duration // problem.config.slot_duration_minutes
+        print(f"🏃 Track finish constraint: {max_track_duration} min = slot {track_finish_slot}")
+
     solution = solve_with_optimization(
-        problem, timeout_ms, optimization_timeout_ms, print_schedules
+        problem, timeout_ms, optimization_timeout_ms, print_schedules,
+        track_finish_slot=track_finish_slot,
     )
 
     # Verify track precedence constraints in the solution
@@ -1302,6 +1371,7 @@ def add_all_constraints(
     youngest_finish_slot: int | None = None,
     young_finish_slot: int | None = None,
     older_min_gap_slots: int = 0,
+    track_finish_slot: int | None = None,
 ) -> None:
     """Add all constraints to the solver in the correct order.
 
@@ -1313,6 +1383,7 @@ def add_all_constraints(
         youngest_finish_slot: If set, 10 year olds must finish by this slot (highest priority)
         young_finish_slot: If set, 11/12 year olds must finish by this slot
         older_min_gap_slots: Minimum gap in slots between events for older athletes (13+)
+        track_finish_slot: If set, all track events must finish by this slot
     """
     if verbose:
         print("Adding track precedence constraints...")
@@ -1349,3 +1420,8 @@ def add_all_constraints(
         if verbose:
             print(f"Adding older athlete spacing constraints (min gap: {older_min_gap_slots} slots)...")
         add_older_athlete_spacing_constraints(solver, problem, variables, older_min_gap_slots)
+
+    if track_finish_slot is not None:
+        if verbose:
+            print(f"Adding track finish constraints (finish by slot {track_finish_slot})...")
+        add_track_finish_constraint(solver, problem, variables, track_finish_slot)

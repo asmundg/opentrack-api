@@ -1,85 +1,32 @@
 """CSV exporter for scheduled track meets.
 
-Exports the computed schedule to CSV format compatible with opentrack_admin.
+Exports an updated copy of the input CSV with computed start times.
 """
 
 import csv
 from datetime import datetime, timedelta
 
 from .functional_scheduler import SchedulingResult
-from .models import EventGroup, EventType
-
-
-# Map EventType to opentrack_admin event codes
-EVENT_TYPE_TO_CODE: dict[EventType, str] = {
-    EventType.m60: "60m",
-    EventType.m100: "100m",
-    EventType.m200: "200m",
-    EventType.m400: "400m",
-    EventType.m800: "800m",
-    EventType.m1500: "1500m",
-    EventType.m5000: "5000m",
-    EventType.m60_hurdles: "60H",
-    EventType.m80_hurdles: "80H",
-    EventType.m100_hurdles: "100H",
-    EventType.sp: "SP",
-    EventType.lj: "LJ",
-    EventType.tj: "TJ",
-    EventType.hj: "HJ",
-    EventType.dt: "DT",
-    EventType.jt: "JT",
-    EventType.ht: "HT",
-    EventType.bt: "BT",
-    EventType.pv: "PV",
-}
-
-
-# Map Category value to opentrack_admin category format
-def _category_to_opentrack(category_value: str) -> str:
-    """Convert category value to opentrack_admin format.
-
-    Examples:
-        "G-Rekrutt" -> "G-rekrutt"
-        "J-Rekrutt" -> "J-rekrutt"
-        "G11" -> "G11"
-        "J18-19" -> "J18-19"
-        "Menn-Senior" -> "M"
-        "Kvinner-Senior" -> "W"
-    """
-    # Handle senior categories
-    if category_value in ("Menn-Senior", "MS"):
-        return "M"
-    if category_value in ("Kvinner-Senior", "KS"):
-        return "W"
-
-    # Handle rekrutt - normalize case
-    if "rekrutt" in category_value.lower():
-        if category_value.startswith("G"):
-            return "G-rekrutt"
-        elif category_value.startswith("J"):
-            return "J-rekrutt"
-
-    # Return as-is for standard categories like G11, J15, etc.
-    return category_value
+from .models import EventGroup
+from .isonen_parser import parse_event_type, parse_category
 
 
 def export_schedule_csv(
     result: SchedulingResult,
+    original_csv_path: str,
     output_path: str,
     start_hour: int = 9,
     start_minute: int = 0,
 ) -> None:
     """
-    Export the scheduled events to CSV format for opentrack_admin.
+    Export an updated copy of the input CSV with computed start times.
 
-    Output format (compatible with opentrack_admin parse_schedule_csv):
-        category,event,start_time
-        J14,LJ,17:00
-        G-rekrutt,HJ,17:00
-        G11,60m,17:25
+    Reads the original Isonen CSV and updates the "Kl." (time) and "Dato" (date)
+    columns based on the computed schedule, preserving all other columns.
 
     Args:
         result: The scheduling result containing the computed schedule
+        original_csv_path: Path to the original input CSV
         output_path: Path for the output CSV file
         start_hour: Starting hour for the schedule (24-hour format)
         start_minute: Starting minute for the schedule
@@ -87,43 +34,92 @@ def export_schedule_csv(
     if result.status != "solved":
         raise ValueError(f"Cannot export unsolved schedule: {result.status}")
 
+    # Build mapping from (event_type, category) -> start time
+    event_start_times = _build_event_start_times(
+        result, start_hour, start_minute
+    )
+
+    # Read original CSV and update times
+    rows = _read_and_update_csv(original_csv_path, event_start_times)
+
+    # Write updated CSV
+    _write_csv(output_path, rows)
+
+    print(f"✅ Schedule CSV exported to: {output_path}")
+    print(f"   {len(rows)} entries updated")
+
+
+def _build_event_start_times(
+    result: SchedulingResult,
+    start_hour: int,
+    start_minute: int,
+) -> dict[tuple[str, str], datetime]:
+    """Build mapping from (event_type, category) to scheduled start time."""
     base_time = datetime.now().replace(
         hour=start_hour, minute=start_minute, second=0, microsecond=0
     )
     slot_duration = result.slot_duration_minutes
 
-    rows: list[dict[str, str]] = []
+    event_times: dict[tuple[str, str], datetime] = {}
 
-    # Collect all scheduled events
-    for slot, slot_events in sorted(result.schedule.items()):
+    for slot, slot_events in result.schedule.items():
         for event_info in slot_events:
             if event_info.get("is_start", False):
                 event_group: EventGroup = event_info["event"]
                 slot_time = base_time + timedelta(minutes=slot * slot_duration)
-                time_str = slot_time.strftime("%H:%M")
 
-                # Get event code
-                event_code = EVENT_TYPE_TO_CODE.get(event_group.event_type)
-                if not event_code:
-                    continue
-
-                # Create a row for each category in the event group
+                # Map each individual event in the group to this start time
                 for event in event_group.events:
-                    category = _category_to_opentrack(event.age_category.value)
-                    rows.append({
-                        "category": category,
-                        "event": event_code,
-                        "start_time": time_str,
-                    })
+                    key = (event.event_type.value, event.age_category.value)
+                    event_times[key] = slot_time
 
-    # Sort by time, then by event, then by category
-    rows.sort(key=lambda r: (r["start_time"], r["event"], r["category"]))
+    return event_times
 
-    # Write CSV
+
+def _read_and_update_csv(
+    csv_path: str,
+    event_start_times: dict[tuple[str, str], datetime],
+) -> list[dict[str, str]]:
+    """Read original CSV and update the time column with scheduled times."""
+    updated_rows: list[dict[str, str]] = []
+
+    with open(csv_path, "r", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+
+        for row in reader:
+            # Try to find the scheduled time for this row
+            event_name = row.get("Øvelse", "").strip()
+            category_name = row.get("Klasse", "").strip()
+
+            if event_name and category_name:
+                try:
+                    event_type = parse_event_type(event_name)
+                    category = parse_category(category_name)
+                    key = (event_type.value, category.value)
+
+                    if key in event_start_times:
+                        scheduled_time = event_start_times[key]
+                        # Update the time column (Kl.)
+                        row["Kl."] = scheduled_time.strftime("%H:%M")
+                        # Update the date column (Dato)
+                        row["Dato"] = scheduled_time.strftime("%d.%m.%Y")
+                except ValueError:
+                    # Keep original time if we can't parse
+                    pass
+
+            updated_rows.append(dict(row))
+
+    return updated_rows
+
+
+def _write_csv(output_path: str, rows: list[dict[str, str]]) -> None:
+    """Write rows to CSV file."""
+    if not rows:
+        raise ValueError("No rows to write")
+
+    fieldnames = list(rows[0].keys())
+
     with open(output_path, "w", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=["category", "event", "start_time"])
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-
-    print(f"✅ Schedule CSV exported to: {output_path}")
-    print(f"   {len(rows)} events scheduled")

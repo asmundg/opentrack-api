@@ -69,6 +69,10 @@ def schedule(
             help="Use secondary venues for young athletes (J/G10)",
         ),
     ] = True,
+    max_track_duration: Annotated[
+        int | None,
+        typer.Option("--max-track-duration", help="Maximum track duration in minutes (track ends earlier than field)"),
+    ] = None,
 ) -> None:
     """Generate a track meet schedule from an Isonen CSV file."""
     # Configure secondary venues
@@ -102,6 +106,7 @@ def schedule(
         max_time_slots=max_slots,
         timeout_ms=timeout * 1000,
         optimization_timeout_ms=timeout * 1000,
+        max_track_duration=max_track_duration,
     )
 
     if result.status != "solved":
@@ -131,10 +136,11 @@ def schedule(
 
     typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
 
-    # Export CSV for opentrack_admin
+    # Export updated CSV with computed start times
     csv_output = output.with_suffix(".csv")
     export_schedule_csv(
         result=result,
+        original_csv_path=str(input_file),
         output_path=str(csv_output),
         start_hour=start_hour,
         start_minute=start_minute,
