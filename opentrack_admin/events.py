@@ -636,21 +636,25 @@ class EventScheduler:
                 pb_value = str(data["pb"]) if data["pb"] else ""
                 pb_input.click()
                 pb_input.fill(pb_value)
-            
+                pb_input.blur()  # Trigger blur to update internal state
+
             if "sb" in data and data["sb"] and sb_input.count() > 0:
                 sb_value = str(data["sb"]) if data["sb"] else ""
                 sb_input.click()
                 sb_input.fill(sb_value)
-            
+                sb_input.blur()  # Trigger blur to update internal state
+
             updated += 1
             logger.debug(f"Filled PB/SB for: {name}")
         
-        # Save - look for Save button on the page
-        save_btn = page.get_by_role("button", name="Save")
-        if save_btn.count() > 0:
-            save_btn.first.click()
-            page.wait_for_load_state("networkidle")
-        
+        # Save and wait for confirmation (there are two Save buttons, use first)
+        page.wait_for_timeout(1000)  # Wait for form to be ready
+        save_btn = page.locator("button[name='performances_submit']").first
+        save_btn.scroll_into_view_if_needed()
+        logger.info(f"Clicking save button via JavaScript")
+        save_btn.evaluate("el => el.click()")
+        page.get_by_text("Performances have been saved successfully").wait_for(state="visible", timeout=10000)
+
         logger.info(f"Updated PB/SB for {updated}/{row_count} competitors")
         return updated
 
@@ -924,7 +928,7 @@ ISONEN_CATEGORY_MAP: dict[str, str] = {
     "Gutter 15": "G15",
     "Gutter 16": "G16",
     "Gutter 17": "G17",
-    "Gutter 18-19": "G18",
+    "Gutter 18-19": "G18-19",
     # Girls
     "Jenter 6-8 Rekrutt": "J10",
     "Jenter 9": "J10",
@@ -936,7 +940,7 @@ ISONEN_CATEGORY_MAP: dict[str, str] = {
     "Jenter 15": "J15",
     "Jenter 16": "J16",
     "Jenter 17": "J17",
-    "Jenter 18-19": "J18",
+    "Jenter 18-19": "J18-19",
     # Seniors
     "Kvinner Senior": "W",
     "Menn Senior": "M",
