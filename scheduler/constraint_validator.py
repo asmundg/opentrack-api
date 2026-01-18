@@ -7,21 +7,22 @@ event overview CSVs after manual adjustments.
 """
 
 from collections import defaultdict
-from datetime import datetime, timedelta
-from typing import Any
 
 from .dtos import EventScheduleRow
 from .models import (
     EventGroup,
     Athlete,
     Venue,
-    get_venue_for_event,
+    Category,
     get_track_event_order,
     get_category_age_order,
-    is_hurdles_event,
-    EventVenueMapping,
     TRACK_DISTANCE_ORDER,
 )
+
+
+def _is_fifa_event(event_schedule: EventScheduleRow) -> bool:
+    """Check if an event is a FIFA (non-athletic) event."""
+    return event_schedule.categories.strip().upper() == Category.fifa.value.upper()
 
 
 class ConstraintViolation(Exception):
@@ -50,8 +51,12 @@ def validate_event_schedule(
     Raises:
         ConstraintViolation: If any constraint is violated
     """
-    # Build lookup from event_group_id to EventScheduleRow
-    event_schedule_map = {e.event_group_id: e for e in events}
+    # Separate FIFA events (non-athletic, like breaks) from regular events
+    # FIFA events are allowed in the schedule but are not validated against event groups
+    regular_events = [e for e in events if not _is_fifa_event(e)]
+
+    # Build lookup from event_group_id to EventScheduleRow (regular events only)
+    event_schedule_map = {e.event_group_id: e for e in regular_events}
 
     # Build lookup from event_group_id to EventGroup
     event_group_map = {eg.id: eg for eg in event_groups}
@@ -63,7 +68,7 @@ def validate_event_schedule(
             f"Missing schedule entries for event groups: {', '.join(sorted(missing_groups))}"
         )
 
-    # Check for extra schedule entries
+    # Check for extra schedule entries (FIFA events are allowed as extras)
     extra_entries = set(event_schedule_map.keys()) - set(event_group_map.keys())
     if extra_entries:
         raise ConstraintViolation(
@@ -71,33 +76,33 @@ def validate_event_schedule(
         )
 
     # Validate venue conflicts (no two events at same venue at same time)
-    _validate_venue_conflicts(events, event_groups, event_schedule_map, slot_duration_minutes)
+    # Include FIFA events - they still occupy physical space
+    _validate_venue_conflicts(events)
 
     # Validate athlete conflicts (athletes can't compete in overlapping events)
-    _validate_athlete_conflicts(events, event_groups, athletes, event_schedule_map, slot_duration_minutes)
+    # Only check regular events - FIFA events have no athletes
+    _validate_athlete_conflicts(event_groups, athletes, event_schedule_map)
 
-    # Validate track event ordering constraints
-    _validate_track_ordering(events, event_groups, event_schedule_map)
+    # Validate track event ordering constraints (FIFA events are not track events)
+    _validate_track_ordering(event_groups, event_schedule_map)
 
     print("✓ All constraints validated successfully")
 
 
 def _validate_venue_conflicts(
     events: list[EventScheduleRow],
-    event_groups: list[EventGroup],
-    event_schedule_map: dict[str, EventScheduleRow],
-    slot_duration_minutes: int,
 ) -> None:
     """Validate that no two events use the same venue at overlapping times."""
 
     # Group events by venue and check for time overlaps
-    venue_events: dict[Venue, list[tuple[EventScheduleRow, EventGroup]]] = defaultdict(list)
+    # Use event_group_id as identifier (works for both regular and FIFA events)
+    venue_events: dict[Venue, list[tuple[EventScheduleRow, str]]] = defaultdict(list)
 
     for event_schedule in events:
-        event_group = event_groups[next(
-            i for i, eg in enumerate(event_groups) if eg.id == event_schedule.event_group_id
-        )]
-        venue_events[event_schedule.venue].append((event_schedule, event_group))
+        # For FIFA events, use the event_group_id directly as the label
+        # For regular events, use the event group id
+        event_id = event_schedule.event_group_id
+        venue_events[event_schedule.venue].append((event_schedule, event_id))
 
     # Check each venue for overlapping events
     for venue, venue_event_list in venue_events.items():
@@ -106,24 +111,22 @@ def _validate_venue_conflicts(
 
         # Check consecutive events for overlap
         for i in range(len(venue_event_list) - 1):
-            current_event, current_group = venue_event_list[i]
-            next_event, next_group = venue_event_list[i + 1]
+            current_event, current_id = venue_event_list[i]
+            next_event, next_id = venue_event_list[i + 1]
 
             # Events overlap if next starts before current ends
             if next_event.start_time < current_event.end_time:
                 raise ConstraintViolation(
                     f"Venue conflict at {venue.value}: "
-                    f"{current_group.id} ({current_event.start_time}-{current_event.end_time}) "
-                    f"overlaps with {next_group.id} ({next_event.start_time}-{next_event.end_time})"
+                    f"{current_id} ({current_event.start_time}-{current_event.end_time}) "
+                    f"overlaps with {next_id} ({next_event.start_time}-{next_event.end_time})"
                 )
 
 
 def _validate_athlete_conflicts(
-    events: list[EventScheduleRow],
     event_groups: list[EventGroup],
     athletes: list[Athlete],
     event_schedule_map: dict[str, EventScheduleRow],
-    slot_duration_minutes: int,
 ) -> None:
     """Validate that no athlete has overlapping events."""
 
@@ -163,7 +166,6 @@ def _validate_athlete_conflicts(
 
 
 def _validate_track_ordering(
-    events: list[EventScheduleRow],
     event_groups: list[EventGroup],
     event_schedule_map: dict[str, EventScheduleRow],
 ) -> None:
@@ -207,7 +209,7 @@ def _validate_track_ordering(
                 f"Track events must follow distance order: {', '.join(e.value for e in TRACK_DISTANCE_ORDER)}"
             )
 
-        # If same event type, check age ordering (younger first)
+        # If same event type, check age ordering (younger first) - SOFT CONSTRAINT
         if current_group.event_type == next_group.event_type:
             # Get youngest category in each group
             current_youngest = min(
@@ -222,9 +224,10 @@ def _validate_track_ordering(
             if next_youngest < current_youngest:
                 current_cats = ','.join(e.age_category.value for e in current_group.events)
                 next_cats = ','.join(e.age_category.value for e in next_group.events)
-                raise ConstraintViolation(
-                    f"Track age ordering violation for {current_group.event_type.value}: "
-                    f"Younger categories ({next_cats}) cannot come after older categories ({current_cats})"
+                # Age ordering is a soft constraint - warn but don't fail
+                print(
+                    f"⚠️  Track age ordering (soft constraint): {current_group.event_type.value} "
+                    f"has younger categories ({next_cats}) after older categories ({current_cats})"
                 )
 
 

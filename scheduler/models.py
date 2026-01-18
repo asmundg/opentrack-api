@@ -57,6 +57,8 @@ class Category(Enum):
     g18_19 = "G18-19"
     ks = "Kvinner Senior"
     ms = "Menn Senior"
+    # Special category for non-athletic events (breaks, etc.) - shown in schedule but ignored for opentrack
+    fifa = "FIFA"
 
 
 # Categories for 10 year olds - HIGHEST priority to finish early

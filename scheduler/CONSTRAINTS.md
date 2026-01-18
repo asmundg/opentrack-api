@@ -19,7 +19,9 @@ An athlete cannot compete in two events simultaneously. If an athlete is registe
 Track events follow a strict sequence based on starting position logistics:
 1. **By distance** - Shorter distances first (starter team moves counter-clockwise)
 2. **Hurdles after flat** - Within same distance block, flat races before hurdles
-3. **By age** - Youngest to oldest within each distance/hurdles block
+3. **By age** - Youngest to oldest within each distance/hurdles
+   block. This is a soft policy and we can diverge from it when
+   needed.
 
 This ordering minimizes equipment moves and starting position changes.
 

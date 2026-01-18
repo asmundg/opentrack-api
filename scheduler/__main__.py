@@ -265,9 +265,14 @@ def _create_field_groups(
             girls_count = sum(athlete_counts.get(e.id, 0) for e in girls_events)
             combined_count = boys_count + girls_count
 
-            # Cross-gender merge if either is too small AND combined fits
             either_too_small = boys_count < MIN_TARGET or girls_count < MIN_TARGET
-            if either_too_small and combined_count <= MAX_TARGET:
+            is_rekrutt_tier = tier_categories == rekrutt_categories
+
+            # For rekrutt (10 year olds): always merge if either is too small
+            # For others: only merge if combined fits in MAX_TARGET
+            should_merge = either_too_small and (is_rekrutt_tier or combined_count <= MAX_TARGET)
+
+            if should_merge:
                 # Merge all into one group
                 all_events = boys_events + girls_events
                 all_events.sort(key=lambda e: tier_categories.index(e.age_category.value)

@@ -492,12 +492,13 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
         # Single event in group - show specific category with count
         single_event = event.events[0]
         count = category_counts.get(single_event.age_category.value, 0)
-        event_name = f"{event.event_type.value} {single_event.age_category.value}({count})"
+        category_bold = f"<strong>{single_event.age_category.value}</strong>"
+        event_name = f"{event.event_type.value} {category_bold}({count})"
     else:
         # Multiple events in group - show categories with counts summary
         # Format: "G17 / G18-19 / J16 / J17 (2+1+1+2)"
         sorted_events = sorted(event.events, key=lambda x: x.age_category.value)
-        category_names = [e.age_category.value for e in sorted_events]
+        category_names = [f"<strong>{e.age_category.value}</strong>" for e in sorted_events]
         counts = [str(category_counts.get(e.age_category.value, 0)) for e in sorted_events]
         categories_str = " / ".join(category_names)
         counts_str = "+".join(counts)

@@ -9,9 +9,34 @@ from datetime import datetime
 from typing import Any
 
 from .dtos import EventScheduleRow
-from .models import EventGroup, Athlete
+from .models import EventGroup, Athlete, Category, Event
 from .types import SchedulingResult
 from .event_csv import events_to_slot_assignments
+
+
+def _is_fifa_event(event_schedule: EventScheduleRow) -> bool:
+    """Check if an event is a FIFA (non-athletic) event."""
+    return event_schedule.categories.strip().upper() == Category.fifa.value.upper()
+
+
+def _create_fifa_event_group(event_schedule: EventScheduleRow) -> EventGroup:
+    """Create a synthetic EventGroup for a FIFA (non-athletic) event."""
+    # Create a minimal Event for the FIFA category
+    fifa_event = Event(
+        id=event_schedule.event_group_id,
+        event_type=event_schedule.event_type,
+        age_category=Category.fifa,
+        start_time="",  # Will be set by scheduling
+        duration_minutes=event_schedule.duration_minutes,
+        personnel_required=0,
+        priority_weight=0,
+    )
+
+    return EventGroup(
+        id=event_schedule.event_group_id,
+        event_type=event_schedule.event_type,
+        events=[fifa_event],
+    )
 
 
 def build_scheduling_result_from_events(
@@ -42,8 +67,16 @@ def build_scheduling_result_from_events(
         events, base_date, slot_duration_minutes
     )
 
-    # Build event_group_map for lookup
+    # Build event_group_map for lookup (includes original event groups)
     event_group_map = {eg.id: eg for eg in event_groups}
+
+    # Create synthetic EventGroups for FIFA events
+    fifa_event_groups: list[EventGroup] = []
+    for event_schedule in events:
+        if _is_fifa_event(event_schedule):
+            fifa_group = _create_fifa_event_group(event_schedule)
+            event_group_map[fifa_group.id] = fifa_group
+            fifa_event_groups.append(fifa_group)
 
     # Build schedule dictionary
     schedule: dict[int, list[dict[str, Any]]] = {}
@@ -89,6 +122,9 @@ def build_scheduling_result_from_events(
     total_duration_minutes = total_slots * slot_duration_minutes
     slots_with_events = len([s for s in events_per_slot.values() if s > 0])
 
+    # Combine original event groups with FIFA event groups for the result
+    all_event_groups = list(event_groups) + fifa_event_groups
+
     return SchedulingResult(
         status="solved",
         schedule=schedule,
@@ -101,6 +137,6 @@ def build_scheduling_result_from_events(
             "manual_schedule": True,
             "total_events": len(events),
         },
-        events=event_groups,
+        events=all_event_groups,
         athletes=athletes,
     )

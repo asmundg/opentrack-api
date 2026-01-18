@@ -16,29 +16,31 @@ from .models import EventGroup, get_venue_for_event
 from .types import SchedulingResult
 
 
-def export_event_overview_csv(
+def result_to_event_schedule_rows(
     result: SchedulingResult,
-    output_path: Path,
     base_date: datetime,
     slot_duration_minutes: int = 5,
-) -> None:
+) -> list[EventScheduleRow]:
     """
-    Export event overview CSV with start/end times for each event group.
-
-    This CSV can be manually edited to adjust event times before regenerating
-    the final schedule and athlete overview.
+    Convert a SchedulingResult to a list of EventScheduleRow objects.
 
     Args:
         result: The scheduling result from the optimizer
-        output_path: Path to write the CSV file
         base_date: Base datetime for the schedule (date + start time)
         slot_duration_minutes: Duration of each time slot in minutes
+
+    Returns:
+        List of EventScheduleRow objects sorted by start time
     """
     rows: list[EventScheduleRow] = []
 
     # Extract event groups and their assigned slots from the schedule
     for slot, events_in_slot in result.schedule.items():
         for event_info in events_in_slot:
+            # Only process the start of each event, not continuations
+            if not event_info.get('is_start', False):
+                continue
+
             event_group_id = event_info['id']
 
             # Find the corresponding EventGroup
@@ -78,6 +80,28 @@ def export_event_overview_csv(
 
     # Sort by start time, then by event type
     rows.sort(key=lambda r: (r.start_time, r.event_type.value))
+    return rows
+
+
+def export_event_overview_csv(
+    result: SchedulingResult,
+    output_path: Path,
+    base_date: datetime,
+    slot_duration_minutes: int = 5,
+) -> None:
+    """
+    Export event overview CSV with start/end times for each event group.
+
+    This CSV can be manually edited to adjust event times before regenerating
+    the final schedule and athlete overview.
+
+    Args:
+        result: The scheduling result from the optimizer
+        output_path: Path to write the CSV file
+        base_date: Base datetime for the schedule (date + start time)
+        slot_duration_minutes: Duration of each time slot in minutes
+    """
+    rows = result_to_event_schedule_rows(result, base_date, slot_duration_minutes)
 
     # Write to CSV
     with output_path.open('w', newline='', encoding='utf-8') as f:

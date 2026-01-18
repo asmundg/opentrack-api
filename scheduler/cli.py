@@ -13,7 +13,7 @@ from .isonen_parser import parse_isonen_csv
 from .__main__ import group_events_by_type
 from .models import Event
 from . import models
-from .event_csv import export_event_overview_csv, import_event_overview_csv
+from .event_csv import export_event_overview_csv, import_event_overview_csv, result_to_event_schedule_rows
 from .constraint_validator import validate_event_schedule, ConstraintViolation
 from .schedule_builder import build_scheduling_result_from_events
 
@@ -117,6 +117,24 @@ def schedule(
         typer.echo(f"Failed to find solution: {result.status}", err=True)
         raise typer.Exit(1)
 
+    # Validate the generated schedule as a sanity check
+    if not quiet:
+        typer.echo(f"\nValidating generated schedule...")
+    base_datetime = datetime.now().replace(
+        hour=start_hour, minute=start_minute, second=0, microsecond=0
+    )
+    event_schedule = result_to_event_schedule_rows(result, base_datetime, slot_duration_minutes=5)
+    try:
+        validate_event_schedule(
+            events=event_schedule,
+            event_groups=event_groups,
+            athletes=athletes,
+            slot_duration_minutes=5,
+        )
+    except ConstraintViolation as e:
+        typer.echo(f"⚠️  Scheduler produced invalid schedule: {e}", err=True)
+        # Don't fail - this is a sanity check, not a blocker
+
     if not quiet:
         typer.echo(f"\nSolution found!")
         typer.echo(f"Total slots: {result.total_slots}")
@@ -153,9 +171,6 @@ def schedule(
 
     # Export event overview CSV for manual editing
     events_csv_output = output.parent / f"{output.stem}_events.csv"
-    base_datetime = datetime.now().replace(
-        hour=start_hour, minute=start_minute, second=0, microsecond=0
-    )
     export_event_overview_csv(
         result=result,
         output_path=events_csv_output,
@@ -224,14 +239,6 @@ def schedule_from_events(
         Path,
         typer.Option("--output", "-o", help="Output HTML file path"),
     ] = Path("schedule.html"),
-    start_hour: Annotated[
-        int,
-        typer.Option("--start-hour", help="Start hour (0-23)", min=0, max=23),
-    ] = 17,
-    start_minute: Annotated[
-        int,
-        typer.Option("--start-minute", help="Start minute (0-59)", min=0, max=59),
-    ] = 0,
     title: Annotated[
         str,
         typer.Option("--title", help="Title for the HTML schedule"),
@@ -240,13 +247,6 @@ def schedule_from_events(
         bool,
         typer.Option("--quiet", "-q", help="Suppress detailed output"),
     ] = False,
-    secondary_venues: Annotated[
-        bool,
-        typer.Option(
-            "--secondary-venues/--no-secondary-venues",
-            help="Use secondary venues for young athletes (J/G10)",
-        ),
-    ] = True,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -259,9 +259,6 @@ def schedule_from_events(
     This workflow allows manual adjustments between automated scheduling
     and final output generation.
     """
-    # Configure secondary venues
-    models.USE_SECONDARY_VENUES = secondary_venues
-
     if not quiet:
         typer.echo(f"Parsing participant data from {input_file}...")
 
@@ -301,9 +298,10 @@ def schedule_from_events(
     if not quiet:
         typer.echo(f"Building schedule from manual event times...")
 
-    # Build SchedulingResult from manual event times
+    # Derive base time from earliest event in the CSV
+    earliest_time = min(e.start_time for e in event_schedule)
     base_datetime = datetime.now().replace(
-        hour=start_hour, minute=start_minute, second=0, microsecond=0
+        hour=earliest_time.hour, minute=earliest_time.minute, second=0, microsecond=0
     )
 
     result = build_scheduling_result_from_events(
@@ -324,8 +322,8 @@ def schedule_from_events(
         result=result,
         file_path=str(output),
         title=title,
-        start_hour=start_hour,
-        start_minute=start_minute,
+        start_hour=earliest_time.hour,
+        start_minute=earliest_time.minute,
     )
 
     typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
@@ -336,8 +334,8 @@ def schedule_from_events(
         result=result,
         original_csv_path=str(input_file),
         output_path=str(csv_output),
-        start_hour=start_hour,
-        start_minute=start_minute,
+        start_hour=earliest_time.hour,
+        start_minute=earliest_time.minute,
     )
     typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
 

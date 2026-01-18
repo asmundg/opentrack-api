@@ -95,7 +95,7 @@ def build_athlete_event_groups(
             if event.id in event_to_group:
                 group_ids.add(event_to_group[event.id])
         if group_ids:
-            athlete_groups[athlete.name] = list(group_ids)
+            athlete_groups[athlete.name] = sorted(group_ids)  # Sort for determinism
 
     return athlete_groups
 
@@ -515,8 +515,8 @@ def add_athlete_conflict_constraints(
     )
 
     # Add constraints for each unique event group combination
-    for group_ids, athlete_names in group_combinations.items():
-        group_ids_list = list(group_ids)
+    for group_ids, athlete_names in sorted(group_combinations.items(), key=lambda x: sorted(x[0])):
+        group_ids_list = sorted(group_ids)  # Sort for determinism
         print(
             f"    Event groups {group_ids_list} shared by {len(athlete_names)} athletes: {athlete_names[:3]}{'...' if len(athlete_names) > 3 else ''}"
         )
@@ -554,14 +554,15 @@ def add_venue_conflict_constraints(
     constraint_count = 0
 
     # For each venue, ensure at most one event active per slot
-    for venue, event_ids in venue_events.items():
+    for venue, event_ids in sorted(venue_events.items(), key=lambda x: x[0].value):  # Sort for determinism
+        event_ids_sorted = sorted(event_ids)  # Sort for determinism
         if (
-            len(event_ids) > 1
+            len(event_ids_sorted) > 1
         ):  # Only add constraints if there are multiple events for this venue
             for slot in range(problem.config.max_time_slots):
                 venue_vars_active_in_slot = [
                     variables.event_active_vars[event_id][slot]
-                    for event_id in event_ids
+                    for event_id in event_ids_sorted
                 ]
                 solver.add(z3.PbLe([(var, 1) for var in venue_vars_active_in_slot], 1))
                 constraint_count += 1
@@ -711,7 +712,7 @@ def add_youngest_athlete_finish_constraint(
     constraint_count = 0
     print(f"  Found {len(youngest_groups)} 10-year-old event groups")
 
-    for group_id in youngest_groups:
+    for group_id in sorted(youngest_groups):  # Sort for determinism
         duration_slots = problem.event_duration_slots[group_id]
         max_start = max_finish_slot - duration_slots + 1
 
@@ -751,7 +752,7 @@ def add_young_athlete_finish_constraint(
     constraint_count = 0
     print(f"  Found {len(young_only_groups)} 11/12-year-old event groups")
 
-    for group_id in young_only_groups:
+    for group_id in sorted(young_only_groups):  # Sort for determinism
         duration_slots = problem.event_duration_slots[group_id]
         max_start = max_finish_slot - duration_slots + 1
 
@@ -830,7 +831,7 @@ def add_older_athlete_spacing_constraints(
     constraint_count = 0
     print(f"  Found {len(older_athletes)} older athletes with multiple events")
 
-    for athlete_name, group_ids in older_athletes.items():
+    for athlete_name, group_ids in sorted(older_athletes.items()):  # Sort for determinism
         if len(group_ids) < 2:
             continue
 
@@ -1025,6 +1026,7 @@ def solve_scheduling_problem(
     # Create solver and variables
     solver = z3.Solver()
     solver.set("timeout", timeout_ms)
+    solver.set("random_seed", 42)  # Make solver deterministic
     variables = create_z3_variables(problem)
 
     # Debug: print event duration calculations (only for initial solve)
