@@ -578,14 +578,15 @@ def _format_venue_cell_content(events_in_venue: list[dict[str, Any]]) -> str:
 
 
 def _format_venue_name(venue: Venue) -> str:
-    """Format venue name for display."""
+    """Format venue name for display (Norwegian)."""
     venue_names = {
-        Venue.TRACK: "Track",
-        Venue.JUMPING_PIT: "Jumping Pit",
-        Venue.HIGH_JUMP_AREA: "High Jump",
-        Venue.SHOT_PUT_CIRCLE: "Shot Put",
-        Venue.THROWING_CIRCLE: "Throwing Circle",
-        Venue.JAVELIN_AREA: "Javelin",
+        Venue.TRACK: "Løp",
+        Venue.JUMPING_PIT: "Lengde",
+        Venue.HIGH_JUMP_AREA: "Høyde",
+        Venue.SHOT_PUT_CIRCLE: "Kule",
+        Venue.SHOT_PUT_CIRCLE_2: "Kule 2",
+        Venue.THROWING_CIRCLE: "Kast",
+        Venue.JAVELIN_AREA: "Spyd",
     }
     return venue_names.get(venue, venue.value.replace("_", " ").title())
 
