@@ -7,8 +7,15 @@ import csv
 from datetime import datetime, timedelta
 
 from .functional_scheduler import SchedulingResult
-from .models import EventGroup
+from .models import EventGroup, Category
 from .isonen_parser import parse_event_type, parse_category
+
+
+# Rekrutt categories that should be normalized in output
+REKRUTT_NORMALIZE: dict[Category, str] = {
+    Category.g10: "Gutter 10",
+    Category.j10: "Jenter 10",
+}
 
 
 def export_schedule_csv(
@@ -103,8 +110,12 @@ def _read_and_update_csv(
                         row["Kl."] = scheduled_time.strftime("%H:%M")
                         # Update the date column (Dato)
                         row["Dato"] = scheduled_time.strftime("%d.%m.%Y")
+
+                    # Normalize rekrutt categories (Gutter 6-8/9/10 → Gutter 10, etc.)
+                    if category in REKRUTT_NORMALIZE:
+                        row["Klasse"] = REKRUTT_NORMALIZE[category]
                 except ValueError:
-                    # Keep original time if we can't parse
+                    # Keep original values if we can't parse
                     pass
 
             updated_rows.append(dict(row))
