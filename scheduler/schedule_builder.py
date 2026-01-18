@@ -112,6 +112,7 @@ def build_scheduling_result_from_events(
                 'event': event_group,
                 'is_start': is_start,
                 'slot': slot,
+                'venue': event_schedule.venue,  # Preserve venue from CSV
             })
 
             if is_start:

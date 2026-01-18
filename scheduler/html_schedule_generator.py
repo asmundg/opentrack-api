@@ -82,8 +82,16 @@ def _generate_empty_schedule_html(title: str) -> str:
     """
 
 
-def _get_venue_for_event_group(event_group: EventGroup) -> Venue | None:
-    """Get the venue for an EventGroup, considering secondary venue assignments."""
+def _get_venue_for_event_group(event_group: EventGroup, override_venue: Venue | None = None) -> Venue | None:
+    """Get the venue for an EventGroup, considering secondary venue assignments.
+
+    Args:
+        event_group: The event group to get venue for
+        override_venue: If provided, use this venue instead of calculating from event type
+                       (used when venue is explicitly set in events CSV)
+    """
+    if override_venue is not None:
+        return override_venue
     first_event = event_group.events[0] if event_group.events else None
     category = first_event.age_category if first_event else None
     return get_venue_for_event(event_group.event_type, category)
@@ -96,7 +104,8 @@ def _get_venues_used_from_schedule(schedule: dict[int, list[dict[str, Any]]]) ->
     for slot_events in schedule.values():
         for event_info in slot_events:
             event_group: EventGroup = event_info['event']
-            venue = _get_venue_for_event_group(event_group)
+            override_venue = event_info.get('venue')  # From events CSV if available
+            venue = _get_venue_for_event_group(event_group, override_venue)
             if venue is not None:
                 venues_used.add(venue)
 
@@ -271,7 +280,8 @@ def _build_venue_grid_with_spans_from_result(
     for slot in sorted(schedule.keys()):
         for event_info in schedule[slot]:
             event_group: EventGroup = event_info['event']
-            venue = _get_venue_for_event_group(event_group)
+            override_venue = event_info.get('venue')  # From events CSV if available
+            venue = _get_venue_for_event_group(event_group, override_venue)
 
             if venue is not None and venue in venue_grid[slot]:
                 # Only process each event once (at its starting slot)
@@ -486,14 +496,23 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
     duration_slots = event_info.get('duration_slots', 1)
     category_color = event_info.get('category_color', '#757575')
 
+    # Check if this is a FIFA (non-athletic) event - skip participant counts
+    is_fifa = (
+        len(event.events) == 1
+        and event.events[0].age_category == Category.fifa
+    )
+
     # Format event name with per-category athlete counts
     categories_line = ""  # Only used for multi-category events
     if len(event.events) == 1:
-        # Single event in group - show specific category with count
+        # Single event in group - show specific category with count (skip for FIFA)
         single_event = event.events[0]
-        count = category_counts.get(single_event.age_category.value, 0)
         category_bold = f"<strong>{single_event.age_category.value}</strong>"
-        event_name = f"{event.event_type.value} {category_bold}({count})"
+        if is_fifa:
+            event_name = f"{event.event_type.value} {category_bold}"
+        else:
+            count = category_counts.get(single_event.age_category.value, 0)
+            event_name = f"{event.event_type.value} {category_bold}({count})"
     else:
         # Multiple events in group - show categories with counts summary
         # Format: "G17 / G18-19 / J16 / J17 (2+1+1+2)"
@@ -506,7 +525,11 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
         # Put categories on separate line for readability
         categories_line = f"{categories_str} ({counts_str})"
 
-    duration_text = f"{event.duration_minutes}min • {participant_count} total"
+    # Duration text - skip participant count for FIFA events
+    if is_fifa:
+        duration_text = f"{event.duration_minutes}min"
+    else:
+        duration_text = f"{event.duration_minutes}min • {participant_count} total"
 
     # Calculate the height based on number of slots (40px per slot from CSS + borders)
     calculated_height = duration_slots * 40 + (duration_slots - 1) * 1  # 1px for borders
