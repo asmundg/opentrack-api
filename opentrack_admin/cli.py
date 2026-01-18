@@ -137,7 +137,7 @@ def create(
 @app.command()
 def schedule(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
-    file: Annotated[Path, typer.Argument(help="CSV file with schedule (columns: category,event,start_time)")],
+    file: Annotated[Path, typer.Argument(help="Isonen-format schedule CSV (schedule.csv from scheduler)")],
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
 ) -> None:
@@ -199,7 +199,7 @@ def schedule(
 @app.command("update-pbs")
 def update_pbs(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
-    file: Annotated[Path, typer.Argument(help="CSV file with events (columns: category,event,start_time)")],
+    file: Annotated[Path, typer.Argument(help="Isonen-format schedule CSV (schedule.csv from scheduler)")],
     club: Annotated[str, typer.Option("--club", help="Default club name for PB lookups (e.g., 'Tyrving')")] = "",
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     debug_pblookup: Annotated[bool, typer.Option("--debug-pblookup", help="Enable debug output from pblookup service")] = False,

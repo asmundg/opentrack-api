@@ -841,37 +841,125 @@ def parse_time(time_str: str) -> time:
 
 
 def parse_schedule_csv(content: str) -> list[EventSchedule]:
-    """Parse a CSV schedule file.
-    
-    Expected format (with header):
-        category,event,start_time
-        J14,LJ,17:00
-        G-rekrutt,HJ,17:00
-        G11,60m,17:25
-    
+    """Parse an Isonen-format schedule CSV file.
+
+    Expected format (schedule.csv from scheduler):
+        Fornavn,Etternavn,...,Klasse,Øvelse,...,Kl.,...
+        John,Doe,...,Gutter 14,Lengde,...,17:00,...
+
     Args:
         content: CSV file content as string
-        
+
     Returns:
-        List of EventSchedule objects
+        List of EventSchedule objects (deduplicated by category+event)
     """
     schedules = []
-    
+    seen: set[tuple[str, str]] = set()  # For deduplication
+
     reader = csv.DictReader(StringIO(content))
-    
+
     for row in reader:
         try:
-            category = row["category"].strip()
-            event = row["event"].strip()
-            start_time = parse_time(row["start_time"])
-            
+            category = _normalize_isonen_category(row["Klasse"].strip())
+            event = _normalize_isonen_event(row["Øvelse"].strip())
+            start_time = parse_time(row["Kl."])
+
+            # Skip if we've already seen this category+event combination
+            key = (category, event)
+            if key in seen:
+                continue
+            seen.add(key)
+
             schedules.append(EventSchedule(
                 category=category,
                 event=event,
                 start_time=start_time,
             ))
-        except (KeyError, ValueError) as e:
-            # Skip invalid rows but could log warning
+        except (KeyError, ValueError):
+            # Skip invalid rows
             continue
-    
+
     return schedules
+
+
+# Mapping from Isonen event names to event codes
+ISONEN_EVENT_CODES: dict[str, str] = {
+    # Track events
+    "60 meter": "60m",
+    "100 meter": "100m",
+    "200 meter": "200m",
+    "400 meter": "400m",
+    "800 meter": "800m",
+    "1500 meter": "1500m",
+    "3000 meter": "3000m",
+    "5000 meter": "5000m",
+    # Hurdles
+    "60 meter hekk": "60H",
+    "80 meter hekk": "80H",
+    "100 meter hekk": "100H",
+    "110 meter hekk": "110H",
+    "400 meter hekk": "400H",
+    # Field events
+    "Høyde": "HJ",
+    "Lengde": "LJ",
+    "Tresteg": "TJ",
+    "Stavsprang": "PV",
+    "Kule": "SP",
+    "Diskos": "DT",
+    "Spyd": "JT",
+    "Slegge": "HT",
+    "Liten ball": "BT",  # Ball throw for young athletes
+}
+
+# Mapping from Isonen category names to normalized categories
+ISONEN_CATEGORY_MAP: dict[str, str] = {
+    # Boys
+    "Gutter 6-8 Rekrutt": "G10",
+    "Gutter 9": "G10",
+    "Gutter 10": "G10",
+    "Gutter 11": "G11",
+    "Gutter 12": "G12",
+    "Gutter 13": "G13",
+    "Gutter 14": "G14",
+    "Gutter 15": "G15",
+    "Gutter 16": "G16",
+    "Gutter 17": "G17",
+    "Gutter 18-19": "G18",
+    # Girls
+    "Jenter 6-8 Rekrutt": "J10",
+    "Jenter 9": "J10",
+    "Jenter 10": "J10",
+    "Jenter 11": "J11",
+    "Jenter 12": "J12",
+    "Jenter 13": "J13",
+    "Jenter 14": "J14",
+    "Jenter 15": "J15",
+    "Jenter 16": "J16",
+    "Jenter 17": "J17",
+    "Jenter 18-19": "J18",
+    # Seniors
+    "Kvinner Senior": "W",
+    "Menn Senior": "M",
+}
+
+
+def _normalize_isonen_category(category: str) -> str:
+    """Convert Isonen category name to event code format.
+
+    E.g., "Gutter 14" -> "G14", "Jenter 6-8 Rekrutt" -> "G10"
+    """
+    if category in ISONEN_CATEGORY_MAP:
+        return ISONEN_CATEGORY_MAP[category]
+    # Fallback: try to extract from pattern
+    return category
+
+
+def _normalize_isonen_event(event: str) -> str:
+    """Convert Isonen event name to event code.
+
+    E.g., "60 meter" -> "60m", "Lengde" -> "LJ"
+    """
+    if event in ISONEN_EVENT_CODES:
+        return ISONEN_EVENT_CODES[event]
+    # Fallback: return as-is
+    return event
