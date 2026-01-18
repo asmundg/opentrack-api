@@ -1,5 +1,6 @@
 """Command-line interface for track meet scheduling."""
 
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -12,6 +13,9 @@ from .isonen_parser import parse_isonen_csv
 from .__main__ import group_events_by_type
 from .models import Event
 from . import models
+from .event_csv import export_event_overview_csv, import_event_overview_csv
+from .constraint_validator import validate_event_schedule, ConstraintViolation
+from .schedule_builder import build_scheduling_result_from_events
 
 app = typer.Typer(
     name="scheduler",
@@ -147,6 +151,21 @@ def schedule(
     )
     typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
 
+    # Export event overview CSV for manual editing
+    events_csv_output = output.parent / f"{output.stem}_events.csv"
+    base_datetime = datetime.now().replace(
+        hour=start_hour, minute=start_minute, second=0, microsecond=0
+    )
+    export_event_overview_csv(
+        result=result,
+        output_path=events_csv_output,
+        base_date=base_datetime,
+        slot_duration_minutes=5,
+    )
+    typer.echo(f"Event overview CSV saved to: {events_csv_output.absolute()}")
+    typer.echo(f"\n💡 Tip: You can now manually edit {events_csv_output.name} and use")
+    typer.echo(f"   'schedule from-events' to regenerate outputs with your changes.")
+
 
 @app.command("info")
 def info(
@@ -181,6 +200,146 @@ def info(
 
     if len(athletes) > 5:
         typer.echo(f"  ... and {len(athletes) - 5} more")
+
+
+@app.command("from-events")
+def schedule_from_events(
+    input_file: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the original Isonen CSV file with participant data",
+            exists=True,
+            readable=True,
+        ),
+    ],
+    events_csv: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the event overview CSV with manual timings",
+            exists=True,
+            readable=True,
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output HTML file path"),
+    ] = Path("schedule.html"),
+    start_hour: Annotated[
+        int,
+        typer.Option("--start-hour", help="Start hour (0-23)", min=0, max=23),
+    ] = 17,
+    start_minute: Annotated[
+        int,
+        typer.Option("--start-minute", help="Start minute (0-59)", min=0, max=59),
+    ] = 0,
+    title: Annotated[
+        str,
+        typer.Option("--title", help="Title for the HTML schedule"),
+    ] = "Track Meet Schedule",
+    quiet: Annotated[
+        bool,
+        typer.Option("--quiet", "-q", help="Suppress detailed output"),
+    ] = False,
+    secondary_venues: Annotated[
+        bool,
+        typer.Option(
+            "--secondary-venues/--no-secondary-venues",
+            help="Use secondary venues for young athletes (J/G10)",
+        ),
+    ] = True,
+) -> None:
+    """
+    Generate outputs from manually edited event overview CSV.
+
+    This command:
+    1. Reads the event overview CSV with manual event times
+    2. Validates that all constraints are still satisfied
+    3. Generates updated HTML schedule and athlete CSV
+
+    This workflow allows manual adjustments between automated scheduling
+    and final output generation.
+    """
+    # Configure secondary venues
+    models.USE_SECONDARY_VENUES = secondary_venues
+
+    if not quiet:
+        typer.echo(f"Parsing participant data from {input_file}...")
+
+    # Parse original data to get event groups and athletes
+    events, athletes = parse_isonen_csv(str(input_file))
+    event_groups = group_events_by_type(events, athletes)
+
+    if not quiet:
+        typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
+        typer.echo(f"Created {len(event_groups)} event groups")
+        typer.echo(f"\nImporting event schedule from {events_csv}...")
+
+    # Import event overview CSV
+    try:
+        event_schedule = import_event_overview_csv(events_csv)
+    except (FileNotFoundError, ValueError) as e:
+        typer.echo(f"Error reading event CSV: {e}", err=True)
+        raise typer.Exit(1)
+
+    if not quiet:
+        typer.echo(f"Validating constraints...")
+
+    # Validate constraints
+    try:
+        validate_event_schedule(
+            events=event_schedule,
+            event_groups=event_groups,
+            athletes=athletes,
+            slot_duration_minutes=5,
+        )
+    except ConstraintViolation as e:
+        typer.echo(f"\n❌ Constraint violation detected:", err=True)
+        typer.echo(f"   {e}", err=True)
+        typer.echo(f"\nPlease fix the constraint violations in {events_csv} and try again.", err=True)
+        raise typer.Exit(1)
+
+    if not quiet:
+        typer.echo(f"Building schedule from manual event times...")
+
+    # Build SchedulingResult from manual event times
+    base_datetime = datetime.now().replace(
+        hour=start_hour, minute=start_minute, second=0, microsecond=0
+    )
+
+    result = build_scheduling_result_from_events(
+        events=event_schedule,
+        event_groups=event_groups,
+        athletes=athletes,
+        base_date=base_datetime,
+        slot_duration_minutes=5,
+    )
+
+    if not quiet:
+        typer.echo(f"\nSchedule built successfully!")
+        typer.echo(f"Total slots: {result.total_slots}")
+        typer.echo(f"Duration: {result.total_duration_minutes} minutes")
+
+    # Generate HTML schedule
+    save_html_schedule(
+        result=result,
+        file_path=str(output),
+        title=title,
+        start_hour=start_hour,
+        start_minute=start_minute,
+    )
+
+    typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
+
+    # Export updated athlete CSV with manual times
+    csv_output = output.with_suffix(".csv")
+    export_schedule_csv(
+        result=result,
+        original_csv_path=str(input_file),
+        output_path=str(csv_output),
+        start_hour=start_hour,
+        start_minute=start_minute,
+    )
+    typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
 
 
 if __name__ == "__main__":
