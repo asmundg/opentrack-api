@@ -723,19 +723,27 @@ class EventScheduler:
         debug: bool = False,
     ) -> int:
         """Update PB values for all competitors in an event.
-        
+
         Full flow: Navigate to View -> Competitors tab, extract names,
         look up PBs via pblookup, and fill them in.
-        
+
+        Skips PB lookups for athletes under 13 years old.
+
         Args:
             schedule: The event schedule containing event code
             default_club: Club to use for lookups if not found in table
             debug: Enable debug output from pblookup
-            
+
         Returns:
             Number of competitors updated
         """
         logger.info(f"=== Updating PBs for {schedule.search_term} ===")
+
+        # Skip PB lookups for athletes under 13
+        age = get_category_age(schedule.category)
+        if age is not None and age < 13:
+            logger.info(f"Skipping PB lookup for {schedule.category} (age {age} < 13)")
+            return 0
         
         # Navigate to Competitors tab
         self.navigate_to_competitors_tab()
