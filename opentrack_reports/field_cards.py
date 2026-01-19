@@ -541,31 +541,31 @@ def create_field_cards(
         )
         elements.append(
             Paragraph(
-                f"{meeting_name} - START TIME: {group_data['time']}", event_info_style
+                f"{meeting_name} - STARTTID: {group_data['time']}", event_info_style
             )
         )
 
-        # Add wind conditions notice for relevant events
+        # Add wind conditions notice for relevant events (Norwegian)
         if has_wind:
             elements.append(
                 Paragraph(
-                    "<i>Wind measurements required for record purposes</i>", small_style
+                    "<i>Vindmåling kreves for rekordformål</i>", small_style
                 )
             )
 
-        # Add High Jump instructions
+        # Add High Jump instructions (Norwegian)
         if is_high_jump:
             if base_event_type == "HJ":
                 elements.append(
                     Paragraph(
-                        "<i>High Jump: Each height has 3 columns for attempts. Mark O (cleared), X (missed), or - (passed) in each attempt box.</i>",
+                        "<i>Høyde: Hver høyde har 3 kolonner for forsøk. Marker O (godkjent), X (bommet), eller - (stått over) i hver forsøksboks.</i>",
                         small_style,
                     )
                 )
             elif base_event_type == "PV":
                 elements.append(
                     Paragraph(
-                        "<i>Pole Vault: Each height has 3 columns for attempts. Mark O (cleared), X (missed), or - (passed) in each attempt box.</i>",
+                        "<i>Stav: Hver høyde har 3 kolonner for forsøk. Marker O (godkjent), X (bommet), eller - (stått over) i hver forsøksboks.</i>",
                         small_style,
                     )
                 )
@@ -583,13 +583,13 @@ def create_field_cards(
             # Create blank height columns that judges can fill in
             num_height_columns = 9  # Provide 9 blank height columns
 
-            # Create header row for High Jump
+            # Create header row for High Jump (Norwegian)
             header_row = [
-                Paragraph("<b>Order</b>", header_style),
-                Paragraph("<b>Bib</b>", header_style),
-                Paragraph("<b>Name</b>", header_style),
-                Paragraph("<b>Club</b>", header_style),
-                Paragraph("<b>Age</b>", header_style),
+                Paragraph("<b>Rekkef.</b>", header_style),
+                Paragraph("<b>Nr</b>", header_style),
+                Paragraph("<b>Navn</b>", header_style),
+                Paragraph("<b>Klubb</b>", header_style),
+                Paragraph("<b>Klasse</b>", header_style),
                 Paragraph("<b>PB</b>", header_style),
                 Paragraph("<b>SB</b>", header_style),
             ]
@@ -603,59 +603,57 @@ def create_field_cards(
                 header_row.append("")  # Attempt 2 (will be merged with height header)
                 header_row.append("")  # Attempt 3 (will be merged with height header)
 
-            # Add final columns
+            # Add final columns (Norwegian)
             if base_event_type == "HJ":
-                header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
+                header_row.append(Paragraph("<b>Beste<br/>høyde</b>", header_style))
             elif base_event_type == "PV":
-                header_row.append(Paragraph("<b>Best<br/>Height</b>", header_style))
-            header_row.append(Paragraph("<b>Note</b>", header_style))
-            header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
+                header_row.append(Paragraph("<b>Beste<br/>høyde</b>", header_style))
+            header_row.append(Paragraph("<b>Merk</b>", header_style))
+            header_row.append(Paragraph("<b>Plass</b>", header_style))
 
         else:
             # REGULAR FIELD EVENT LAYOUT
-            # Create ORIS-style header row
+            # Create ORIS-style header row (Norwegian)
             header_row = [
-                Paragraph("<b>Order</b>", header_style),
-                Paragraph("<b>Bib</b>", header_style),
-                Paragraph("<b>Name</b>", header_style),
-                Paragraph("<b>Club</b>", header_style),
-                Paragraph("<b>Age</b>", header_style),
+                Paragraph("<b>Rekkef.</b>", header_style),
+                Paragraph("<b>Nr</b>", header_style),
+                Paragraph("<b>Navn</b>", header_style),
+                Paragraph("<b>Klubb</b>", header_style),
+                Paragraph("<b>Klasse</b>", header_style),
                 Paragraph("<b>PB</b>", header_style),
                 Paragraph("<b>SB</b>", header_style),
             ]
 
             # Add weight column for throwing events
             if is_throwing:
-                header_row.append(Paragraph("<b>Weight</b>", header_style))
+                header_row.append(Paragraph("<b>Vekt</b>", header_style))
 
             # Add zone indicator column for horizontal jumps (LJ, TJ)
             if is_horizontal_jump:
                 header_row.append("")  # Empty header - SONE indicator will appear in data rows
 
-            # Add columns for each attempt - using ordinal numbers like in the image
-            ordinal_suffixes = {1: "st", 2: "nd", 3: "rd"}
-            wind_text = " (with wind)" if has_wind else ""
+            # Add columns for each attempt - using Norwegian format
+            wind_text = " (med vind)" if has_wind else ""
             print(
                 f"    Creating {group_data['max_attempts']} attempt columns{wind_text}"
             )
             for i in range(1, group_data["max_attempts"] + 1):
-                suffix = ordinal_suffixes.get(i, "th")
                 header_row.append(
-                    Paragraph(f"<b>{i}{suffix}<br/>Trial</b>", header_style)
+                    Paragraph(f"<b>{i}.<br/>forsøk</b>", header_style)
                 )
                 if has_wind:
                     header_row.append(
-                        Paragraph("<b>Wind</b>", header_style)
+                        Paragraph("<b>Vind</b>", header_style)
                     )  # Wind column for LJ/TJ
 
-            # Add columns for best result and final position
+            # Add columns for best result and final position (Norwegian)
             header_row.append(
                 Paragraph(
-                    f"<b>Best<br/>of {group_data['max_attempts']}</b>", header_style
+                    f"<b>Beste<br/>av {group_data['max_attempts']}</b>", header_style
                 )
             )
-            header_row.append(Paragraph("<b>Note</b>", header_style))
-            header_row.append(Paragraph("<b>Final<br/>Pos</b>", header_style))
+            header_row.append(Paragraph("<b>Merk</b>", header_style))
+            header_row.append(Paragraph("<b>Plass</b>", header_style))
 
         # Create data for the table
         table_data = [header_row]
@@ -1239,7 +1237,7 @@ def create_field_cards(
     # Define a function for page numbers and signature area
     def add_page_number_and_signature(canvas, doc, signature_elements=None):
         page_num = canvas.getPageNumber()
-        text = f"Page {page_num}"
+        text = f"Side {page_num}"
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
 
@@ -1251,19 +1249,19 @@ def create_field_cards(
             doc.width + doc.rightMargin - 2, sig_y_position + 4 * cm, text
         )
 
-        # Add signature area at bottom if provided
+        # Add signature area at bottom if provided (Norwegian)
         if signature_elements:
             canvas.setFont("Helvetica-Bold", 10)
             # Use the correct ReportLab method for centered text
             center_x = doc.leftMargin + doc.width / 2
             # ReportLab uses drawCentredText (British spelling)
             try:
-                canvas.drawCentredText(center_x, sig_y_position + 3 * cm, "OFFICIALS")
+                canvas.drawCentredText(center_x, sig_y_position + 3 * cm, "FUNKSJONÆRER")
             except AttributeError:
                 # Fallback to manual centering if method doesn't exist
-                text_width = canvas.stringWidth("OFFICIALS", "Helvetica-Bold", 10)
+                text_width = canvas.stringWidth("FUNKSJONÆRER", "Helvetica-Bold", 10)
                 canvas.drawString(
-                    center_x - text_width / 2, sig_y_position + 3 * cm, "OFFICIALS"
+                    center_x - text_width / 2, sig_y_position + 3 * cm, "FUNKSJONÆRER"
                 )
 
             canvas.setFont("Helvetica", 8)
@@ -1271,38 +1269,38 @@ def create_field_cards(
             canvas.drawString(
                 doc.leftMargin,
                 sig_y_position + 2.5 * cm,
-                "Actual start: ____________________________",
+                "Faktisk start: ____________________________",
             )
             canvas.drawString(
                 doc.leftMargin + doc.width / 2,
                 sig_y_position + 2.5 * cm,
-                "End: ____________________________",
+                "Slutt: ____________________________",
             )
 
             # Judge and Technical Delegate signatures
             canvas.drawString(
                 doc.leftMargin,
                 sig_y_position + 1.5 * cm,
-                "Judge: ____________________________",
+                "Dommer: ____________________________",
             )
             canvas.drawString(
                 doc.leftMargin + doc.width / 2,
                 sig_y_position + 1.5 * cm,
-                "Technical Delegate: ____________________________",
+                "Overdommer: ____________________________",
             )
 
             # Timestamp
-            timestamp = datetime.now().strftime("Last changed: %a %b %d %H:%M:%S %Y")
+            timestamp = datetime.now().strftime("Sist endret: %a %d. %b %Y %H:%M:%S")
             canvas.setFont("Helvetica-Oblique", 8)
             canvas.drawString(doc.leftMargin, sig_y_position + 0.5 * cm, timestamp)
 
-            # Add annotation hints on the right side
+            # Add annotation hints on the right side (Norwegian)
             canvas.setFont("Helvetica", 7)
             hints_x = doc.width + doc.leftMargin - 2 * cm
-            canvas.drawString(hints_x, sig_y_position + 2.0 * cm, "Annotations:")
-            canvas.drawString(hints_x, sig_y_position + 1.5 * cm, "X  fail")
-            canvas.drawString(hints_x, sig_y_position + 1.1 * cm, "–  pass")
-            canvas.drawString(hints_x, sig_y_position + 0.7 * cm, "r  retired")
+            canvas.drawString(hints_x, sig_y_position + 2.0 * cm, "Merknader:")
+            canvas.drawString(hints_x, sig_y_position + 1.5 * cm, "X  bom")
+            canvas.drawString(hints_x, sig_y_position + 1.1 * cm, "–  stått over")
+            canvas.drawString(hints_x, sig_y_position + 0.7 * cm, "r  trukket seg")
 
         canvas.restoreState()
 

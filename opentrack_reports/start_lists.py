@@ -360,7 +360,7 @@ def create_start_lists(
         # Individual event names will be shown as headers above each table
         elements.append(
             Paragraph(
-                f"{meeting_name} - {event_date_str} - START TIME: {group_data['time']}",
+                f"{meeting_name} - {event_date_str} - STARTTID: {group_data['time']}",
                 lane_style,
             )
         )
@@ -478,9 +478,9 @@ def create_start_lists(
                         )
                     )
 
-                    # Create table data with headers
+                    # Create table data with headers (Norwegian)
                     table_data = [
-                        ["Lane", "Bib", "Name", "Club", "Age", "PB", "SB"]
+                        ["Bane", "Nr", "Navn", "Klubb", "Klasse", "PB", "SB"]
                     ]
 
                     for competitor_info in sorted_competitors:
@@ -555,7 +555,7 @@ def create_start_lists(
     # Define a function for page numbers
     def add_page_number(canvas, doc):
         page_num = canvas.getPageNumber()
-        text = f"Page {page_num}"
+        text = f"Side {page_num}"
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
         canvas.drawRightString(doc.width + doc.rightMargin - 10, 10, text)
