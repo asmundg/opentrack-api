@@ -70,7 +70,6 @@ def create(
     competition_type: Annotated[str, typer.Option("--type", help="Competition type (track, indoor, road, cross_country, trail)")] = "track",
     website: Annotated[Optional[str], typer.Option("--website", help="Competition/club website URL")] = None,
     entry_link: Annotated[Optional[str], typer.Option("--entry-link", help="External entry link (e.g., Isonen URL)")] = None,
-    public: Annotated[bool, typer.Option("--public", help="Make competition public immediately (default: hidden)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
 ) -> None:
     """Create a new competition."""
@@ -109,7 +108,6 @@ def create(
         competition_type=competition_type,
         website=website or "",
         external_entry_link=entry_link or "",
-        hide_from_public=not public,
         combined_events_table="tyrving",
     )
 

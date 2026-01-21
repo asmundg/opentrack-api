@@ -45,7 +45,6 @@ class CompetitionDetails:
     # Display settings
     website: str = ""
     external_entry_link: str = ""  # e.g., Isonen link
-    hide_from_public: bool = True  # Start hidden while setting up
 
     # Scoring settings
     combined_events_table: Literal["world_athletics", "tyrving"] | None = None  # None = use default
@@ -79,30 +78,34 @@ class CompetitionCreator:
             self.session.login()
 
         # Step 1: Navigate and create basic competition (includes initial entry setup)
-        logger.info("Step 1/6: Creating basic competition...")
+        logger.info("Step 1/7: Creating basic competition...")
         self._create_basic_competition(details)
 
         # Step 2: Configure advanced settings (hide from public)
-        logger.info("Step 2/6: Configuring advanced settings...")
-        self._configure_advanced_settings(details)
+        logger.info("Step 2/7: Configuring advanced settings...")
+        self._configure_advanced_settings()
 
-        # Step 3: Configure display settings (website, entry link, points)
-        logger.info("Step 3/6: Configuring display settings...")
+        # Step 3: Configure display settings (website, entry link, points, hide results/competitors)
+        logger.info("Step 3/7: Configuring display settings...")
         self._configure_display_settings(details)
 
         # Step 4: Configure scoring (e.g., Tyrving tables)
         if details.combined_events_table:
-            logger.info("Step 4/6: Configuring scoring...")
+            logger.info("Step 4/7: Configuring scoring...")
             self._configure_scoring(details)
         else:
-            logger.info("Step 4/6: Skipping scoring (not configured)")
+            logger.info("Step 4/7: Skipping scoring (not configured)")
 
-        # Step 5: Number competitors
-        logger.info("Step 5/6: Numbering competitors...")
+        # Step 5: Configure photofinish (FinishLynx)
+        logger.info("Step 5/7: Configuring photofinish...")
+        self._configure_photofinish()
+
+        # Step 6: Number competitors
+        logger.info("Step 6/7: Numbering competitors...")
         self._number_competitors()
 
-        # Step 6: Apply random seeding
-        logger.info("Step 6/6: Applying random seeding...")
+        # Step 7: Apply random seeding
+        logger.info("Step 7/7: Applying random seeding...")
         self._apply_random_seeding()
 
         logger.info("Competition created successfully: %s", self.page.url)
@@ -171,15 +174,14 @@ class CompetitionCreator:
         page.wait_for_load_state("networkidle")
         logger.debug("Basic competition created and entries enabled")
 
-    def _configure_advanced_settings(self, details: CompetitionDetails) -> None:
-        """Configure advanced settings like visibility."""
+    def _configure_advanced_settings(self) -> None:
+        """Configure advanced settings - hide competition from public."""
         page = self.page
 
-        if details.hide_from_public:
-            logger.debug("Setting competition to hidden from public")
-            hide_checkbox = page.get_by_role("checkbox", name="Hide from public:")
-            if not hide_checkbox.is_checked():
-                hide_checkbox.check()
+        logger.debug("Setting competition to hidden from public")
+        hide_checkbox = page.get_by_role("checkbox", name="Hide from public:")
+        if not hide_checkbox.is_checked():
+            hide_checkbox.check()
 
         logger.debug("Saving advanced settings")
         page.locator("button[name=\"adv_submit\"]").click()
@@ -203,6 +205,15 @@ class CompetitionCreator:
         if details.external_entry_link:
             logger.debug("Setting external entry link: %s", details.external_entry_link)
             page.get_by_role("textbox", name="External entry link:").fill(details.external_entry_link)
+
+        # Hide results and competitors (useful during setup)
+        logger.debug("Hiding results and competitors")
+        hide_results = page.get_by_role("checkbox", name="Hide results:")
+        if not hide_results.is_checked():
+            hide_results.check()
+        hide_competitors = page.get_by_role("checkbox", name="Hide competitors:")
+        if not hide_competitors.is_checked():
+            hide_competitors.check()
 
         # Save display settings
         logger.debug("Saving display settings")
@@ -238,6 +249,30 @@ class CompetitionCreator:
             page.get_by_label("Combined Events tables:").select_option(table_value)
 
         logger.debug("Saving scoring settings")
+        page.get_by_role("button", name="Save").click()
+        page.wait_for_load_state("networkidle")
+
+    def _configure_photofinish(self) -> None:
+        """Configure FinishLynx photofinish integration."""
+        page = self.page
+
+        # Navigate to TV and photofinish -> FinishLynx
+        logger.debug("Navigating to FinishLynx settings")
+        page.get_by_role("link", name="TV and photofinish").click()
+        page.get_by_role("link", name="FinishLynx").click()
+
+        # Enable photofinish file generation
+        logger.debug("Enabling photofinish settings")
+        photofinish_files = page.get_by_role("checkbox", name="Photofinish files should")
+        if not photofinish_files.is_checked():
+            photofinish_files.check()
+
+        # Enable results from photofinish
+        results_from_photofinish = page.get_by_role("checkbox", name="Results from photofinish")
+        if not results_from_photofinish.is_checked():
+            results_from_photofinish.check()
+
+        logger.debug("Saving photofinish settings")
         page.get_by_role("button", name="Save").click()
         page.wait_for_load_state("networkidle")
 
