@@ -40,17 +40,17 @@ class PBLookupService:
         """
         # Standardize event name
         standardized_event = standardize_event_name(event)
-        
+
         # Extract surname for search
         surname = extract_surname(name)
         if not surname:
             if self.debug:
                 print(f"Could not extract surname from '{name}'", file=sys.stderr)
             return None
-        
+
         if self.debug:
             print(f"Searching for athletes with surname '{surname}'", file=sys.stderr)
-        
+
         # Search for athletes with matching surname
         try:
             candidate_athletes = self.scraper.search_athletes_by_surname(surname)
@@ -138,7 +138,7 @@ class PBLookupService:
         surname = extract_surname(name)
         if not surname:
             return None
-        
+
         try:
             candidate_athletes = self.scraper.search_athletes_by_surname(surname)
         except Exception as e:

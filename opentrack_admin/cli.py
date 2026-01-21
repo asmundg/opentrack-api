@@ -11,7 +11,8 @@ import typer
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig
-from .events import EventScheduler, parse_schedule_csv, Checkpoint
+from .events import EventSchedule, EventScheduler, parse_schedule_csv, Checkpoint
+from pblookup import PBLookupService
 
 # Create the typer app for admin commands
 app = typer.Typer(
@@ -70,11 +71,11 @@ def create(
     website: Annotated[Optional[str], typer.Option("--website", help="Competition/club website URL")] = None,
     entry_link: Annotated[Optional[str], typer.Option("--entry-link", help="External entry link (e.g., Isonen URL)")] = None,
     public: Annotated[bool, typer.Option("--public", help="Make competition public immediately (default: hidden)")] = False,
-    show_points: Annotated[bool, typer.Option("--no-points/--points", help="Enable/disable individual points display")] = True,
-    number_competitors: Annotated[bool, typer.Option("--no-numbering/--numbering", help="Enable/disable automatic bib number assignment")] = True,
-    random_seeding: Annotated[bool, typer.Option("--no-seeding/--seeding", help="Enable/disable random seeding of start lists")] = True,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
 ) -> None:
     """Create a new competition."""
+    setup_logging(verbose=verbose)
+
     config = OpenTrackConfig.from_env()
     
     if not config.username or not config.password:
@@ -109,10 +110,7 @@ def create(
         website=website or "",
         external_entry_link=entry_link or "",
         hide_from_public=not public,
-        show_individual_points=show_points,
         combined_events_table="tyrving",
-        auto_number_competitors=number_competitors,
-        random_seeding=random_seeding,
     )
 
     print(f"🏃 Creating competition: {details.name}")
@@ -199,34 +197,49 @@ def schedule(
 @app.command("update-pbs")
 def update_pbs(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
-    file: Annotated[Path, typer.Argument(help="Isonen-format schedule CSV (schedule.csv from scheduler)")],
+    file: Annotated[Optional[Path], typer.Argument(help="Isonen-format schedule CSV (schedule.csv from scheduler)")] = None,
+    event: Annotated[Optional[str], typer.Option("--event", "-e", help="Single event code (e.g., 'LJ', 'SP', '100m')")] = None,
+    category: Annotated[Optional[str], typer.Option("--category", "-c", help="Single event category (e.g., 'G14', 'J15')")] = None,
     club: Annotated[str, typer.Option("--club", help="Default club name for PB lookups (e.g., 'Tyrving')")] = "",
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     debug_pblookup: Annotated[bool, typer.Option("--debug-pblookup", help="Enable debug output from pblookup service")] = False,
     no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
 ) -> None:
-    """Update PB/SB values for competitors in events."""
+    """Update PB/SB values for competitors in events.
+
+    Either provide a CSV file with all events, or use --event and --category for a single event.
+    """
     setup_logging(verbose=verbose)
     logger = logging.getLogger(__name__)
-    
+
     config = OpenTrackConfig.from_env()
-    
+
     if not config.username or not config.password:
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
         raise typer.Exit(1)
 
-    if not file.exists():
-        print(f"❌ Schedule file not found: {file}")
-        raise typer.Exit(1)
-    
-    schedules = parse_schedule_csv(file.read_text())
-    
-    if not schedules:
-        print("❌ No valid events found in schedule file.")
-        print("   Expected CSV format: category,event,start_time")
-        raise typer.Exit(1)
+    # Build schedule list from file or single event
+    if event and category:
+        # Single event mode
+        from datetime import time as dt_time
+        schedules = [EventSchedule(category=category, event=event, start_time=dt_time(0, 0))]
+        print(f"📊 Updating PBs for single event: {category} {event}")
+    elif file:
+        if not file.exists():
+            print(f"❌ Schedule file not found: {file}")
+            raise typer.Exit(1)
 
-    print(f"📊 Updating PBs for {len(schedules)} events...")
+        schedules = parse_schedule_csv(file.read_text())
+
+        if not schedules:
+            print("❌ No valid events found in schedule file.")
+            print("   Expected CSV format: category,event,start_time")
+            raise typer.Exit(1)
+
+        print(f"📊 Updating PBs for {len(schedules)} events...")
+    else:
+        print("❌ Either provide a CSV file or use --event and --category")
+        raise typer.Exit(1)
     if club:
         print(f"   Default club: {club}")
     print()
@@ -314,6 +327,50 @@ def update_pbs(
             for event, error in errors:
                 print(f"   - {event}: {error}")
             raise typer.Exit(1)
+
+
+@app.command("lookup-pb")
+def lookup_pb(
+    name: Annotated[str, typer.Argument(help="Athlete's full name")],
+    club: Annotated[str, typer.Option("--club", "-c", help="Club name for disambiguation")] = "",
+    birth_date: Annotated[str, typer.Option("--birth", "-b", help="Birth date (DD.MM.YYYY) for disambiguation")] = "",
+    debug: Annotated[bool, typer.Option("--debug", "-d", help="Enable debug output")] = False,
+) -> None:
+    """Look up PBs for an athlete by name."""
+    service = PBLookupService(debug=debug)
+
+    print(f"🔍 Looking up: {name}")
+    if club:
+        print(f"   Club: {club}")
+    if birth_date:
+        print(f"   Birth: {birth_date}")
+    print()
+
+    athlete = service.lookup_athlete(name, club=club, birth_date=birth_date)
+
+    if not athlete:
+        print("❌ No athlete found")
+        raise typer.Exit(1)
+
+    print(f"✅ Found: {athlete.name}")
+    if athlete.birth_date:
+        print(f"   Birth: {athlete.birth_date}")
+    if athlete.clubs:
+        print(f"   Clubs: {', '.join(athlete.clubs)}")
+    print()
+
+    if athlete.outdoor_pbs:
+        print("Outdoor PBs:")
+        for event, result in sorted(athlete.outdoor_pbs.items()):
+            print(f"   {event}: {result}")
+
+    if athlete.indoor_pbs:
+        print("\nIndoor PBs:")
+        for event, result in sorted(athlete.indoor_pbs.items()):
+            print(f"   {event}: {result}")
+
+    if not athlete.outdoor_pbs and not athlete.indoor_pbs:
+        print("   No PBs found")
 
 
 # Legacy entry point for backwards compatibility

@@ -558,10 +558,10 @@ class EventScheduler:
                 continue
             
             name = name_link.text_content().strip()
-            
-            # Try to get club from the row (varies by table structure)
-            # Club is often in a cell with class "club" or similar
-            club_cell = row.locator("td.club, td:has-text('IF'), td:has-text('IL'), td:has-text('TIF')")
+
+            # Try to get club from the row - only use explicit club class
+            # Don't try text matching as it's too error-prone (e.g., "Tilde" contains "il")
+            club_cell = row.locator("td.club")
             club = ""
             if club_cell.count() > 0:
                 club = club_cell.first.text_content().strip()
