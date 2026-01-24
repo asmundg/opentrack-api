@@ -35,17 +35,19 @@ To match OpenTrack's event structure, all categories aged 10 and under are colla
 
 ## Input Format
 
-The tool expects an Isonen-format CSV with these columns:
+The tool expects an Isonen-format CSV export. The full format includes many columns:
 
 ```csv
-Fornavn,Etternavn,Kjønn,Klasse,Klubb,Øvelse,Dato,Kl.,SB,PB
+Fornavn,Etternavn,E-post,Land,Landskode,Fødselsdato,Alder,Mobil,Kjønn,Klubb,Klubb-ID,Gruppe-ID,Krets/region,Krets/region ID,Kommentar,Sport,Øvelse,Klasse,Dato,Kl.,Sum,Mva,Lisens,Helårslisens,Engangslisens,Påmeldt av,E-post påmelder,Påmelder betalte,Påmelder betalte mva,Betalt,Transaksjons-ID,Påmeldings-ID,Påmeldingsstatus,Påmeldt dato,Påmeldt kl.,Deltakerstatus,Alle betalinger,Buypass ID,Person ID,Påmeldingsavgift,Påmeldingsavgift mva,Markedskommunikasjon,Mediesamtykke
 ```
 
-**Required columns**:
+**Only 2 columns are required** - all others are ignored:
 - `Klasse` - Age category (e.g., "Gutter 15", "Jenter Rekrutt 6-8")
 - `Øvelse` - Event name (e.g., "100 meter", "Lengde", "Kule")
 
-See `example_isonen_input.csv` for a complete example.
+This means you can export directly from Isonen and use it without modification.
+
+See `example_isonen_input.csv` for a complete example with all columns.
 
 ## Output Format
 

@@ -1,21 +1,21 @@
-Fornavn,Etternavn,Kjønn,Klasse,Klubb,Øvelse,Dato,Kl.,SB,PB
-Lars,Andersen,G,Gutter 15,Oslo IL,100 meter,15.06.2024,14:00,12.45,12.30
-Anna,Bergström,J,Jenter 15,Bergen SIF,Lengde,15.06.2024,14:05,,4.23
-Ole,Hansen,G,Gutter 9,Tyrving,60 meter,15.06.2024,14:10,10.50,10.40
-Emma,Karlsen,J,Jenter Rekrutt 6-8,Tyrving,Lengde,15.06.2024,14:15,2.50,2.45
-Jonas,Olsen,G,Gutter 10,Oslo IL,Kule,15.06.2024,14:20,5.20,5.15
-Sara,Nilsen,J,Jenter 15,Bergen SIF,100 meter,15.06.2024,14:25,14.20,14.15
-Per,Berg,G,Gutter 9,Tyrving,Lengde,15.06.2024,14:30,3.10,3.05
-Lise,Aasen,J,Jenter Rekrutt 6-8,Oslo IL,60 meter,15.06.2024,14:35,11.20,11.15
-Martin,Johansen,G,Gutter 13,Tyrving,200 meter,15.06.2024,14:40,28.50,28.20
-Kari,Larsen,J,Jenter 13,Bergen SIF,Høyde,15.06.2024,14:45,1.25,1.30
-Erik,Nilsen,G,Gutter 11,Oslo IL,60 meter,15.06.2024,14:50,9.80,9.75
-Sofie,Hansen,J,Jenter 11,Tyrving,Kule,15.06.2024,14:55,4.50,4.45
-Anders,Olsen,G,Gutter 16,Bergen SIF,Spyd,15.06.2024,15:00,32.50,33.20
-Ingrid,Berg,J,Jenter 16,Oslo IL,Tresteg,15.06.2024,15:05,9.20,9.35
-Thomas,Aasen,G,Gutter 14,Tyrving,800 meter,15.06.2024,15:10,2:25.5,2:24.8
-Maria,Karlsen,J,Jenter 14,Bergen SIF,60 meter hekk,15.06.2024,15:15,11.20,11.10
-Kristian,Andersen,G,Gutter 12,Oslo IL,Lengde,15.06.2024,15:20,3.85,3.90
-Linda,Nilsen,J,Jenter 12,Tyrving,100 meter,15.06.2024,15:25,15.20,15.15
-Henrik,Johansen,G,Gutter 17,Bergen SIF,110 meter hekk,15.06.2024,15:30,16.80,16.50
-Emma,Hansen,J,Jenter 17,Oslo IL,100 meter hekk,15.06.2024,15:35,16.20,16.10
+Fornavn,Etternavn,E-post,Land,Landskode,Fødselsdato,Alder,Mobil,Kjønn,Klubb,Klubb-ID,Gruppe-ID,Krets/region,Krets/region ID,Kommentar,Sport,Øvelse,Klasse,Dato,Kl.,Sum,Mva,Lisens,Helårslisens,Engangslisens,Påmeldt av,E-post påmelder,Påmelder betalte,Påmelder betalte mva,Betalt,Transaksjons-ID,Påmeldings-ID,Påmeldingsstatus,Påmeldt dato,Påmeldt kl.,Deltakerstatus,Alle betalinger,Buypass ID,Person ID,Påmeldingsavgift,Påmeldingsavgift mva,Markedskommunikasjon,Mediesamtykke
+Lars,Andersen,lars@example.com,Norge,NO,12.03.2009,15,91234567,G,Oslo IL,123,456,Oslo,01,,Friidrett,100 meter,Gutter 15,15.06.2024,14:00,150,30,Ja,Ja,Nei,Trener Hansen,trener@oslo.no,150,30,Ja,TX123456,PM001,Godkjent,01.06.2024,10:00,Aktiv,150,BP001,P001,150,30,Ja,Ja
+Anna,Bergström,anna@example.com,Norge,NO,08.05.2009,15,91234568,J,Bergen SIF,124,457,Hordaland,12,,Friidrett,Lengde,Jenter 15,15.06.2024,14:05,150,30,Ja,Ja,Nei,Trener Olsen,trener@bergen.no,150,30,Ja,TX123457,PM002,Godkjent,01.06.2024,10:05,Aktiv,150,BP002,P002,150,30,Ja,Ja
+Ole,Hansen,ole@example.com,Norge,NO,15.07.2015,9,91234569,G,Tyrving,125,458,Buskerud,06,,Friidrett,60 meter,Gutter 9,15.06.2024,14:10,100,20,Ja,Ja,Nei,Forelder Hansen,forelder@tyrving.no,100,20,Ja,TX123458,PM003,Godkjent,01.06.2024,10:10,Aktiv,100,BP003,P003,100,20,Nei,Ja
+Emma,Karlsen,emma@example.com,Norge,NO,20.02.2016,8,91234570,J,Tyrving,125,458,Buskerud,06,,Friidrett,Lengde,Jenter Rekrutt 6-8,15.06.2024,14:15,100,20,Ja,Ja,Nei,Forelder Karlsen,forelder2@tyrving.no,100,20,Ja,TX123459,PM004,Godkjent,01.06.2024,10:15,Aktiv,100,BP004,P004,100,20,Nei,Ja
+Jonas,Olsen,jonas@example.com,Norge,NO,10.04.2014,10,91234571,G,Oslo IL,123,456,Oslo,01,,Friidrett,Kule,Gutter 10,15.06.2024,14:20,100,20,Ja,Ja,Nei,Trener Hansen,trener@oslo.no,100,20,Ja,TX123460,PM005,Godkjent,01.06.2024,10:20,Aktiv,100,BP005,P005,100,20,Ja,Ja
+Sara,Nilsen,sara@example.com,Norge,NO,22.06.2009,15,91234572,J,Bergen SIF,124,457,Hordaland,12,,Friidrett,100 meter,Jenter 15,15.06.2024,14:25,150,30,Ja,Ja,Nei,Trener Olsen,trener@bergen.no,150,30,Ja,TX123461,PM006,Godkjent,01.06.2024,10:25,Aktiv,150,BP006,P006,150,30,Ja,Ja
+Per,Berg,per@example.com,Norge,NO,18.08.2015,9,91234573,G,Tyrving,125,458,Buskerud,06,,Friidrett,Lengde,Gutter 9,15.06.2024,14:30,100,20,Ja,Ja,Nei,Forelder Berg,forelder3@tyrving.no,100,20,Ja,TX123462,PM007,Godkjent,01.06.2024,10:30,Aktiv,100,BP007,P007,100,20,Nei,Ja
+Lise,Aasen,lise@example.com,Norge,NO,05.11.2016,8,91234574,J,Oslo IL,123,456,Oslo,01,,Friidrett,60 meter,Jenter Rekrutt 6-8,15.06.2024,14:35,100,20,Ja,Ja,Nei,Forelder Aasen,forelder4@oslo.no,100,20,Ja,TX123463,PM008,Godkjent,01.06.2024,10:35,Aktiv,100,BP008,P008,100,20,Ja,Ja
+Martin,Johansen,martin@example.com,Norge,NO,14.01.2011,13,91234575,G,Tyrving,125,458,Buskerud,06,,Friidrett,200 meter,Gutter 13,15.06.2024,14:40,150,30,Ja,Ja,Nei,Trener Larsen,trener@tyrving.no,150,30,Ja,TX123464,PM009,Godkjent,01.06.2024,10:40,Aktiv,150,BP009,P009,150,30,Ja,Ja
+Kari,Larsen,kari@example.com,Norge,NO,30.09.2011,13,91234576,J,Bergen SIF,124,457,Hordaland,12,,Friidrett,Høyde,Jenter 13,15.06.2024,14:45,150,30,Ja,Ja,Nei,Trener Olsen,trener@bergen.no,150,30,Ja,TX123465,PM010,Godkjent,01.06.2024,10:45,Aktiv,150,BP010,P010,150,30,Ja,Ja
+Erik,Nilsen,erik@example.com,Norge,NO,25.03.2013,11,91234577,G,Oslo IL,123,456,Oslo,01,,Friidrett,60 meter,Gutter 11,15.06.2024,14:50,150,30,Ja,Ja,Nei,Trener Hansen,trener@oslo.no,150,30,Ja,TX123466,PM011,Godkjent,01.06.2024,10:50,Aktiv,150,BP011,P011,150,30,Ja,Ja
+Sofie,Hansen,sofie@example.com,Norge,NO,17.12.2013,11,91234578,J,Tyrving,125,458,Buskerud,06,,Friidrett,Kule,Jenter 11,15.06.2024,14:55,150,30,Ja,Ja,Nei,Trener Larsen,trener@tyrving.no,150,30,Ja,TX123467,PM012,Godkjent,01.06.2024,10:55,Aktiv,150,BP012,P012,150,30,Ja,Ja
+Anders,Olsen,anders@example.com,Norge,NO,11.02.2008,16,91234579,G,Bergen SIF,124,457,Hordaland,12,,Friidrett,Spyd,Gutter 16,15.06.2024,15:00,150,30,Ja,Ja,Nei,Trener Olsen,trener@bergen.no,150,30,Ja,TX123468,PM013,Godkjent,01.06.2024,11:00,Aktiv,150,BP013,P013,150,30,Ja,Ja
+Ingrid,Berg,ingrid@example.com,Norge,NO,07.06.2008,16,91234580,J,Oslo IL,123,456,Oslo,01,,Friidrett,Tresteg,Jenter 16,15.06.2024,15:05,150,30,Ja,Ja,Nei,Trener Hansen,trener@oslo.no,150,30,Ja,TX123469,PM014,Godkjent,01.06.2024,11:05,Aktiv,150,BP014,P014,150,30,Ja,Ja
+Thomas,Aasen,thomas@example.com,Norge,NO,28.10.2010,14,91234581,G,Tyrving,125,458,Buskerud,06,,Friidrett,800 meter,Gutter 14,15.06.2024,15:10,150,30,Ja,Ja,Nei,Trener Larsen,trener@tyrving.no,150,30,Ja,TX123470,PM015,Godkjent,01.06.2024,11:10,Aktiv,150,BP015,P015,150,30,Ja,Ja
+Maria,Karlsen,maria@example.com,Norge,NO,19.04.2010,14,91234582,J,Bergen SIF,124,457,Hordaland,12,,Friidrett,60 meter hekk,Jenter 14,15.06.2024,15:15,150,30,Ja,Ja,Nei,Trener Olsen,trener@bergen.no,150,30,Ja,TX123471,PM016,Godkjent,01.06.2024,11:15,Aktiv,150,BP016,P016,150,30,Ja,Ja
+Kristian,Andersen,kristian@example.com,Norge,NO,03.08.2012,12,91234583,G,Oslo IL,123,456,Oslo,01,,Friidrett,Lengde,Gutter 12,15.06.2024,15:20,150,30,Ja,Ja,Nei,Trener Hansen,trener@oslo.no,150,30,Ja,TX123472,PM017,Godkjent,01.06.2024,11:20,Aktiv,150,BP017,P017,150,30,Ja,Ja
+Linda,Nilsen,linda@example.com,Norge,NO,16.01.2012,12,91234584,J,Tyrving,125,458,Buskerud,06,,Friidrett,100 meter,Jenter 12,15.06.2024,15:25,150,30,Ja,Ja,Nei,Trener Larsen,trener@tyrving.no,150,30,Ja,TX123473,PM018,Godkjent,01.06.2024,11:25,Aktiv,150,BP018,P018,150,30,Ja,Ja
+Henrik,Johansen,henrik@example.com,Norge,NO,09.07.2007,17,91234585,G,Bergen SIF,124,457,Hordaland,12,,Friidrett,110 meter hekk,Gutter 17,15.06.2024,15:30,150,30,Ja,Ja,Nei,Trener Olsen,trener@bergen.no,150,30,Ja,TX123474,PM019,Godkjent,01.06.2024,11:30,Aktiv,150,BP019,P019,150,30,Ja,Ja
+Emma,Hansen,emma.h@example.com,Norge,NO,21.11.2007,17,91234586,J,Oslo IL,123,456,Oslo,01,,Friidrett,100 meter hekk,Jenter 17,15.06.2024,15:35,150,30,Ja,Ja,Nei,Trener Hansen,trener@oslo.no,150,30,Ja,TX123475,PM020,Godkjent,01.06.2024,11:35,Aktiv,150,BP020,P020,150,30,Ja,Ja
