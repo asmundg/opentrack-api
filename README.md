@@ -37,6 +37,18 @@ This opens a browser where you can:
 
 The generated code shows you the exact selectors and steps needed, which you can then copy into `opentrack_admin/competition.py`.
 
+## Features
+
+### XLSX Event Export
+
+Export events from Isonen CSV to OpenTrack XLSX format for bulk event creation:
+
+```bash
+uv run python -m scheduler.cli to-opentrack-xlsx participants.csv -o events.xlsx
+```
+
+This automatically collapses young age categories (≤10) into "10" to match OpenTrack's structure. See [OPENTRACK_XLSX_EXPORT.md](OPENTRACK_XLSX_EXPORT.md) for details.
+
 ## Usage
 
 ### Test Login
