@@ -16,6 +16,7 @@ from . import models
 from .event_csv import export_event_overview_csv, import_event_overview_csv, result_to_event_schedule_rows
 from .constraint_validator import validate_event_schedule, ConstraintViolation
 from .schedule_builder import build_scheduling_result_from_events
+from .opentrack_xlsx_exporter import export_isonen_csv_to_opentrack_xlsx
 
 app = typer.Typer(
     name="scheduler",
@@ -338,6 +339,61 @@ def schedule_from_events(
         start_minute=earliest_time.minute,
     )
     typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
+
+
+@app.command("to-opentrack-xlsx")
+def export_to_opentrack_xlsx(
+    input_file: Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the Isonen CSV file with participant data",
+            exists=True,
+            readable=True,
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Output XLSX file path"),
+    ] = Path("opentrack_events.xlsx"),
+    meet_name: Annotated[
+        str,
+        typer.Option("--meet-name", help="Name of the track meet"),
+    ] = "Track Meet",
+    quiet: Annotated[
+        bool,
+        typer.Option("--quiet", "-q", help="Suppress detailed output"),
+    ] = False,
+) -> None:
+    """
+    Export Isonen CSV to OpenTrack XLSX format for event creation.
+
+    This command:
+    1. Reads the Isonen CSV participant data
+    2. Extracts unique category+event combinations
+    3. Collapses categories <=10 into "10" (e.g., "Gutter 9" -> "Gutter 10")
+    4. Exports to XLSX format for uploading to OpenTrack
+
+    The XLSX file can then be uploaded to OpenTrack to create all events at once.
+    """
+    if not quiet:
+        typer.echo(f"Reading participant data from {input_file}...")
+
+    # Export to XLSX
+    try:
+        num_events = export_isonen_csv_to_opentrack_xlsx(
+            csv_path=input_file,
+            output_path=output,
+            meet_name=meet_name,
+        )
+
+        if not quiet:
+            typer.echo(f"\n✅ Exported {num_events} unique events to OpenTrack XLSX format")
+            typer.echo(f"   File saved to: {output.absolute()}")
+            typer.echo(f"\n💡 Note: Categories <=10 have been collapsed to '10'")
+            typer.echo(f"   (e.g., 'Gutter 9' and 'Gutter Rekrutt 6-8' both become 'Gutter 10')")
+    except Exception as e:
+        typer.echo(f"❌ Error exporting to XLSX: {e}", err=True)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":
