@@ -220,6 +220,16 @@ class Event:
     personnel_required: int
     priority_weight: int  # higher = schedule earlier
 
+    def get_date(self) -> str:
+        """Extract the date portion from ISO 8601 start_time (YYYY-MM-DD format)."""
+        from datetime import datetime
+        try:
+            dt = datetime.fromisoformat(self.start_time)
+            return dt.date().isoformat()
+        except (ValueError, AttributeError):
+            # Fallback to today's date if parsing fails
+            return datetime.now().date().isoformat()
+
 @dataclass
 class EventGroup:
     id: str
