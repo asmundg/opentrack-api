@@ -5,7 +5,7 @@ All CSV I/O goes through these validated DTOs to avoid opaque dictionaries
 and ensure data integrity.
 """
 
-from datetime import datetime, time
+from datetime import datetime, time, date
 from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Self
 
@@ -32,6 +32,9 @@ class EventScheduleRow(BaseModel):
     venue: Venue = Field(
         description="The venue where this event takes place"
     )
+    date: date = Field(
+        description="Event date (YYYY-MM-DD format)"
+    )
     start_time: time = Field(
         description="Event start time (HH:MM format)"
     )
@@ -42,6 +45,24 @@ class EventScheduleRow(BaseModel):
         description="Total duration in minutes",
         ge=0
     )
+
+    @field_validator('date', mode='before')
+    @classmethod
+    def parse_date(cls, v: str | date) -> date:
+        """Parse date from string if needed."""
+        if isinstance(v, date):
+            return v
+        if isinstance(v, str):
+            # Handle YYYY-MM-DD or DD.MM.YYYY format
+            try:
+                return datetime.strptime(v.strip(), '%Y-%m-%d').date()
+            except ValueError:
+                try:
+                    return datetime.strptime(v.strip(), '%d.%m.%Y').date()
+                except ValueError:
+                    # Try ISO format
+                    return datetime.fromisoformat(v).date()
+        raise ValueError(f"Invalid date format: {v}")
 
     @field_validator('start_time', 'end_time', mode='before')
     @classmethod
@@ -86,6 +107,7 @@ class EventScheduleRow(BaseModel):
             'event_type': self.event_type.value,
             'categories': self.categories,
             'venue': self.venue.value,
+            'date': self.date.strftime('%Y-%m-%d'),
             'start_time': self.start_time.strftime('%H:%M'),
             'end_time': self.end_time.strftime('%H:%M'),
             'duration_minutes': str(self.duration_minutes),
@@ -115,6 +137,7 @@ class EventScheduleRow(BaseModel):
             event_type=event_type,
             categories=row['categories'],
             venue=venue,
+            date=row['date'],
             start_time=row['start_time'],
             end_time=row['end_time'],
             duration_minutes=int(row['duration_minutes']),

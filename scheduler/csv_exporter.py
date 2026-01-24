@@ -24,6 +24,7 @@ def export_schedule_csv(
     output_path: str,
     start_hour: int = 9,
     start_minute: int = 0,
+    base_date: datetime | None = None,
 ) -> None:
     """
     Export an updated copy of the input CSV with computed start times.
@@ -37,13 +38,14 @@ def export_schedule_csv(
         output_path: Path for the output CSV file
         start_hour: Starting hour for the schedule (24-hour format)
         start_minute: Starting minute for the schedule
+        base_date: The date for this schedule (defaults to today if not specified)
     """
     if result.status != "solved":
         raise ValueError(f"Cannot export unsolved schedule: {result.status}")
 
     # Build mapping from (event_type, category) -> start time
     event_start_times = _build_event_start_times(
-        result, start_hour, start_minute
+        result, start_hour, start_minute, base_date
     )
 
     # Read original CSV and update times
@@ -60,11 +62,17 @@ def _build_event_start_times(
     result: SchedulingResult,
     start_hour: int,
     start_minute: int,
+    base_date: datetime | None = None,
 ) -> dict[tuple[str, str], datetime]:
     """Build mapping from (event_type, category) to scheduled start time."""
-    base_time = datetime.now().replace(
-        hour=start_hour, minute=start_minute, second=0, microsecond=0
-    )
+    if base_date is None:
+        base_time = datetime.now().replace(
+            hour=start_hour, minute=start_minute, second=0, microsecond=0
+        )
+    else:
+        base_time = base_date.replace(
+            hour=start_hour, minute=start_minute, second=0, microsecond=0
+        )
     slot_duration = result.slot_duration_minutes
 
     event_times: dict[tuple[str, str], datetime] = {}

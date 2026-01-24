@@ -1,10 +1,69 @@
 import time
 from datetime import datetime
+from collections import defaultdict
 
 from .functional_scheduler import SchedulingResult, schedule_track_meet
 from .html_schedule_generator import save_html_schedule
 from .isonen_parser import parse_isonen_csv
 from .models import Athlete, Category, Event, EventGroup, EventType, EventVenueMapping, Venue
+
+
+def group_events_by_date(events: list[Event]) -> dict[str, list[Event]]:
+    """
+    Group events by their date.
+
+    Args:
+        events: List of events with ISO 8601 start_time
+
+    Returns:
+        Dictionary mapping date strings (YYYY-MM-DD) to lists of events
+    """
+    events_by_date: dict[str, list[Event]] = defaultdict(list)
+
+    for event in events:
+        date_str = event.get_date()
+        events_by_date[date_str].append(event)
+
+    return dict(events_by_date)
+
+
+def group_athletes_by_date(
+    athletes: list[Athlete],
+    events_by_date: dict[str, list[Event]]
+) -> dict[str, list[Athlete]]:
+    """
+    Group athletes by the dates they're competing.
+
+    Args:
+        athletes: List of all athletes
+        events_by_date: Events grouped by date
+
+    Returns:
+        Dictionary mapping date strings to lists of athletes competing that day
+    """
+    # Create a reverse mapping from event ID to date
+    event_id_to_date: dict[str, str] = {}
+    for date_str, events in events_by_date.items():
+        for event in events:
+            event_id_to_date[event.id] = date_str
+
+    athletes_by_date: dict[str, list[Athlete]] = defaultdict(list)
+
+    for athlete in athletes:
+        # Find all dates this athlete competes
+        athlete_dates: set[str] = set()
+        for event in athlete.events:
+            if event.id in event_id_to_date:
+                athlete_dates.add(event_id_to_date[event.id])
+
+        # Create a filtered athlete for each date with only that day's events
+        for date_str in athlete_dates:
+            date_events = [e for e in athlete.events if event_id_to_date.get(e.id) == date_str]
+            if date_events:
+                filtered_athlete = Athlete(name=athlete.name, events=date_events)
+                athletes_by_date[date_str].append(filtered_athlete)
+
+    return dict(athletes_by_date)
 
 
 def print_full_schedule(solution: SchedulingResult, title: str = "Full Schedule"):

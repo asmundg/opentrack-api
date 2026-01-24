@@ -10,7 +10,7 @@ from .functional_scheduler import schedule_track_meet
 from .html_schedule_generator import save_html_schedule
 from .csv_exporter import export_schedule_csv
 from .isonen_parser import parse_isonen_csv
-from .__main__ import group_events_by_type
+from .__main__ import group_events_by_type, group_events_by_date, group_athletes_by_date
 from .models import Event
 from . import models
 from .event_csv import export_event_overview_csv, import_event_overview_csv, result_to_event_schedule_rows
@@ -38,6 +38,10 @@ def schedule(
         Path,
         typer.Option("--output", "-o", help="Output HTML file path"),
     ] = Path("schedule.html"),
+    date: Annotated[
+        str | None,
+        typer.Option("--date", help="Schedule only this date (YYYY-MM-DD format). If not specified, schedules all dates."),
+    ] = None,
     start_hour: Annotated[
         int,
         typer.Option("--start-hour", help="Start hour (0-23)", min=0, max=23),
@@ -93,92 +97,150 @@ def schedule(
     if not quiet:
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
 
-    event_groups = group_events_by_type(events, athletes)
+    # Group events by date
+    events_by_date = group_events_by_date(events)
+    athletes_by_date = group_athletes_by_date(athletes, events_by_date)
+
+    # Filter to specific date if requested
+    if date:
+        if date not in events_by_date:
+            typer.echo(f"Error: No events found for date {date}", err=True)
+            available_dates = sorted(events_by_date.keys())
+            typer.echo(f"Available dates: {', '.join(available_dates)}", err=True)
+            raise typer.Exit(1)
+        dates_to_schedule = [date]
+    else:
+        dates_to_schedule = sorted(events_by_date.keys())
 
     if not quiet:
-        typer.echo(f"Created {len(event_groups)} event groups")
-        typer.echo("Solving schedule...")
+        typer.echo(f"Found {len(dates_to_schedule)} date(s) to schedule: {', '.join(dates_to_schedule)}")
 
-    # Convert max_duration to max_slots (5 min per slot)
-    slot_duration = 5
-    max_slots = max_duration // slot_duration if max_duration else 48
+    # Schedule each date
+    for schedule_date in dates_to_schedule:
+        if not quiet and len(dates_to_schedule) > 1:
+            typer.echo(f"\n{'='*60}")
+            typer.echo(f"Scheduling {schedule_date}")
+            typer.echo(f"{'='*60}")
 
-    result = schedule_track_meet(
-        events=event_groups,
-        athletes=athletes,
-        total_personnel=personnel,
-        max_time_slots=max_slots,
-        timeout_ms=timeout * 1000,
-        optimization_timeout_ms=timeout * 1000,
-        max_track_duration=max_track_duration,
-    )
+        day_events = events_by_date[schedule_date]
+        day_athletes = athletes_by_date.get(schedule_date, [])
 
-    if result.status != "solved":
-        typer.echo(f"Failed to find solution: {result.status}", err=True)
-        raise typer.Exit(1)
+        if not quiet:
+            typer.echo(f"Date: {schedule_date}")
+            typer.echo(f"Events: {len(day_events)}, Athletes: {len(day_athletes)}")
 
-    # Validate the generated schedule as a sanity check
-    if not quiet:
-        typer.echo(f"\nValidating generated schedule...")
-    base_datetime = datetime.now().replace(
-        hour=start_hour, minute=start_minute, second=0, microsecond=0
-    )
-    event_schedule = result_to_event_schedule_rows(result, base_datetime, slot_duration_minutes=5)
-    try:
-        validate_event_schedule(
-            events=event_schedule,
-            event_groups=event_groups,
-            athletes=athletes,
+        event_groups = group_events_by_type(day_events, day_athletes)
+
+        if not quiet:
+            typer.echo(f"Created {len(event_groups)} event groups")
+            typer.echo("Solving schedule...")
+
+        # Convert max_duration to max_slots (5 min per slot)
+        slot_duration = 5
+        max_slots = max_duration // slot_duration if max_duration else 48
+
+        result = schedule_track_meet(
+            events=event_groups,
+            athletes=day_athletes,
+            total_personnel=personnel,
+            max_time_slots=max_slots,
+            timeout_ms=timeout * 1000,
+            optimization_timeout_ms=timeout * 1000,
+            max_track_duration=max_track_duration,
+        )
+
+        if result.status != "solved":
+            typer.echo(f"Failed to find solution for {schedule_date}: {result.status}", err=True)
+            if len(dates_to_schedule) == 1:
+                raise typer.Exit(1)
+            else:
+                continue  # Try next date
+
+        # Parse the date to create a proper datetime
+        try:
+            date_obj = datetime.strptime(schedule_date, "%Y-%m-%d")
+        except ValueError:
+            typer.echo(f"Warning: Could not parse date {schedule_date}, using today", err=True)
+            date_obj = datetime.now()
+
+        base_datetime = date_obj.replace(
+            hour=start_hour, minute=start_minute, second=0, microsecond=0
+        )
+
+        # Validate the generated schedule as a sanity check
+        if not quiet:
+            typer.echo(f"\nValidating generated schedule...")
+        event_schedule = result_to_event_schedule_rows(result, base_datetime, slot_duration_minutes=5)
+        try:
+            validate_event_schedule(
+                events=event_schedule,
+                event_groups=event_groups,
+                athletes=day_athletes,
+                slot_duration_minutes=5,
+            )
+        except ConstraintViolation as e:
+            typer.echo(f"⚠️  Scheduler produced invalid schedule: {e}", err=True)
+            # Don't fail - this is a sanity check, not a blocker
+
+        if not quiet:
+            typer.echo(f"\nSolution found!")
+            typer.echo(f"Total slots: {result.total_slots}")
+            typer.echo(f"Duration: {result.total_duration_minutes} minutes")
+
+            if result.optimization_stats:
+                stats = result.optimization_stats
+                improvement = stats["initial_slots"] - stats["final_slots"]
+                typer.echo(
+                    f"Optimization: {stats['initial_slots']} -> {stats['final_slots']} slots "
+                    f"(improved by {improvement})"
+                )
+
+        # Generate date-specific output filenames
+        if len(dates_to_schedule) > 1:
+            date_suffix = f"_{schedule_date}"
+            output_html = output.parent / f"{output.stem}{date_suffix}.html"
+            output_csv = output.parent / f"{output.stem}{date_suffix}.csv"
+            output_events_csv = output.parent / f"{output.stem}{date_suffix}_events.csv"
+            schedule_title = f"{title} - {schedule_date}"
+        else:
+            output_html = output
+            output_csv = output.with_suffix(".csv")
+            output_events_csv = output.parent / f"{output.stem}_events.csv"
+            schedule_title = title
+
+        save_html_schedule(
+            result=result,
+            file_path=str(output_html),
+            title=schedule_title,
+            start_hour=start_hour,
+            start_minute=start_minute,
+        )
+
+        typer.echo(f"\nHTML schedule saved to: {output_html.absolute()}")
+
+        # Export updated CSV with computed start times
+        export_schedule_csv(
+            result=result,
+            original_csv_path=str(input_file),
+            output_path=str(output_csv),
+            start_hour=start_hour,
+            start_minute=start_minute,
+            base_date=base_datetime,
+        )
+        typer.echo(f"CSV schedule saved to: {output_csv.absolute()}")
+
+        # Export event overview CSV for manual editing
+        export_event_overview_csv(
+            result=result,
+            output_path=output_events_csv,
+            base_date=base_datetime,
             slot_duration_minutes=5,
         )
-    except ConstraintViolation as e:
-        typer.echo(f"⚠️  Scheduler produced invalid schedule: {e}", err=True)
-        # Don't fail - this is a sanity check, not a blocker
+        typer.echo(f"Event overview CSV saved to: {output_events_csv.absolute()}")
 
-    if not quiet:
-        typer.echo(f"\nSolution found!")
-        typer.echo(f"Total slots: {result.total_slots}")
-        typer.echo(f"Duration: {result.total_duration_minutes} minutes")
-
-        if result.optimization_stats:
-            stats = result.optimization_stats
-            improvement = stats["initial_slots"] - stats["final_slots"]
-            typer.echo(
-                f"Optimization: {stats['initial_slots']} -> {stats['final_slots']} slots "
-                f"(improved by {improvement})"
-            )
-
-    save_html_schedule(
-        result=result,
-        file_path=str(output),
-        title=title,
-        start_hour=start_hour,
-        start_minute=start_minute,
-    )
-
-    typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
-
-    # Export updated CSV with computed start times
-    csv_output = output.with_suffix(".csv")
-    export_schedule_csv(
-        result=result,
-        original_csv_path=str(input_file),
-        output_path=str(csv_output),
-        start_hour=start_hour,
-        start_minute=start_minute,
-    )
-    typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
-
-    # Export event overview CSV for manual editing
-    events_csv_output = output.parent / f"{output.stem}_events.csv"
-    export_event_overview_csv(
-        result=result,
-        output_path=events_csv_output,
-        base_date=base_datetime,
-        slot_duration_minutes=5,
-    )
-    typer.echo(f"Event overview CSV saved to: {events_csv_output.absolute()}")
-    typer.echo(f"\n💡 Tip: You can now manually edit {events_csv_output.name} and use")
+    if len(dates_to_schedule) > 1:
+        typer.echo(f"\n✅ Successfully scheduled {len(dates_to_schedule)} dates")
+    typer.echo(f"\n💡 Tip: You can now manually edit the _events.csv files and use")
     typer.echo(f"   'schedule from-events' to regenerate outputs with your changes.")
 
 
