@@ -11,7 +11,7 @@ from .html_schedule_generator import save_html_schedule
 from .csv_exporter import export_schedule_csv
 from .isonen_parser import parse_isonen_csv
 from .__main__ import group_events_by_type
-from .models import Event
+from .models import Event, EventType, SecondaryVenueConfig
 from . import models
 from .event_csv import export_event_overview_csv, import_event_overview_csv, result_to_event_schedule_rows
 from .constraint_validator import validate_event_schedule, ConstraintViolation
@@ -67,12 +67,12 @@ def schedule(
         typer.Option("--quiet", "-q", help="Suppress detailed output"),
     ] = False,
     secondary_venues: Annotated[
-        bool,
+        str,
         typer.Option(
-            "--secondary-venues/--no-secondary-venues",
-            help="Use secondary venues for young athletes (J/G10)",
+            "--secondary-venues",
+            help="Comma-separated event types for secondary venues (e.g. 'hj,sp'), or empty to disable",
         ),
-    ] = True,
+    ] = "hj,sp",
     max_track_duration: Annotated[
         int | None,
         typer.Option("--max-track-duration", help="Maximum track duration in minutes (track ends earlier than field)"),
@@ -80,10 +80,27 @@ def schedule(
 ) -> None:
     """Generate a track meet schedule from an Isonen CSV file."""
     # Configure secondary venues
-    models.USE_SECONDARY_VENUES = secondary_venues
+    if secondary_venues:
+        active = set()
+        for name in secondary_venues.split(","):
+            name = name.strip()
+            if not name:
+                continue
+            try:
+                active.add(EventType[name])
+            except KeyError:
+                typer.echo(f"Unknown event type for secondary venue: '{name}'", err=True)
+                raise typer.Exit(1)
+            if EventType[name] not in SecondaryVenueConfig:
+                typer.echo(f"No secondary venue configured for '{name}'", err=True)
+                raise typer.Exit(1)
+        models.ACTIVE_SECONDARY_VENUES = active
+    else:
+        models.ACTIVE_SECONDARY_VENUES = set()
     if not quiet:
-        if secondary_venues:
-            typer.echo("Secondary venues: enabled (J/G10 use separate areas)")
+        if models.ACTIVE_SECONDARY_VENUES:
+            names = ", ".join(et.name for et in models.ACTIVE_SECONDARY_VENUES)
+            typer.echo(f"Secondary venues: {names}")
         else:
             typer.echo("Secondary venues: disabled")
         typer.echo(f"Parsing {input_file}...")

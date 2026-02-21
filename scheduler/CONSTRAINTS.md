@@ -84,4 +84,4 @@ Default: 5 minutes per slot. All times are quantized to slots.
 Not currently used as a constraint (placeholder for future).
 
 ### Secondary Venues
-Controlled by `USE_SECONDARY_VENUES` flag. When enabled, young athletes (J/G10) use secondary venues (e.g., shot put circle 2) which allows parallel scheduling.
+Controlled by `ACTIVE_SECONDARY_VENUES` set and `--secondary-venues` CLI flag. When an event type is active, young athletes (J/G10) use secondary venues (e.g., shot put circle 2, high jump area 2) which allows parallel scheduling.

@@ -11,6 +11,7 @@ class Venue(Enum):
     SHOT_PUT_CIRCLE_2 = "shot_put_circle_2"  # Secondary circle for young athletes
     JUMPING_PIT = "jumping_pit"
     HIGH_JUMP_AREA = "high_jump_area"
+    HIGH_JUMP_AREA_2 = "high_jump_area_2"  # Secondary area for young athletes
     JAVELIN_AREA = "javelin_area"
 
 
@@ -178,15 +179,15 @@ EventVenueMapping: dict[EventType, Venue] = {
     EventType.pv: Venue.HIGH_JUMP_AREA,
 }
 
-# Secondary venue configuration: maps (event_type, secondary_venue) to the categories
-# that should use the secondary venue instead of the primary one.
-# Set to None to disable secondary venue usage.
-SecondaryVenueConfig: dict[EventType, tuple[Venue, frozenset[Category]] | None] = {
-    EventType.sp: (Venue.SHOT_PUT_CIRCLE_2, YOUNGEST_CATEGORIES),  # J/G10 use secondary circle
+# Secondary venue configuration: maps event_type to (secondary_venue, eligible_categories).
+# The CLI --secondary-venues flag selects which of these are active.
+SecondaryVenueConfig: dict[EventType, tuple[Venue, frozenset[Category]]] = {
+    EventType.sp: (Venue.SHOT_PUT_CIRCLE_2, YOUNGEST_CATEGORIES),
+    EventType.hj: (Venue.HIGH_JUMP_AREA_2, YOUNGEST_CATEGORIES),
 }
 
-# Control flag to enable/disable secondary venue assignments globally
-USE_SECONDARY_VENUES: bool = True
+# Which secondary venues are currently active (set by CLI)
+ACTIVE_SECONDARY_VENUES: set[EventType] = set()
 
 
 def get_venue_for_event(event_type: EventType, category: Category | None = None) -> Venue | None:
@@ -198,7 +199,7 @@ def get_venue_for_event(event_type: EventType, category: Category | None = None)
     """
     primary_venue = EventVenueMapping.get(event_type)
 
-    if not USE_SECONDARY_VENUES or category is None:
+    if category is None or event_type not in ACTIVE_SECONDARY_VENUES:
         return primary_venue
 
     secondary_config = SecondaryVenueConfig.get(event_type)
@@ -299,6 +300,8 @@ EventCategoryDurationOverride: dict[tuple[EventType, Category], int] = {
     (EventType.lj, Category.g10): 3,
     (EventType.lj, Category.g11): 4,
     (EventType.lj, Category.g12): 4,
+    (EventType.hj, Category.j10): 4,
+    (EventType.hj, Category.g10): 4,
     }
 
 EventCategoryDuration: dict[tuple[EventType, Category], int] = {

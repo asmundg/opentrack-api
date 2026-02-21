@@ -138,11 +138,13 @@ def _validate_athlete_conflicts(
 
     # Check each athlete's schedule
     for athlete in athletes:
-        # Get all event groups this athlete participates in
+        # Get all event groups this athlete participates in (deduplicate by group)
         athlete_groups = []
+        seen_group_ids: set[str] = set()
         for event in athlete.events:
             group = event_to_group.get(event.id)
-            if group and group.id in event_schedule_map:
+            if group and group.id in event_schedule_map and group.id not in seen_group_ids:
+                seen_group_ids.add(group.id)
                 schedule = event_schedule_map[group.id]
                 athlete_groups.append((schedule, group))
 
