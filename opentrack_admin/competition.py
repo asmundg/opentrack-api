@@ -1,8 +1,10 @@
 """Competition creation and management for OpenTrack."""
 
 import logging
+import time
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Literal
 
 from .browser import OpenTrackSession
@@ -242,6 +244,53 @@ class CompetitionCreator:
 
         logger.debug("Saving scoring settings")
         page.get_by_role("button", name="Save").click()
+        page.wait_for_load_state("networkidle")
+
+    def import_athletes(self, xlsx_path: Path) -> None:
+        """Upload XLSX file and process it to create competitor/event records.
+
+        Uses OpenTrack's custom import page (manage/custom/) which has a
+        3-step workflow: upload → process → fetch PBs (we skip step 3).
+        """
+        page = self.page
+
+        # Navigate to the custom import page
+        competition_url = page.url.rstrip("/")
+        custom_url = f"{competition_url}/manage/custom/"
+        logger.info("Navigating to custom import: %s", custom_url)
+        page.goto(custom_url)
+        page.wait_for_load_state("networkidle")
+
+        # Step 1: Upload the XLSX file
+        logger.info("Uploading file: %s", xlsx_path.name)
+        page.locator("input[name=fileinput]").set_input_files(str(xlsx_path))
+        page.locator("button[name=upload]").click()
+        page.wait_for_load_state("networkidle")
+
+        # Step 2: Wait for background validation task to complete
+        # The PROCESS button is disabled while the task runs; poll until enabled
+        logger.info("Waiting for validation task to complete...")
+        process_button = page.locator("button[name=process]")
+        deadline = time.monotonic() + 60
+        while time.monotonic() < deadline:
+            page.reload()
+            page.wait_for_load_state("networkidle")
+            if process_button.is_enabled():
+                break
+            logger.debug("Process button still disabled, waiting...")
+            time.sleep(3)
+        else:
+            raise TimeoutError("Timed out waiting for validation task to complete")
+
+        # Step 3: Process - create competitor/event records
+        logger.info("Processing athletes...")
+        process_button.click()
+        page.wait_for_load_state("networkidle")
+        logger.info("Athletes imported successfully")
+
+        # Navigate back to competition manage page so subsequent steps
+        # (e.g. numbering, seeding) can find their UI elements
+        page.goto(competition_url)
         page.wait_for_load_state("networkidle")
 
     def prepare_athletes(self) -> None:

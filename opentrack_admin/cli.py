@@ -133,9 +133,10 @@ def create(
 @app.command("import-athletes")
 def import_athletes(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition")],
+    file: Annotated[Path, typer.Argument(help="XLSX file with athlete data to import")],
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
 ) -> None:
-    """Number competitors and apply random seeding after athletes have been imported."""
+    """Import athletes from XLSX, number competitors and apply random seeding."""
     setup_logging(verbose=verbose)
 
     config = OpenTrackConfig.from_env()
@@ -144,7 +145,16 @@ def import_athletes(
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
         raise typer.Exit(1)
 
-    print(f"🏃 Preparing athletes for: {competition_url}")
+    if not file.exists():
+        print(f"❌ File not found: {file}")
+        raise typer.Exit(1)
+
+    if file.suffix.lower() != ".xlsx":
+        print(f"❌ Expected .xlsx file, got: {file.suffix}")
+        raise typer.Exit(1)
+
+    print(f"🏃 Importing athletes for: {competition_url}")
+    print(f"   File: {file}")
     print()
 
     with OpenTrackSession(config) as session:
@@ -159,8 +169,9 @@ def import_athletes(
         creator = CompetitionCreator(session)
 
         try:
+            creator.import_athletes(file)
             creator.prepare_athletes()
-            print("✅ Athletes numbered and seeded")
+            print("✅ Athletes imported, numbered and seeded")
         except Exception as e:
             print(f"❌ Error: {e}")
             raise typer.Exit(1)
