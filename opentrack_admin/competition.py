@@ -78,35 +78,27 @@ class CompetitionCreator:
             self.session.login()
 
         # Step 1: Navigate and create basic competition (includes initial entry setup)
-        logger.info("Step 1/7: Creating basic competition...")
+        logger.info("Step 1/5: Creating basic competition...")
         self._create_basic_competition(details)
 
         # Step 2: Configure advanced settings (hide from public)
-        logger.info("Step 2/7: Configuring advanced settings...")
+        logger.info("Step 2/5: Configuring advanced settings...")
         self._configure_advanced_settings()
 
         # Step 3: Configure display settings (website, entry link, points, hide results/competitors)
-        logger.info("Step 3/7: Configuring display settings...")
+        logger.info("Step 3/5: Configuring display settings...")
         self._configure_display_settings(details)
 
         # Step 4: Configure scoring (e.g., Tyrving tables)
         if details.combined_events_table:
-            logger.info("Step 4/7: Configuring scoring...")
+            logger.info("Step 4/5: Configuring scoring...")
             self._configure_scoring(details)
         else:
-            logger.info("Step 4/7: Skipping scoring (not configured)")
+            logger.info("Step 4/5: Skipping scoring (not configured)")
 
         # Step 5: Configure photofinish (FinishLynx)
-        logger.info("Step 5/7: Configuring photofinish...")
+        logger.info("Step 5/5: Configuring photofinish...")
         self._configure_photofinish()
-
-        # Step 6: Number competitors
-        logger.info("Step 6/7: Numbering competitors...")
-        self._number_competitors()
-
-        # Step 7: Apply random seeding
-        logger.info("Step 7/7: Applying random seeding...")
-        self._apply_random_seeding()
 
         logger.info("Competition created successfully: %s", self.page.url)
         return self.page.url
@@ -251,6 +243,19 @@ class CompetitionCreator:
         logger.debug("Saving scoring settings")
         page.get_by_role("button", name="Save").click()
         page.wait_for_load_state("networkidle")
+
+    def prepare_athletes(self) -> None:
+        """Number competitors and apply random seeding.
+
+        Run this after athletes have been imported into the competition.
+        """
+        logger.info("Step 1/2: Numbering competitors...")
+        self._number_competitors()
+
+        logger.info("Step 2/2: Applying random seeding...")
+        self._apply_random_seeding()
+
+        logger.info("Athletes prepared successfully")
 
     def _configure_photofinish(self) -> None:
         """Configure FinishLynx photofinish integration."""

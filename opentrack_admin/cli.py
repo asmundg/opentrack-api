@@ -130,6 +130,42 @@ def create(
             raise typer.Exit(1)
 
 
+@app.command("import-athletes")
+def import_athletes(
+    competition_url: Annotated[str, typer.Argument(help="URL of the competition")],
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
+) -> None:
+    """Number competitors and apply random seeding after athletes have been imported."""
+    setup_logging(verbose=verbose)
+
+    config = OpenTrackConfig.from_env()
+
+    if not config.username or not config.password:
+        print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
+        raise typer.Exit(1)
+
+    print(f"🏃 Preparing athletes for: {competition_url}")
+    print()
+
+    with OpenTrackSession(config) as session:
+        session.page.goto(competition_url)
+        session.page.wait_for_load_state("networkidle")
+
+        if not session.is_logged_in():
+            session.login()
+            session.page.goto(competition_url)
+            session.page.wait_for_load_state("networkidle")
+
+        creator = CompetitionCreator(session)
+
+        try:
+            creator.prepare_athletes()
+            print("✅ Athletes numbered and seeded")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            raise typer.Exit(1)
+
+
 @app.command()
 def schedule(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
