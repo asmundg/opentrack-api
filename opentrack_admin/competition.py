@@ -1,15 +1,62 @@
 """Competition creation and management for OpenTrack."""
 
 import logging
-import time
+import tempfile
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Literal
 
+from openpyxl import load_workbook
+
 from .browser import OpenTrackSession
 
 logger = logging.getLogger(__name__)
+
+# Normalize young age categories to "10" for OpenTrack import
+_CATEGORY_NORMALIZE: dict[str, str] = {
+    "Gutter 6-8 Rekrutt": "Gutter 10",
+    "Gutter 9": "Gutter 10",
+    "Jenter 6-8 Rekrutt": "Jenter 10",
+    "Jenter 9": "Jenter 10",
+}
+
+
+def _normalize_xlsx(xlsx_path: Path) -> Path:
+    """Normalize young age categories in XLSX and return path to temp copy.
+
+    Rewrites "Klasse" column values like "Gutter 6-8 Rekrutt" and "Gutter 9"
+    to "Gutter 10" (and similarly for Jenter) so OpenTrack recognizes them.
+    """
+    wb = load_workbook(xlsx_path)
+    ws = wb.active
+
+    # Find the "Klasse" column
+    header_row = next(ws.iter_rows(min_row=1, max_row=1, values_only=False))
+    klasse_col = None
+    for cell in header_row:
+        if cell.value and str(cell.value).strip() == "Klasse":
+            klasse_col = cell.column
+            break
+    if klasse_col is None:
+        raise ValueError("No 'Klasse' column found in XLSX")
+
+    # Normalize values
+    changed = 0
+    for row in ws.iter_rows(min_row=2, min_col=klasse_col, max_col=klasse_col):
+        cell = row[0]
+        if cell.value and str(cell.value).strip() in _CATEGORY_NORMALIZE:
+            cell.value = _CATEGORY_NORMALIZE[str(cell.value).strip()]
+            changed += 1
+
+    if changed:
+        logger.info("Normalized %d category values in XLSX", changed)
+
+    # Save to a temp file (same suffix so OpenTrack accepts it)
+    tmp = tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False)
+    wb.save(tmp.name)
+    tmp.close()
+    return Path(tmp.name)
 
 
 # Competition type mapping to OpenTrack values
@@ -249,10 +296,15 @@ class CompetitionCreator:
     def import_athletes(self, xlsx_path: Path) -> None:
         """Upload XLSX file and process it to create competitor/event records.
 
-        Uses OpenTrack's custom import page (manage/custom/) which has a
-        3-step workflow: upload → process → fetch PBs (we skip step 3).
+        Normalizes young age categories (6-8 Rekrutt, 9 → 10) in a temp copy
+        before uploading. Uses OpenTrack's custom import page (manage/custom/)
+        with a 3-step workflow: upload → process → fetch PBs (we skip step 3).
         """
         page = self.page
+
+        # Normalize categories in a temp copy
+        upload_path = _normalize_xlsx(xlsx_path)
+        logger.info("Normalized XLSX written to: %s", upload_path)
 
         # Navigate to the custom import page
         competition_url = page.url.rstrip("/")
@@ -262,36 +314,20 @@ class CompetitionCreator:
         page.wait_for_load_state("networkidle")
 
         # Step 1: Upload the XLSX file
-        logger.info("Uploading file: %s", xlsx_path.name)
-        page.locator("input[name=fileinput]").set_input_files(str(xlsx_path))
+        logger.info("Uploading file: %s", upload_path.name)
+        page.locator("input[name=fileinput]").set_input_files(str(upload_path))
         page.locator("button[name=upload]").click()
         page.wait_for_load_state("networkidle")
+        self._wait_for_background_task("upload")
 
-        # Step 2: Wait for background validation task to complete
-        # The PROCESS button is disabled while the task runs; poll until enabled
-        logger.info("Waiting for validation task to complete...")
-        process_button = page.locator("button[name=process]")
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            page.reload()
-            page.wait_for_load_state("networkidle")
-            if process_button.is_enabled():
-                break
-            logger.debug("Process button still disabled, waiting...")
-            time.sleep(3)
-        else:
-            raise TimeoutError("Timed out waiting for validation task to complete")
-
-        # Step 3: Process - create competitor/event records
+        # Step 2: Process - create competitor/event records
+        # Accept the "Are you sure?" confirmation dialog
         logger.info("Processing athletes...")
-        process_button.click()
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator("button[name=process]").click()
         page.wait_for_load_state("networkidle")
+        self._wait_for_background_task("process")
         logger.info("Athletes imported successfully")
-
-        # Navigate back to competition manage page so subsequent steps
-        # (e.g. numbering, seeding) can find their UI elements
-        page.goto(competition_url)
-        page.wait_for_load_state("networkidle")
 
     def prepare_athletes(self) -> None:
         """Number competitors and apply random seeding.
@@ -330,6 +366,27 @@ class CompetitionCreator:
         page.get_by_role("button", name="Save").click()
         page.wait_for_load_state("networkidle")
 
+    def _wait_for_background_task(self, step_name: str) -> None:
+        """Wait for a background task to complete if one is running.
+
+        OpenTrack uses a Vue/Pusher component that shows a banner during
+        background tasks. The banner container is bg-warning while running
+        and changes to bg-success when finished.
+
+        We first wait for bg-warning to appear (task started), then wait
+        for it to disappear (task finished, replaced by bg-success).
+        """
+        page = self.page
+        banner = page.locator(".container-fluid.bg-warning")
+        # Wait for the task to start (banner appears within a few seconds)
+        try:
+            banner.wait_for(state="visible", timeout=10_000)
+        except Exception:
+            return  # No task started
+        logger.info("Waiting for %s background task...", step_name)
+        banner.wait_for(state="hidden", timeout=120_000)
+        logger.info("%s background task complete", step_name)
+
     def _number_competitors(self) -> None:
         """Automatically assign bib numbers to all competitors."""
         page = self.page
@@ -338,10 +395,11 @@ class CompetitionCreator:
         logger.debug("Navigating to competitor numbering")
         page.get_by_role("button", name="Manage competitors ").click()
         page.get_by_role("link", name="Numbering").click()
+        page.wait_for_load_state("networkidle")
 
-        # Apply numbering - button text includes count, so use regex/partial match
+        # Apply numbering — triggers an AJAX POST, not a full navigation
         logger.debug("Applying bib numbers")
-        page.get_by_role("button", name="Save and apply to").click()
+        page.locator("button[name=apply_numbers]").click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
         logger.debug("Bib numbers assigned")
 
