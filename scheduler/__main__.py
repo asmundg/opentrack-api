@@ -258,6 +258,11 @@ def _check_gender_split_needed(
         if group_tier is None or group_tier in tiers_to_split:
             continue
 
+        # Skip small groups — splitting them just creates more groups without saving time
+        group_athlete_count = len(group_athletes[g.id])
+        if group_athlete_count < _MIN_GROUP_SIZE_FOR_GENDER_SPLIT:
+            continue
+
         # Check each cross-venue group for single-gender blocking
         for other in field_groups:
             if other.id == g.id:
@@ -274,13 +279,16 @@ def _check_gender_split_needed(
             shared_boys = {a for a in shared if athlete_is_boy.get(a, False)}
             shared_girls = shared - shared_boys
 
-            if shared_boys and not shared_girls:
+            # Long groups are worth splitting even with 1 shared athlete
+            min_shared = 1 if g.duration_minutes > _MAX_UNSPLIT_FIELD_DURATION else _MIN_SHARED_FOR_GENDER_SPLIT
+
+            if shared_boys and not shared_girls and len(shared_boys) >= min_shared:
                 print(
                     f"  ⚠️  Gender-asymmetric blocking: {g.id} & {other.id} "
                     f"share {len(shared_boys)} boys — splitting tier '{group_tier}' by gender"
                 )
                 tiers_to_split.add(group_tier)
-            elif shared_girls and not shared_boys:
+            elif shared_girls and not shared_boys and len(shared_girls) >= min_shared:
                 print(
                     f"  ⚠️  Gender-asymmetric blocking: {g.id} & {other.id} "
                     f"share {len(shared_girls)} girls — splitting tier '{group_tier}' by gender"
@@ -530,6 +538,19 @@ _MAX_CROSS_VENUE_SHARED_ATHLETES = 5
 # If a mixed-gender group shares athletes of only one gender with a cross-venue
 # group longer than this, the tier should be gender-split.
 _MIN_BLOCKING_DURATION_FOR_GENDER_SPLIT = 25  # minutes
+
+# Only consider gender splitting for groups with at least this many athletes.
+# Splitting tiny groups just creates more scheduling units without saving time.
+_MIN_GROUP_SIZE_FOR_GENDER_SPLIT = 4
+
+# Only split by gender if at least this many athletes of one gender are shared
+# with the blocking group. A single shared athlete isn't worth splitting the tier
+# unless the group is very long (> _MAX_UNSPLIT_FIELD_DURATION minutes).
+_MIN_SHARED_FOR_GENDER_SPLIT = 2
+
+# Groups longer than this are split even with a single shared athlete,
+# because the long contiguous block makes scheduling infeasible.
+_MAX_UNSPLIT_FIELD_DURATION = 50
 
 
 def _create_field_groups(

@@ -163,8 +163,9 @@ def _calculate_event_duration(
 
         return min(scaled_duration, 60)  # Cap at 60 minutes
 
-    # Track events have fixed duration regardless of participants
-    return base_duration
+    # Track events: multiply by number of heats (max 8 per heat)
+    heats = -(-max(1, participant_count) // 8)  # ceil division
+    return base_duration * heats
 
 
 def parse_isonen_csv(csv_file_path: str) -> tuple[list[Event], list[Athlete]]:

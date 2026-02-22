@@ -1195,36 +1195,37 @@ def solve_with_optimization(
         print("   No 11/12-year-old events to optimize")
 
     phase2b_time = time.time() - phase2b_start
-    phase2_time = phase2a_time + phase2b_time
 
-    # Phase 3: Maximize older athlete recovery gaps
+    # Identify track groups (used by both Phase 2c and Phase 3)
+    track_group_ids = [
+        gid for gid, g in problem.events.items()
+        if g.event_type in TRACK_DISTANCE_ORDER
+    ]
+
+    # Phase 2c: Maximize older athlete recovery gaps (before track-early bias)
     # Use the full time budget (max_time_slots) to allow spreading events for better recovery
-    print(f"\n🏃 Phase 3: Maximizing older athlete recovery gaps...")
+    # Runs BEFORE track-early so that gaps take priority and track-early doesn't lock things down.
+    print(f"\n🏃 Phase 2c: Maximizing older athlete recovery gaps...")
     print(f"   Time budget: {problem.config.max_time_slots} slots ({problem.config.max_time_slots * problem.config.slot_duration_minutes} min)")
     print(f"   Minimum needed: {best_slots} slots ({best_slots * problem.config.slot_duration_minutes} min)")
-    phase3_start = time.time()
+    phase2c_start = time.time()
 
     best_gap = 0
-    # Get baseline solution with young athlete constraints (no gap constraint yet)
+    # Get baseline solution with young athlete constraints (no gap or track finish constraint yet)
     best_solution = solve_scheduling_problem(
         problem, timeout_ms,
         max_slots=problem.config.max_time_slots,  # Allow full time budget
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,
-        track_finish_slot=track_finish_slot,
     )
     if older_athletes:
         # Binary search for maximum feasible gap within time budget
-        # Max gap is limited by available slots: if we have 24 slots and minimum is 20,
-        # we have 4 extra slots that could be used for gaps
         available_extra_slots = problem.config.max_time_slots - best_slots
-        # Each gap between events requires 1 slot, and athletes may have 2-4 events
-        # A reasonable upper bound is the extra slots + some baseline
         max_possible_gap = min(
-            (available_extra_slots + best_slots) // 3,  # Rough estimate
-            problem.config.max_time_slots // 4,  # Don't go crazy
+            (available_extra_slots + best_slots) // 3,
+            problem.config.max_time_slots // 4,
         )
-        max_possible_gap = max(max_possible_gap, best_slots // 2)  # At least try half the slots
+        max_possible_gap = max(max_possible_gap, best_slots // 2)
 
         low, high = 1, max_possible_gap
 
@@ -1232,22 +1233,58 @@ def solve_with_optimization(
             mid = (low + high) // 2
             solution = solve_scheduling_problem(
                 problem, timeout_ms,
-                max_slots=problem.config.max_time_slots,  # Allow full time budget
+                max_slots=problem.config.max_time_slots,
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=best_young_finish if young_only_groups else None,
                 older_min_gap_slots=mid,
-                track_finish_slot=track_finish_slot,
             )
             if solution.status == "solved":
                 best_gap = mid
                 best_solution = solution
-                low = mid + 1  # Try larger gap
+                low = mid + 1
             else:
-                high = mid - 1  # Need smaller gap
+                high = mid - 1
 
         print(f"   Older athlete minimum gap: {best_gap} slots ({best_gap * problem.config.slot_duration_minutes} min)")
     else:
         print("   No older athletes with multiple events to optimize")
+
+    phase2c_time = time.time() - phase2c_start
+    phase2_time = phase2a_time + phase2b_time + phase2c_time
+
+    # Phase 3: Minimize track finish slot (bias track events early)
+    # Runs AFTER gaps so we keep the gap guarantee while pushing track events earlier.
+    print(f"\n🏟️  Phase 3: Biasing track events to run early...")
+    phase3_start = time.time()
+
+    best_track_finish = problem.config.max_time_slots  # Default: no extra constraint
+    if track_group_ids and track_finish_slot is None:
+        min_track_finish = max(problem.event_duration_slots[gid] for gid in track_group_ids)
+
+        low, high = min_track_finish, problem.config.max_time_slots
+        while low <= high:
+            mid = (low + high) // 2
+            solution = solve_scheduling_problem(
+                problem, timeout_ms,
+                max_slots=problem.config.max_time_slots,
+                youngest_finish_slot=best_youngest_finish if youngest_groups else None,
+                young_finish_slot=best_young_finish if young_only_groups else None,
+                older_min_gap_slots=best_gap,
+                track_finish_slot=mid,
+            )
+            if solution.status == "solved":
+                best_track_finish = mid
+                best_solution = solution
+                high = mid - 1
+            else:
+                low = mid + 1
+
+        print(f"   Track events finish by slot {best_track_finish} ({best_track_finish * problem.config.slot_duration_minutes} min)")
+    elif track_finish_slot is not None:
+        best_track_finish = track_finish_slot
+        print(f"   Using explicit track finish constraint: slot {track_finish_slot}")
+    else:
+        print("   No track events to optimize")
 
     phase3_time = time.time() - phase3_start
     total_time = time.time() - total_start_time
@@ -1263,6 +1300,7 @@ def solve_with_optimization(
     print(f"   Total slots: {best_solution.total_slots}")
     print(f"   10-year-olds finish by: slot {best_youngest_finish} ({best_youngest_finish * problem.config.slot_duration_minutes} min)")
     print(f"   11/12-year-olds finish by: slot {best_young_finish} ({best_young_finish * problem.config.slot_duration_minutes} min)")
+    print(f"   Track events finish by: slot {best_track_finish} ({best_track_finish * problem.config.slot_duration_minutes} min)")
     print(f"   Older athlete min gap: {best_gap} slots ({best_gap * problem.config.slot_duration_minutes} min)")
     print(f"   ⏱️  Time: {total_time:.2f}s (P1: {phase1_time:.2f}s, P2: {phase2_time:.2f}s, P3: {phase3_time:.2f}s)")
 
