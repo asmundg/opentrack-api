@@ -76,7 +76,7 @@ def _generate_empty_schedule_html(title: str) -> str:
     </head>
     <body>
         <h1>{title}</h1>
-        <div class="no-events">No events scheduled</div>
+        <div class="no-events">Ingen planlagte øvelser</div>
     </body>
     </html>
     """
@@ -425,7 +425,7 @@ def _generate_html_content(
         table_rows += f'<tr>{row_cells}</tr>\n'
     
     # Generate venue headers
-    venue_headers = '<th class="time-header">Time</th>'
+    venue_headers = '<th class="time-header">Tid</th>'
     for venue in venues_ordered:
         venue_headers += f'<th class="venue-header">{_format_venue_name(venue)}</th>'
     
@@ -443,9 +443,9 @@ def _generate_html_content(
     <div class="container">
         <h1>{title}</h1>
         <div class="schedule-info">
-            <p><strong>Total Duration:</strong> {result.total_duration_minutes} minutes</p>
-            <p><strong>Total Slots:</strong> {result.total_slots}</p>
-            <p><strong>Slot Duration:</strong> {result.slot_duration_minutes} minutes</p>
+            <p><strong>Total varighet:</strong> {result.total_duration_minutes} minutter</p>
+            <p><strong>Antall tidsluker:</strong> {result.total_slots}</p>
+            <p><strong>Tidsluke:</strong> {result.slot_duration_minutes} minutter</p>
         </div>
         <table class="schedule-table">
             <thead>
@@ -456,30 +456,30 @@ def _generate_html_content(
             </tbody>
         </table>
         <div class="legend">
-            <h3>Legend</h3>
+            <h3>Tegnforklaring</h3>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(135deg, #FFA500 0%, #FFD700 100%); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> 10 year olds (Rekrutt) - Yellow/Orange
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(135deg, #FFA500 0%, #FFD700 100%); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> 10 &aring;r (Rekrutt) &ndash; Gul/Oransje
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #87CEEB; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G11/G12 - Light Blue
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #87CEEB; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G11/G12 &ndash; Lysbl&aring;
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #FFB6C1; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J11/J12 - Light Pink
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #FFB6C1; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J11/J12 &ndash; Lysrosa
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #5B9BD5; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G13/G14 - Blue
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #5B9BD5; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G13/G14 &ndash; Bl&aring;
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #DC143C; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J13/J14 - Red
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #DC143C; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J13/J14 &ndash; R&oslash;d
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #808000; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G15+ / Men Senior - Olive
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #808000; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G15+ / Menn Senior &ndash; Oliven
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #90EE90; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J15+ / Women Senior - Light Green
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #90EE90; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J15+ / Kvinner Senior &ndash; Lysegr&oslash;nn
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(135deg, #87CEEB 0%, #FFB6C1 100%); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> Gradient = merged categories
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(135deg, #87CEEB 0%, #FFB6C1 100%); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> Gradient = sammensl&aring;tte klasser
             </div>
         </div>
     </div>
@@ -530,7 +530,7 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
     if is_fifa:
         duration_text = f"{event.duration_minutes}min"
     else:
-        duration_text = f"{event.duration_minutes}min • {participant_count} total"
+        duration_text = f"{event.duration_minutes}min • {participant_count} totalt"
 
     # Calculate the height based on number of slots (40px per slot from CSS + borders)
     calculated_height = duration_slots * 40 + (duration_slots - 1) * 1  # 1px for borders
