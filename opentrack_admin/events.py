@@ -647,10 +647,9 @@ class EventScheduler:
             updated += 1
             logger.debug(f"Filled PB/SB for: {name}")
         
-        # Save and wait for confirmation (there are two Save buttons, use first)
+        # Save and wait for confirmation
         page.wait_for_timeout(1000)  # Wait for form to be ready
-        save_btn = page.locator("button[name='performances_submit']").first
-        save_btn.scroll_into_view_if_needed()
+        save_btn = page.locator("button[name='performances_submit']").last
         logger.info(f"Clicking save button via JavaScript")
         save_btn.evaluate("el => el.click()")
         page.get_by_text("Performances have been saved successfully").wait_for(state="visible", timeout=10000)

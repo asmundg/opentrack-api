@@ -33,3 +33,7 @@ Make adjustments in schedule_events.csv, then recompute
 ```bash
 uv run opentrack scheduler from-events ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.csv schedule_events.csv --mix-genders
 ```
+
+```bash
+uv run opentrack admin update-pbs https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 schedule.csv
+```

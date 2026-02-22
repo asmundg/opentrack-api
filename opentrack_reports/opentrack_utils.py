@@ -1,12 +1,34 @@
 import json
 import re
-import urllib.error
-import urllib.request
-from typing import Any, Union
+from typing import Any
+
+
+def _fetch_with_browser(url: str) -> dict[str, Any]:
+    """Fetch JSON data using Playwright to bypass Cloudflare challenges."""
+    from playwright.sync_api import sync_playwright
+
+    print("Direct fetch blocked, fetching via browser...")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False, channel="chrome")
+        page = browser.new_page()
+        page.goto(url, wait_until="domcontentloaded")
+        page.wait_for_function(
+            """() => {
+                try { JSON.parse(document.body.innerText); return true; }
+                catch { return false; }
+            }""",
+            timeout=30000,
+        )
+        text = page.inner_text("body")
+        browser.close()
+    return json.loads(text)
 
 
 def fetch_json_data(url: str) -> dict[str, Any]:
-    """Fetch JSON data from a given URL using only standard library."""
+    """Fetch JSON data from a given URL, falling back to browser if blocked."""
+    import urllib.error
+    import urllib.request
+
     if not url.endswith("/json/"):
         if url.endswith("/"):
             url += "json/"
@@ -15,19 +37,18 @@ def fetch_json_data(url: str) -> dict[str, Any]:
 
     print(f"Fetching data from {url}")
     try:
-        with urllib.request.urlopen(url) as response:
-            data = json.loads(response.read().decode("utf-8"))
-            return data
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+            },
+        )
+        with urllib.request.urlopen(req) as response:
+            return json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        raise urllib.error.HTTPError(
-            url, e.code, f"HTTP Error: {e.code} - {e.reason}", e.hdrs, e.fp
-        )
-    except urllib.error.URLError as e:
-        raise urllib.error.URLError(f"URL Error: {e.reason}")
-    except json.JSONDecodeError as e:
-        raise json.JSONDecodeError(
-            f"JSON Decode Error from {url}: {e.msg}", e.doc, e.pos
-        )
+        if e.code == 403:
+            return _fetch_with_browser(url)
+        raise
 
 
 def process_local_json(filepath: str) -> dict[str, Any]:

@@ -470,12 +470,17 @@ def create_start_lists(
                     heat_info = group_data["heat_names"][heat_id]
                     heat_event_name = heat_info["event_name"]
                     heat_event_id = heat_info["event_id"]
+                    heat_name = heat_info["heat_name"]
 
-                    # Show the specific event name with ID as a header above each table
+                    # Include heat name when there are multiple heats (e.g. "Race 1 of 2")
+                    if heat_name and " of " in heat_name:
+                        header_text = f"{heat_event_name} - {heat_name}"
+                    else:
+                        header_text = heat_event_name
+
+                    # Show the specific event name with heat info as a header above each table
                     elements.append(
-                        Paragraph(
-                            f"{heat_event_name} (ID: {heat_event_id})", category_style
-                        )
+                        Paragraph(header_text, category_style)
                     )
 
                     # Create table data with headers (Norwegian)
