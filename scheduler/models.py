@@ -193,7 +193,7 @@ HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     (EventType.m60_hurdles, Category.j14): HurdleSpec(6, 11.5, 7.5, 76.2),
     (EventType.m60_hurdles, Category.j15): HurdleSpec(5, 12, 8, 76.2),
     (EventType.m60_hurdles, Category.j16): HurdleSpec(5, 12, 8, 76.2),
-    (EventType.m60_hurdles, Category.j17): HurdleSpec(5, 13, 8.5, 76.2),
+    (EventType.m60_hurdles, Category.j17): HurdleSpec(5, 13, 8.5, 84),
     (EventType.m60_hurdles, Category.j18_19): HurdleSpec(5, 13, 8.5, 84),
     (EventType.m60_hurdles, Category.ks): HurdleSpec(5, 13, 8.5, 84),
 }

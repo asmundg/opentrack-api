@@ -27,3 +27,9 @@ uv run python main.py admin create "Seriestevne 2" "bultf-ser2-26" 2026-02-23 bu
 ```bash
 uv run python main.py admin import-athletes https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.xlsx 
 ```
+
+Make adjustments in schedule_events.csv, then recompute
+
+```bash
+uv run opentrack scheduler from-events ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.csv schedule_events.csv --mix-genders
+```
