@@ -16,6 +16,7 @@ from . import models
 from .event_csv import export_event_overview_csv, import_event_overview_csv, result_to_event_schedule_rows
 from .constraint_validator import validate_event_schedule, ConstraintViolation
 from .schedule_builder import build_scheduling_result_from_events
+from .hurdle_plan_generator import generate_hurdle_plan_html
 
 app = typer.Typer(
     name="scheduler",
@@ -77,6 +78,10 @@ def schedule(
         int | None,
         typer.Option("--max-track-duration", help="Maximum track duration in minutes (track ends earlier than field)"),
     ] = None,
+    mix_genders: Annotated[
+        bool,
+        typer.Option("--mix-genders", help="Allow mixing genders in track heats (useful for youth events)"),
+    ] = False,
 ) -> None:
     """Generate a track meet schedule from an Isonen CSV file."""
     # Configure secondary venues
@@ -110,7 +115,7 @@ def schedule(
     if not quiet:
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
 
-    event_groups = group_events_by_type(events, athletes)
+    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders)
 
     if not quiet:
         typer.echo(f"Created {len(event_groups)} event groups")
@@ -196,6 +201,14 @@ def schedule(
         slot_duration_minutes=5,
     )
     typer.echo(f"Event overview CSV saved to: {events_csv_output.absolute()}")
+
+    # Generate hurdle setup plan if there are hurdle events
+    hurdle_html = generate_hurdle_plan_html(result, start_hour, start_minute)
+    if hurdle_html:
+        hurdle_output = output.parent / f"{output.stem}_hurdles.html"
+        hurdle_output.write_text(hurdle_html)
+        typer.echo(f"Hurdle plan saved to: {hurdle_output.absolute()}")
+
     typer.echo(f"\n💡 Tip: You can now manually edit {events_csv_output.name} and use")
     typer.echo(f"   'schedule from-events' to regenerate outputs with your changes.")
 
@@ -265,6 +278,10 @@ def schedule_from_events(
         bool,
         typer.Option("--quiet", "-q", help="Suppress detailed output"),
     ] = False,
+    mix_genders: Annotated[
+        bool,
+        typer.Option("--mix-genders", help="Allow mixing genders in track heats (useful for youth events)"),
+    ] = False,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -282,7 +299,7 @@ def schedule_from_events(
 
     # Parse original data to get event groups and athletes
     events, athletes = parse_isonen_csv(str(input_file))
-    event_groups = group_events_by_type(events, athletes)
+    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders)
 
     if not quiet:
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
@@ -356,6 +373,13 @@ def schedule_from_events(
         start_minute=earliest_time.minute,
     )
     typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
+
+    # Generate hurdle setup plan if there are hurdle events
+    hurdle_html = generate_hurdle_plan_html(result, earliest_time.hour, earliest_time.minute)
+    if hurdle_html:
+        hurdle_output = output.parent / f"{output.stem}_hurdles.html"
+        hurdle_output.write_text(hurdle_html)
+        typer.echo(f"Hurdle plan saved to: {hurdle_output.absolute()}")
 
 
 if __name__ == "__main__":

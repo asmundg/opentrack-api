@@ -53,7 +53,7 @@ def print_full_schedule(solution: SchedulingResult, title: str = "Full Schedule"
         print(f"Slot {slot:2d} ({start_time}): {', '.join(event_descriptions)}")
 
 
-def group_events_by_type(events: list[Event], athletes: list[Athlete]) -> list[EventGroup]:
+def group_events_by_type(events: list[Event], athletes: list[Athlete], *, mix_genders_track: bool = False) -> list[EventGroup]:
     """Group individual events by type into EventGroups for scheduling with smart merging."""
 
     # Count actual athletes per event
@@ -87,7 +87,7 @@ def group_events_by_type(events: list[Event], athletes: list[Athlete]) -> list[E
     for event_type, events_of_type in events_by_type.items():
         if EventVenueMapping.get(event_type) == Venue.TRACK:
             event_groups.extend(
-                _create_track_groups(event_type, events_of_type, athlete_counts)
+                _create_track_groups(event_type, events_of_type, athlete_counts, mix_genders=mix_genders_track)
             )
     event_groups.extend(field_groups)
 
@@ -452,9 +452,28 @@ def _make_track_group(event_type: EventType, events: list[Event]) -> EventGroup:
     return EventGroup(id=gid, event_type=event_type, events=events)
 
 
-def _create_track_groups(event_type: EventType, events: list[Event], athlete_counts: dict[str, int]) -> list[EventGroup]:
-    """Create track event groups with smart age-based merging, keeping genders separate."""
-    # Split events by gender first - boys and girls cannot be in the same track event
+def _create_track_groups(event_type: EventType, events: list[Event], athlete_counts: dict[str, int], *, mix_genders: bool = False) -> list[EventGroup]:
+    """Create track event groups with smart age-based merging.
+
+    When mix_genders is False (default), genders are kept separate.
+    When True, genders are mixed — useful for youth events where boys and girls
+    can share heats (especially hurdles with identical setups).
+    """
+    if mix_genders:
+        # Hurdle events: group all genders together by distance/height
+        if is_hurdles_event(event_type):
+            return _create_hurdle_groups_for_gender(event_type, events, athlete_counts)
+
+        # Regular track: combined age ranges across genders
+        mixed_age_ranges = [
+            (["G-Rekrutt", "J-Rekrutt"], "Rekrutt"),
+            (["G11", "J11", "G12", "J12", "G13", "J13", "G14", "J14"], "11-14"),
+            (["G15", "J15", "G16", "J16", "G17", "J17", "G18-19", "J18-19",
+              "Menn Senior", "Kvinner Senior"], "15+"),
+        ]
+        return _create_track_groups_for_gender(event_type, events, athlete_counts, mixed_age_ranges)
+
+    # Default: split by gender
     boys_events = [e for e in events if _is_boys_category(e.age_category.value)]
     girls_events = [e for e in events if not _is_boys_category(e.age_category.value)]
 
