@@ -63,16 +63,24 @@ class Category(Enum):
 
 
 # Categories for 10 year olds - HIGHEST priority to finish early
-YOUNGEST_CATEGORIES: frozenset[Category] = frozenset({
-    Category.j10, Category.g10,
-})
+YOUNGEST_CATEGORIES: frozenset[Category] = frozenset(
+    {
+        Category.j10,
+        Category.g10,
+    }
+)
 
 # Categories for young athletes (10/11/12 year olds) who should finish early
-YOUNG_CATEGORIES: frozenset[Category] = frozenset({
-    Category.j10, Category.g10,
-    Category.j11, Category.g11,
-    Category.j12, Category.g12,
-})
+YOUNG_CATEGORIES: frozenset[Category] = frozenset(
+    {
+        Category.j10,
+        Category.g10,
+        Category.j11,
+        Category.g11,
+        Category.j12,
+        Category.g12,
+    }
+)
 
 
 def is_youngest_category(category: Category) -> bool:
@@ -87,16 +95,26 @@ def is_young_category(category: Category) -> bool:
 
 # Age ordering for categories (lower number = younger)
 CATEGORY_AGE_ORDER: dict[Category, int] = {
-    Category.j10: 10, Category.g10: 10,
-    Category.j11: 11, Category.g11: 11,
-    Category.j12: 12, Category.g12: 12,
-    Category.j13: 13, Category.g13: 13,
-    Category.j14: 14, Category.g14: 14,
-    Category.j15: 15, Category.g15: 15,
-    Category.j16: 16, Category.g16: 16,
-    Category.j17: 17, Category.g17: 17,
-    Category.j18_19: 18, Category.g18_19: 18,
-    Category.ks: 99, Category.ms: 99,  # Seniors last
+    Category.j10: 10,
+    Category.g10: 10,
+    Category.j11: 11,
+    Category.g11: 11,
+    Category.j12: 12,
+    Category.g12: 12,
+    Category.j13: 13,
+    Category.g13: 13,
+    Category.j14: 14,
+    Category.g14: 14,
+    Category.j15: 15,
+    Category.g15: 15,
+    Category.j16: 16,
+    Category.g16: 16,
+    Category.j17: 17,
+    Category.g17: 17,
+    Category.j18_19: 18,
+    Category.g18_19: 18,
+    Category.ks: 99,
+    Category.ms: 99,  # Seniors last
 }
 
 
@@ -118,11 +136,11 @@ TRACK_DISTANCE_ORDER: list[EventType] = [
     EventType.m80_hurdles,  # 80m hurdles after 60m block
     EventType.m100,
     EventType.m100_hurdles,
-    EventType.m200,   # 200m to goal
+    EventType.m200,  # 200m to goal
     EventType.m5000,  # 200m to goal (12×400 + 200)
     EventType.m1500,  # 300m to goal (3×400 + 300)
-    EventType.m400,   # Full lap, at finish area
-    EventType.m800,   # 2 laps, at finish area
+    EventType.m400,  # Full lap, at finish area
+    EventType.m800,  # 2 laps, at finish area
 ]
 
 
@@ -133,11 +151,13 @@ HURDLES_BASE_DISTANCE: dict[EventType, EventType] = {
     EventType.m100_hurdles: EventType.m100,
 }
 
-HURDLES_EVENTS: frozenset[EventType] = frozenset({
-    EventType.m60_hurdles,
-    EventType.m80_hurdles,
-    EventType.m100_hurdles,
-})
+HURDLES_EVENTS: frozenset[EventType] = frozenset(
+    {
+        EventType.m60_hurdles,
+        EventType.m80_hurdles,
+        EventType.m100_hurdles,
+    }
+)
 
 
 def is_hurdles_event(event_type: EventType) -> bool:
@@ -190,7 +210,9 @@ SecondaryVenueConfig: dict[EventType, tuple[Venue, frozenset[Category]]] = {
 ACTIVE_SECONDARY_VENUES: set[EventType] = set()
 
 
-def get_venue_for_event(event_type: EventType, category: Category | None = None) -> Venue | None:
+def get_venue_for_event(
+    event_type: EventType, category: Category | None = None
+) -> Venue | None:
     """Get the venue for an event, considering secondary venue assignments.
 
     If category is provided and a secondary venue is configured for that
@@ -221,6 +243,7 @@ class Event:
     personnel_required: int
     priority_weight: int  # higher = schedule earlier
 
+
 @dataclass
 class EventGroup:
     id: str
@@ -230,13 +253,13 @@ class EventGroup:
     @property
     def duration_minutes(self) -> int:
         """Calculate duration for the event group.
-        
+
         For track events: Use maximum duration (events run simultaneously)
         For field events: Sum durations (events run sequentially with shared equipment)
         """
         if not self.events:
             return 0
-            
+
         # Check if this is a track event
         venue = EventVenueMapping.get(self.event_type)
         if venue == Venue.TRACK:
@@ -244,7 +267,13 @@ class EventGroup:
             return max(event.duration_minutes for event in self.events)
         else:
             # Field events share equipment, so sum the durations
-            return sum(event.duration_minutes for event in self.events)
+            total = sum(event.duration_minutes for event in self.events)
+            # HJ/PV: each individual event includes +5 min setup.
+            # Merged groups only pay setup once.
+            if self.event_type in (EventType.hj, EventType.pv) and len(self.events) > 1:
+                total -= 5 * (len(self.events) - 1)
+            return total
+
 
 @dataclass
 class Athlete:

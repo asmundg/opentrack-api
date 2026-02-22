@@ -135,6 +135,7 @@ def schedule(
         raise typer.Exit(1)
 
     # Validate the generated schedule as a sanity check
+    # Use result.events (filtered to only scheduled groups) for validation
     if not quiet:
         typer.echo(f"\nValidating generated schedule...")
     base_datetime = datetime.now().replace(
@@ -144,7 +145,7 @@ def schedule(
     try:
         validate_event_schedule(
             events=event_schedule,
-            event_groups=event_groups,
+            event_groups=result.events,
             athletes=athletes,
             slot_duration_minutes=5,
         )

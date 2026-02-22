@@ -1,10 +1,9 @@
 import time
-from datetime import datetime
 
 from .functional_scheduler import SchedulingResult, schedule_track_meet
 from .html_schedule_generator import save_html_schedule
 from .isonen_parser import parse_isonen_csv
-from .models import Athlete, Category, Event, EventGroup, EventType, EventVenueMapping, Venue
+from .models import Athlete, Event, EventGroup, EventType, EventVenueMapping, Venue
 
 
 def print_full_schedule(solution: SchedulingResult, title: str = "Full Schedule"):
@@ -64,20 +63,228 @@ def group_events_by_type(events: list[Event], athletes: list[Athlete]) -> list[E
             events_by_type[event.event_type] = []
         events_by_type[event.event_type].append(event)
 
-    event_groups = []
+    # Build field groups with default (wide) tiers
+    field_tiers = _FIELD_TIERS_DEFAULT
+    field_groups = _build_field_groups(events_by_type, athlete_counts, field_tiers)
+
+    # Check cross-venue conflict density; split tiers if needed
+    if _has_excessive_cross_venue_conflicts(field_groups, athletes):
+        field_tiers = _FIELD_TIERS_SPLIT
+        field_groups = _build_field_groups(events_by_type, athlete_counts, field_tiers)
+
+    # Check gender-asymmetric blocking; gender-split affected tiers if needed
+    gender_split_tiers = _check_gender_split_needed(field_groups, athletes, field_tiers)
+    if gender_split_tiers:
+        field_groups = _build_field_groups(
+            events_by_type, athlete_counts, field_tiers, gender_split_tiers
+        )
+
+    # Build track groups (unaffected by field tier choice)
+    event_groups: list[EventGroup] = []
     for event_type, events_of_type in events_by_type.items():
-        venue = EventVenueMapping.get(event_type)
+        if EventVenueMapping.get(event_type) == Venue.TRACK:
+            event_groups.extend(
+                _create_track_groups(event_type, events_of_type, athlete_counts)
+            )
+    event_groups.extend(field_groups)
 
-        if venue == Venue.TRACK:
-            # Track events: smart merging by age groups
-            groups = _create_track_groups(event_type, events_of_type, athlete_counts)
-        else:
-            # Field events: merge to get 3-8 athletes per group
-            groups = _create_field_groups(event_type, events_of_type, athlete_counts)
-
-        event_groups.extend(groups)
+    # Sanity check: every input event must appear in exactly one group
+    grouped_event_ids: set[str] = set()
+    for g in event_groups:
+        for e in g.events:
+            if e.id in grouped_event_ids:
+                raise ValueError(f"Event {e.id} appears in multiple groups")
+            grouped_event_ids.add(e.id)
+    input_event_ids = {e.id for e in events}
+    missing = input_event_ids - grouped_event_ids
+    if missing:
+        raise ValueError(f"Events not assigned to any group: {', '.join(sorted(missing))}")
 
     return event_groups
+
+
+def _build_field_groups(
+    events_by_type: dict[EventType, list[Event]],
+    athlete_counts: dict[str, int],
+    tiers: list[tuple[list[str], str]],
+    gender_split_tiers: set[str] | None = None,
+) -> list[EventGroup]:
+    """Build all field event groups using the given tier configuration."""
+    groups: list[EventGroup] = []
+    for event_type, events_of_type in events_by_type.items():
+        if EventVenueMapping.get(event_type) != Venue.TRACK:
+            groups.extend(
+                _create_field_groups(
+                    event_type, events_of_type, athlete_counts, tiers,
+                    gender_split_tiers=gender_split_tiers,
+                )
+            )
+    return groups
+
+
+def _has_excessive_cross_venue_conflicts(
+    field_groups: list[EventGroup], athletes: list[Athlete],
+) -> bool:
+    """Check if any two field groups at different venues share too many athletes.
+
+    When this happens, the groups can't run in parallel, destroying packability.
+    Returns True if the 11-14 tier should be split.
+
+    Only considers groups that contain 11-14 categories (the splittable tier).
+    Rekrutt and 15+ groups are unsplittable by design.
+    """
+    from .models import get_venue_for_event
+
+    # Categories in the 11-14 tier (the only one we can split)
+    splittable_categories = {
+        cat for cats, _ in _FIELD_TIERS_DEFAULT for cat in cats
+        if cat not in ["J-Rekrutt", "G-Rekrutt"]  # exclude Rekrutt
+    } - {
+        cat for cats, name in _FIELD_TIERS_DEFAULT if name == "15+"
+        for cat in cats
+    }
+
+    def _has_splittable_category(group: EventGroup) -> bool:
+        return any(e.age_category.value in splittable_categories for e in group.events)
+
+    # Only check groups containing 11-14 categories
+    candidates = [g for g in field_groups if _has_splittable_category(g)]
+    if not candidates:
+        return False
+
+    # Map individual event ID -> group ID
+    event_to_group: dict[str, str] = {}
+    for g in field_groups:
+        for e in g.events:
+            event_to_group[e.id] = g.id
+
+    # Map group ID -> set of athlete names
+    group_athletes: dict[str, set[str]] = {g.id: set() for g in field_groups}
+    for a in athletes:
+        for e in a.events:
+            gid = event_to_group.get(e.id)
+            if gid is not None:
+                group_athletes[gid].add(a.name)
+
+    # Map group ID -> venue
+    group_venue: dict[str, Venue | None] = {}
+    for g in field_groups:
+        first = g.events[0]
+        group_venue[g.id] = get_venue_for_event(g.event_type, first.age_category)
+
+    # Check pairs where at least one group is a splittable candidate
+    for g1 in candidates:
+        # Check against ALL field groups (not just candidates)
+        for g2 in field_groups:
+            if g2.id <= g1.id:
+                continue  # avoid duplicates
+            if group_venue[g1.id] == group_venue[g2.id]:
+                continue  # same venue — already sequential
+            shared = len(group_athletes[g1.id] & group_athletes[g2.id])
+            if shared > _MAX_CROSS_VENUE_SHARED_ATHLETES:
+                print(
+                    f"  ⚠️  Cross-venue conflict: {g1.id} & {g2.id} "
+                    f"share {shared} athletes — splitting 11-14 tier"
+                )
+                return True
+
+    return False
+
+
+def _check_gender_split_needed(
+    field_groups: list[EventGroup],
+    athletes: list[Athlete],
+    tiers: list[tuple[list[str], str]],
+) -> set[str]:
+    """Check if any mixed-gender field groups would benefit from gender splitting.
+
+    Returns tier names that should be gender-split.
+
+    A tier needs gender splitting when a mixed-gender group shares athletes of
+    only one gender with a long-duration cross-venue group — the other gender
+    is being held back unnecessarily.
+    """
+    from .models import get_venue_for_event
+
+    # Category -> tier name
+    tier_lookup: dict[str, str] = {}
+    for categories, tier_name in tiers:
+        for cat in categories:
+            tier_lookup[cat] = tier_name
+
+    # Event -> group, group lookup
+    event_to_group: dict[str, str] = {}
+    group_by_id: dict[str, EventGroup] = {}
+    for g in field_groups:
+        group_by_id[g.id] = g
+        for e in g.events:
+            event_to_group[e.id] = g.id
+
+    # Athlete -> is_boy (determined from their event categories)
+    athlete_is_boy: dict[str, bool] = {}
+    for a in athletes:
+        for e in a.events:
+            if _is_boys_category(e.age_category.value):
+                athlete_is_boy[a.name] = True
+                break
+        athlete_is_boy.setdefault(a.name, False)
+
+    # Group -> set of athlete names
+    group_athletes: dict[str, set[str]] = {g.id: set() for g in field_groups}
+    for a in athletes:
+        for e in a.events:
+            gid = event_to_group.get(e.id)
+            if gid is not None:
+                group_athletes[gid].add(a.name)
+
+    # Group -> venue
+    group_venue: dict[str, Venue | None] = {}
+    for g in field_groups:
+        group_venue[g.id] = get_venue_for_event(g.event_type, g.events[0].age_category)
+
+    tiers_to_split: set[str] = set()
+
+    for g in field_groups:
+        # Only consider mixed-gender groups
+        has_boys = any(_is_boys_category(e.age_category.value) for e in g.events)
+        has_girls = any(not _is_boys_category(e.age_category.value) for e in g.events)
+        if not (has_boys and has_girls):
+            continue
+
+        group_tier = tier_lookup.get(g.events[0].age_category.value)
+        if group_tier is None or group_tier in tiers_to_split:
+            continue
+
+        # Check each cross-venue group for single-gender blocking
+        for other in field_groups:
+            if other.id == g.id:
+                continue
+            if group_venue[other.id] == group_venue[g.id]:
+                continue  # same venue — already sequential
+            if other.duration_minutes < _MIN_BLOCKING_DURATION_FOR_GENDER_SPLIT:
+                continue
+
+            shared = group_athletes[g.id] & group_athletes[other.id]
+            if not shared:
+                continue
+
+            shared_boys = {a for a in shared if athlete_is_boy.get(a, False)}
+            shared_girls = shared - shared_boys
+
+            if shared_boys and not shared_girls:
+                print(
+                    f"  ⚠️  Gender-asymmetric blocking: {g.id} & {other.id} "
+                    f"share {len(shared_boys)} boys — splitting tier '{group_tier}' by gender"
+                )
+                tiers_to_split.add(group_tier)
+            elif shared_girls and not shared_boys:
+                print(
+                    f"  ⚠️  Gender-asymmetric blocking: {g.id} & {other.id} "
+                    f"share {len(shared_girls)} girls — splitting tier '{group_tier}' by gender"
+                )
+                tiers_to_split.add(group_tier)
+
+    return tiers_to_split
 
 
 def _count_athletes_per_event_real(events: list[Event], athletes: list[Athlete]) -> dict[str, int]:
@@ -175,19 +382,17 @@ def _create_track_groups(event_type: EventType, events: list[Event], athlete_cou
     boys_events = [e for e in events if _is_boys_category(e.age_category.value)]
     girls_events = [e for e in events if not _is_boys_category(e.age_category.value)]
 
-    # Age ranges for boys
+    # Age ranges for boys: 3 tiers (Rekrutt | 11-14 | 15+)
     boys_age_ranges = [
         (["G-Rekrutt"], "G-Rekrutt"),
-        (["G11", "G12"], "G11/12"),
-        (["G13", "G14"], "G13/14"),
+        (["G11", "G12", "G13", "G14"], "G11-14"),
         (["G15", "G16", "G17", "G18-19", "Menn Senior"], "G15+"),
     ]
 
-    # Age ranges for girls
+    # Age ranges for girls: 3 tiers (Rekrutt | 11-14 | 15+)
     girls_age_ranges = [
         (["J-Rekrutt"], "J-Rekrutt"),
-        (["J11", "J12"], "J11/12"),
-        (["J13", "J14"], "J13/14"),
+        (["J11", "J12", "J13", "J14"], "J11-14"),
         (["J15", "J16", "J17", "J18-19", "Kvinner Senior"], "J15+"),
     ]
 
@@ -198,152 +403,104 @@ def _create_track_groups(event_type: EventType, events: list[Event], athlete_cou
     return groups
 
 
+_FIELD_TIERS_DEFAULT: list[tuple[list[str], str]] = [
+    (["J-Rekrutt", "G-Rekrutt"], "Rekrutt"),
+    (["J11", "J12", "J13", "J14", "G11", "G12", "G13", "G14"], "11-14"),
+    (["J15", "J16", "J17", "J18-19", "Kvinner Senior",
+      "G15", "G16", "G17", "G18-19", "Menn Senior"], "15+"),
+]
+
+_FIELD_TIERS_SPLIT: list[tuple[list[str], str]] = [
+    (["J-Rekrutt", "G-Rekrutt"], "Rekrutt"),
+    (["J11", "J12", "G11", "G12"], "11-12"),
+    (["J13", "J14", "G13", "G14"], "13-14"),
+    (["J15", "J16", "J17", "J18-19", "Kvinner Senior",
+      "G15", "G16", "G17", "G18-19", "Menn Senior"], "15+"),
+]
+
+# Maximum athletes per field event group before splitting
+_MAX_FIELD_GROUP_ATHLETES = 15
+
+# If two field groups at different venues share more than this many athletes,
+# the 11-14 tier is too wide and should be split into 11-12 / 13-14.
+_MAX_CROSS_VENUE_SHARED_ATHLETES = 5
+
+# If a mixed-gender group shares athletes of only one gender with a cross-venue
+# group longer than this, the tier should be gender-split.
+_MIN_BLOCKING_DURATION_FOR_GENDER_SPLIT = 25  # minutes
+
+
 def _create_field_groups(
     event_type: EventType,
     events: list[Event],
     athlete_counts: dict[str, int],
+    tiers: list[tuple[list[str], str]] = _FIELD_TIERS_DEFAULT,
+    gender_split_tiers: set[str] | None = None,
 ) -> list[EventGroup]:
-    """Create field event groups, merging categories within age tiers.
+    """Create field EventGroups by merging categories within age tiers.
 
-    Goals:
-    - At least MIN_TARGET (3) athletes per group for rest between attempts
-    - At most MAX_TARGET (8) athletes to avoid events being too long
-    - Merge within age tiers to keep similar ability levels together
-    - Prefer same-gender grouping within tiers
-
-    See CONSTRAINTS.md for merging rationale.
+    Groups events into age tiers at the same venue, mixing genders.
+    Tiers in gender_split_tiers are further sub-split by gender.
+    Splits groups that exceed the athlete threshold.
     """
-    MIN_TARGET = 3  # Minimum athletes for rest between attempts
-    MAX_TARGET = 8  # Maximum before event gets too long
+    from .models import get_venue_for_event
 
-    if not events:
-        return []
+    if gender_split_tiers is None:
+        gender_split_tiers = set()
 
-    rekrutt_categories = ["G-Rekrutt", "J-Rekrutt"]
-    under15_categories = ["G11", "J11", "G12", "J12", "G13", "J13", "G14", "J14"]
-    over15_categories = ["G15", "J15", "G16", "J16", "G17", "J17", "G18-19", "J18-19",
-                         "Menn Senior", "Kvinner Senior"]
+    # Group events by (venue, age_tier)
+    tier_lookup: dict[str, str] = {}
+    for categories, tier_name in tiers:
+        for cat in categories:
+            tier_lookup[cat] = tier_name
 
-    # Count 15+ athletes for this event type
-    over15_events = [e for e in events if e.age_category.value in over15_categories]
-    over15_athlete_count = sum(athlete_counts.get(e.id, 0) for e in over15_events)
-
-    # If very few 15+ athletes, merge with 11-14 (so they don't compete alone)
-    if over15_athlete_count < MIN_TARGET:
-        age_tiers: list[tuple[list[str], str]] = [
-            (rekrutt_categories, "Rekrutt"),
-            (under15_categories + over15_categories, "11+"),
-        ]
-    else:
-        age_tiers = [
-            (rekrutt_categories, "Rekrutt"),
-            (under15_categories, "11-14"),
-            (over15_categories, "15+"),
-        ]
-
-    groups: list[EventGroup] = []
-
-    for tier_categories, _ in age_tiers:
-        tier_events = [e for e in events if e.age_category.value in tier_categories]
-        if not tier_events:
-            continue
-
-        # Split by gender first, then merge within gender
-        boys_events = [e for e in tier_events if _is_boys_category(e.age_category.value)]
-        girls_events = [e for e in tier_events if not _is_boys_category(e.age_category.value)]
-
-        boys_groups = _merge_field_events_greedy(
-            event_type, boys_events, athlete_counts, tier_categories, MIN_TARGET, MAX_TARGET
-        )
-        girls_groups = _merge_field_events_greedy(
-            event_type, girls_events, athlete_counts, tier_categories, MIN_TARGET, MAX_TARGET
-        )
-
-        # If either gender group is too small, try cross-gender merge
-        if boys_events and girls_events:
-            boys_count = sum(athlete_counts.get(e.id, 0) for e in boys_events)
-            girls_count = sum(athlete_counts.get(e.id, 0) for e in girls_events)
-            combined_count = boys_count + girls_count
-
-            either_too_small = boys_count < MIN_TARGET or girls_count < MIN_TARGET
-            is_rekrutt_tier = tier_categories == rekrutt_categories
-
-            # For rekrutt (10 year olds): always merge if either is too small
-            # For others: only merge if combined fits in MAX_TARGET
-            should_merge = either_too_small and (is_rekrutt_tier or combined_count <= MAX_TARGET)
-
-            if should_merge:
-                # Merge all into one group
-                all_events = boys_events + girls_events
-                all_events.sort(key=lambda e: tier_categories.index(e.age_category.value)
-                                if e.age_category.value in tier_categories else 999)
-                groups.append(_make_field_group(event_type, all_events))
-                continue
-
-        groups.extend(boys_groups)
-        groups.extend(girls_groups)
-
-    return groups
-
-
-def _merge_field_events_greedy(
-    event_type: EventType,
-    events: list[Event],
-    athlete_counts: dict[str, int],
-    tier_categories: list[str],
-    min_target: int,
-    max_target: int,
-) -> list[EventGroup]:
-    """Merge field events greedily within a single gender."""
-    if not events:
-        return []
-
-    # Sort by category for consistent ordering within merged groups
-    events.sort(key=lambda e: tier_categories.index(e.age_category.value)
-                if e.age_category.value in tier_categories else 999)
-
-    groups: list[EventGroup] = []
-    current_group: list[Event] = []
-    current_count = 0
-
-    for event in events:
-        event_count = athlete_counts.get(event.id, 0)
-
-        # If adding this event would exceed max, finalize current group first
-        if current_group and current_count + event_count > max_target:
-            groups.append(_make_field_group(event_type, current_group))
-            current_group = []
-            current_count = 0
-
-        current_group.append(event)
-        current_count += event_count
-
-    # Finalize last group
-    if current_group:
-        # If too small, try to merge with previous group
-        if current_count < min_target and groups:
-            last_group = groups[-1]
-            last_count = sum(athlete_counts.get(e.id, 0) for e in last_group.events)
-
-            if last_count + current_count <= max_target:
-                merged_events = last_group.events + current_group
-                groups[-1] = _make_field_group(event_type, merged_events)
-            else:
-                groups.append(_make_field_group(event_type, current_group))
+    buckets: dict[tuple[Venue | None, str], list[Event]] = {}
+    for e in events:
+        venue = get_venue_for_event(event_type, e.age_category)
+        tier = tier_lookup.get(e.age_category.value, "other")
+        if tier in gender_split_tiers:
+            # Sub-split by gender
+            gender = "B" if _is_boys_category(e.age_category.value) else "G"
+            buckets.setdefault((venue, f"{tier}_{gender}"), []).append(e)
         else:
-            groups.append(_make_field_group(event_type, current_group))
+            buckets.setdefault((venue, tier), []).append(e)
+
+    groups: list[EventGroup] = []
+    for (venue, tier), tier_events in buckets.items():
+        total_athletes = sum(athlete_counts.get(e.id, 0) for e in tier_events)
+
+        if total_athletes <= _MAX_FIELD_GROUP_ATHLETES:
+            # Whole tier fits in one group
+            groups.append(_make_field_group(event_type, tier_events))
+        else:
+            # Split: greedily pack events sorted by athlete count
+            tier_events.sort(key=lambda e: athlete_counts.get(e.id, 0))
+            current: list[Event] = []
+            current_count = 0
+            for e in tier_events:
+                ec = athlete_counts.get(e.id, 0)
+                if current and current_count + ec > _MAX_FIELD_GROUP_ATHLETES:
+                    groups.append(_make_field_group(event_type, current))
+                    current = []
+                    current_count = 0
+                current.append(e)
+                current_count += ec
+            if current:
+                groups.append(_make_field_group(event_type, current))
 
     return groups
 
 
-def _make_field_group(event_type: EventType, events: list[Event]) -> EventGroup:
-    """Create an EventGroup with an appropriate ID based on contained events."""
+def _make_field_group(
+    event_type: EventType, events: list[Event],
+) -> EventGroup:
+    """Build an EventGroup with a descriptive ID."""
     if len(events) == 1:
-        group_id = f"{event_type.value}_{events[0].age_category.value}_group"
+        gid = f"{event_type.value}_{events[0].age_category.value}_group"
     else:
-        categories = sorted(set(e.age_category.value for e in events))
-        group_id = f"{event_type.value}_{'_'.join(categories)}_group"
-    return EventGroup(id=group_id, event_type=event_type, events=events)
+        cats = "+".join(e.age_category.value for e in events)
+        gid = f"{event_type.value}_{cats}_group"
+    return EventGroup(id=gid, event_type=event_type, events=events)
 
 
 def test_isonen_parser() -> tuple[list[EventGroup], list[Athlete]]:
