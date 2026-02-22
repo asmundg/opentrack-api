@@ -31,18 +31,35 @@ class _HurdleHeat:
     first_hurdle_m: float
     distance_between_m: float
     lanes: list[_LaneInfo]
-    marker: str | None = None
+    marker: tuple[str, str, str] | None = None  # (label, shape, color)
 
 
-# Floor markers at Tromsøhallen, keyed by (first_hurdle_m, distance_between_m)
-_MARKERS: dict[tuple[float, float], str] = {
-    (11.0, 6.5): "Gult kryss",
-    (11.0, 7.0): "Rødt kryss",
-    (11.5, 7.5): "Blått kryss",
-    (12.0, 8.0): "Svart kryss",
-    (13.0, 8.5): "Rød ball",
-    (13.72, 9.14): "Blå ball",
+# Floor markers at Tromsøhallen, keyed by (first_hurdle_m, distance_between_m).
+# Values: (label, shape, color) where shape is "cross" or "circle".
+_MARKERS: dict[tuple[float, float], tuple[str, str, str]] = {
+    (11.0, 6.5): ("Gult kryss", "cross", "#DAA520"),
+    (11.0, 7.0): ("Rødt kryss", "cross", "#E53935"),
+    (11.5, 7.5): ("Blått kryss", "cross", "#1E88E5"),
+    (12.0, 8.0): ("Svart kryss", "cross", "#333"),
+    (13.0, 8.5): ("Rød ball", "circle", "#E53935"),
+    (13.72, 9.14): ("Blå ball", "circle", "#1E88E5"),
 }
+
+
+def _marker_icon(shape: str, color: str) -> str:
+    """Return an inline SVG icon for a floor marker."""
+    if shape == "cross":
+        return (
+            f'<svg class="marker-icon" viewBox="0 0 20 20">'
+            f'<line x1="10" y1="3" x2="10" y2="17" stroke="{color}" stroke-width="4" stroke-linecap="round"/>'
+            f'<line x1="3" y1="10" x2="17" y2="10" stroke="{color}" stroke-width="4" stroke-linecap="round"/>'
+            f'</svg>'
+        )
+    return (
+        f'<svg class="marker-icon" viewBox="0 0 20 20">'
+        f'<circle cx="10" cy="10" r="8" fill="{color}"/>'
+        f'</svg>'
+    )
 
 
 def generate_hurdle_plan_html(
@@ -95,6 +112,8 @@ def _collect_hurdle_heats(
 
             lanes = _assign_lanes(eg, athlete_counts)
 
+            marker = _MARKERS.get((spec.first_hurdle_m, spec.distance_between_m))
+
             heats.append(
                 _HurdleHeat(
                     event_group=eg,
@@ -103,6 +122,7 @@ def _collect_hurdle_heats(
                     first_hurdle_m=spec.first_hurdle_m,
                     distance_between_m=spec.distance_between_m,
                     lanes=lanes,
+                    marker=marker,
                 )
             )
 
@@ -178,7 +198,7 @@ def _render_html(heats: list[_HurdleHeat]) -> str:
     return f"""<!DOCTYPE html>
 <html>
 <head>
-    <title>Hurdle Setup Plan</title>
+    <title>Hekkeplan</title>
     <meta charset="utf-8">
     <style>
 {_CSS}
@@ -186,7 +206,7 @@ def _render_html(heats: list[_HurdleHeat]) -> str:
 </head>
 <body>
     <div class="container">
-        <h1>Hurdle Setup Plan</h1>
+        <h1>Hekkeplan</h1>
 {tables}
     </div>
 </body>
@@ -199,13 +219,18 @@ def _render_heat(heat: _HurdleHeat) -> str:
     categories = " / ".join(ev.age_category.value for ev in eg.events)
     header = f"{eg.event_type.value} &mdash; {categories} &mdash; {heat.start_time}"
 
+    marker_html = ""
+    if heat.marker:
+        label, shape, color = heat.marker
+        marker_html = f'&middot; {_marker_icon(shape, color)} <strong>{label}</strong>'
+
     rows = ""
     for lane in heat.lanes:
         if lane.category is None:
             rows += (
                 f'        <tr class="gutter">'
                 f"<td>{lane.lane}</td>"
-                f'<td colspan="2">GUTTER</td>'
+                f'<td colspan="2">LEDIG</td>'
                 f"</tr>\n"
             )
         else:
@@ -222,13 +247,14 @@ def _render_heat(heat: _HurdleHeat) -> str:
     <div class="heat">
         <h2>{header}</h2>
         <p class="setup-info">
-            {heat.num_hurdles} hurdles &middot;
-            first at {_fmt(heat.first_hurdle_m)} m &middot;
-            {_fmt(heat.distance_between_m)} m apart
+            {heat.num_hurdles} hekker &middot;
+            f&oslash;rste ved {_fmt(heat.first_hurdle_m)} m &middot;
+            {_fmt(heat.distance_between_m)} m mellomrom
+            {marker_html}
         </p>
         <table>
             <thead>
-                <tr><th>Lane</th><th>Category</th><th>Height</th></tr>
+                <tr><th>Bane</th><th>Klasse</th><th>H&oslash;yde</th></tr>
             </thead>
             <tbody>
 {rows}
@@ -273,5 +299,10 @@ _CSS = """\
         tr.gutter td {
             background-color: #f0f0f0; color: #999;
             font-style: italic; text-align: center;
+        }
+        .marker-icon {
+            width: 18px; height: 18px;
+            vertical-align: middle;
+            margin-right: 2px;
         }
 """
