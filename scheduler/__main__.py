@@ -3,7 +3,10 @@ import time
 from .functional_scheduler import SchedulingResult, schedule_track_meet
 from .html_schedule_generator import save_html_schedule
 from .isonen_parser import parse_isonen_csv
-from .models import Athlete, Event, EventGroup, EventType, EventVenueMapping, Venue
+from .models import (
+    Athlete, Event, EventGroup, EventType, EventVenueMapping, Venue,
+    get_hurdle_spec, hurdle_lane_capacity, is_hurdles_event,
+)
 
 
 def print_full_schedule(solution: SchedulingResult, title: str = "Full Schedule"):
@@ -376,11 +379,91 @@ def _create_track_groups_for_gender(
     return groups
 
 
+def _create_hurdle_groups_for_gender(
+    event_type: EventType,
+    events: list[Event],
+    athlete_counts: dict[str, int],
+) -> list[EventGroup]:
+    """Create hurdle event groups respecting distance and height constraints.
+
+    Events with different distance_between_m cannot share a heat (hurdle positions differ).
+    Events with different height_cm can share a heat but need a gutter lane between
+    height zones, reducing capacity from 8 to 8-(num_heights-1).
+    """
+    if not events:
+        return []
+
+    # Sub-group by distance_between_m
+    by_distance: dict[float, list[Event]] = {}
+    no_spec: list[Event] = []
+    for e in events:
+        spec = get_hurdle_spec(event_type, e.age_category)
+        if spec is None:
+            no_spec.append(e)
+        else:
+            by_distance.setdefault(spec.distance_between_m, []).append(e)
+
+    groups: list[EventGroup] = []
+
+    for _distance, dist_events in sorted(by_distance.items()):
+        # Sort by height so same-height events are adjacent (minimizes gutters when splitting)
+        dist_events.sort(key=lambda e: (
+            get_hurdle_spec(event_type, e.age_category).height_cm,  # type: ignore[union-attr]
+            e.age_category.value,
+        ))
+
+        capacity = hurdle_lane_capacity(event_type, [e.age_category for e in dist_events])
+        total_athletes = sum(athlete_counts.get(e.id, 0) for e in dist_events)
+
+        if total_athletes <= capacity:
+            # Fits in one heat
+            groups.append(_make_track_group(event_type, dist_events))
+        else:
+            # Greedy-pack events, sorted by height to keep same heights together
+            current: list[Event] = []
+            current_count = 0
+            for e in dist_events:
+                ec = athlete_counts.get(e.id, 0)
+                cap = hurdle_lane_capacity(event_type, [x.age_category for x in current + [e]])
+                if current and current_count + ec > cap:
+                    groups.append(_make_track_group(event_type, current))
+                    current = []
+                    current_count = 0
+                current.append(e)
+                current_count += ec
+            if current:
+                groups.append(_make_track_group(event_type, current))
+
+    # Events without specs get their own group
+    for e in no_spec:
+        group_id = f"{event_type.value}_{e.age_category.value}_group"
+        groups.append(EventGroup(id=group_id, event_type=event_type, events=[e]))
+
+    return groups
+
+
+def _make_track_group(event_type: EventType, events: list[Event]) -> EventGroup:
+    """Build an EventGroup for track events with a descriptive ID."""
+    if len(events) == 1:
+        gid = f"{event_type.value}_{events[0].age_category.value}_group"
+    else:
+        cats = "+".join(e.age_category.value for e in events)
+        gid = f"{event_type.value}_{cats}_group"
+    return EventGroup(id=gid, event_type=event_type, events=events)
+
+
 def _create_track_groups(event_type: EventType, events: list[Event], athlete_counts: dict[str, int]) -> list[EventGroup]:
     """Create track event groups with smart age-based merging, keeping genders separate."""
     # Split events by gender first - boys and girls cannot be in the same track event
     boys_events = [e for e in events if _is_boys_category(e.age_category.value)]
     girls_events = [e for e in events if not _is_boys_category(e.age_category.value)]
+
+    # Hurdle events need special grouping by distance/height
+    if is_hurdles_event(event_type):
+        groups: list[EventGroup] = []
+        groups.extend(_create_hurdle_groups_for_gender(event_type, boys_events, athlete_counts))
+        groups.extend(_create_hurdle_groups_for_gender(event_type, girls_events, athlete_counts))
+        return groups
 
     # Age ranges for boys: 3 tiers (Rekrutt | 11-14 | 15+)
     boys_age_ranges = [
@@ -396,7 +479,7 @@ def _create_track_groups(event_type: EventType, events: list[Event], athlete_cou
         (["J15", "J16", "J17", "J18-19", "Kvinner Senior"], "J15+"),
     ]
 
-    groups: list[EventGroup] = []
+    groups = []
     groups.extend(_create_track_groups_for_gender(event_type, boys_events, athlete_counts, boys_age_ranges))
     groups.extend(_create_track_groups_for_gender(event_type, girls_events, athlete_counts, girls_age_ranges))
 

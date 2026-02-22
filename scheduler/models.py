@@ -165,6 +165,62 @@ def is_hurdles_event(event_type: EventType) -> bool:
     return event_type in HURDLES_EVENTS
 
 
+@dataclass(frozen=True)
+class HurdleSpec:
+    num_hurdles: int
+    first_hurdle_m: float
+    distance_between_m: float
+    height_cm: float
+
+
+# 60m hurdle specifications by (event_type, category).
+# Source: Norwegian Athletics Federation hurdle setup tables.
+HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
+    # Boys (Gutter) - 60m hurdles
+    (EventType.m60_hurdles, Category.g11): HurdleSpec(6, 11, 6.5, 68),
+    (EventType.m60_hurdles, Category.g12): HurdleSpec(6, 11, 7, 76.2),
+    (EventType.m60_hurdles, Category.g13): HurdleSpec(6, 11.5, 7.5, 76.2),
+    (EventType.m60_hurdles, Category.g14): HurdleSpec(5, 12, 8, 84),
+    (EventType.m60_hurdles, Category.g15): HurdleSpec(5, 13, 8.5, 84),
+    (EventType.m60_hurdles, Category.g16): HurdleSpec(5, 13, 8.5, 91.4),
+    (EventType.m60_hurdles, Category.g17): HurdleSpec(5, 13.72, 9.14, 91.4),
+    (EventType.m60_hurdles, Category.g18_19): HurdleSpec(5, 13.72, 9.14, 100),
+    (EventType.m60_hurdles, Category.ms): HurdleSpec(5, 13.72, 9.14, 106.7),
+    # Girls (Jenter) - 60m hurdles
+    (EventType.m60_hurdles, Category.j11): HurdleSpec(6, 11, 6.5, 68),
+    (EventType.m60_hurdles, Category.j12): HurdleSpec(6, 11, 7, 68),
+    (EventType.m60_hurdles, Category.j13): HurdleSpec(6, 11.5, 7.5, 68),
+    (EventType.m60_hurdles, Category.j14): HurdleSpec(6, 11.5, 7.5, 76.2),
+    (EventType.m60_hurdles, Category.j15): HurdleSpec(5, 12, 8, 76.2),
+    (EventType.m60_hurdles, Category.j16): HurdleSpec(5, 12, 8, 76.2),
+    (EventType.m60_hurdles, Category.j17): HurdleSpec(5, 13, 8.5, 76.2),
+    (EventType.m60_hurdles, Category.j18_19): HurdleSpec(5, 13, 8.5, 84),
+    (EventType.m60_hurdles, Category.ks): HurdleSpec(5, 13, 8.5, 84),
+}
+
+
+def get_hurdle_spec(event_type: EventType, category: Category) -> HurdleSpec | None:
+    """Get the hurdle specification for an event type and category, or None if not found."""
+    return HURDLE_SPECS.get((event_type, category))
+
+
+def hurdle_lane_capacity(event_type: EventType, categories: list[Category]) -> int:
+    """Calculate lane capacity for a hurdle heat with the given categories.
+
+    Categories with different heights need a gutter (empty) lane between
+    height zones, reducing capacity from the standard 8 lanes.
+    Returns 8 - (num_distinct_heights - 1).
+    """
+    heights: set[float] = set()
+    for cat in categories:
+        spec = get_hurdle_spec(event_type, cat)
+        if spec is not None:
+            heights.add(spec.height_cm)
+    if not heights:
+        return 8
+    return 8 - (len(heights) - 1)
+
+
 def get_track_event_order(event_type: EventType) -> int:
     """Get the ordering index for a track event type (lower = earlier)."""
     if event_type in TRACK_DISTANCE_ORDER:

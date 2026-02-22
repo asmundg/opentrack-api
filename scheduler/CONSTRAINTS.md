@@ -25,6 +25,14 @@ Track events follow a strict sequence based on starting position logistics:
 
 This ordering minimizes equipment moves and starting position changes.
 
+### 4. Hurdle Event Merging
+Hurdle events have physical constraints that prevent arbitrary age-class merging:
+- **Same distance required**: Only categories with the same `distance_between_m` can share a heat. Different distances mean different hurdle positions on the track.
+- **Height gutter lanes**: Categories with different hurdle heights can share a heat, but need an empty "gutter" lane between height zones. This reduces lane capacity: `8 - (num_distinct_heights - 1)`.
+- When a distance sub-group exceeds its lane capacity, events are split using greedy packing sorted by height (to keep same-height events together and minimize gutter lanes per sub-group).
+
+Hurdle specs are defined in `models.py:HURDLE_SPECS`.
+
 ## Optimization Goals
 
 These are soft goals, optimized in priority order. Later goals only improve if earlier goals are not compromised.
