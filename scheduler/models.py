@@ -280,12 +280,12 @@ EventDuration: dict[EventType, int] = {
 }
 
 EventCategoryDurationOverride: dict[tuple[EventType, Category], int] = {
-    (EventType.sp, Category.j10): 3,
-    (EventType.sp, Category.j11): 4,
-    (EventType.sp, Category.j12): 4,
-    (EventType.sp, Category.g10): 3,
-    (EventType.sp, Category.g11): 4,
-    (EventType.sp, Category.g12): 4,
+    (EventType.sp, Category.j10): 2,
+    (EventType.sp, Category.j11): 2,
+    (EventType.sp, Category.j12): 2,
+    (EventType.sp, Category.g10): 2,
+    (EventType.sp, Category.g11): 2,
+    (EventType.sp, Category.g12): 2,
     (EventType.ht, Category.j11): 4,
     (EventType.ht, Category.j12): 4,
     (EventType.ht, Category.g11): 4,
@@ -300,9 +300,9 @@ EventCategoryDurationOverride: dict[tuple[EventType, Category], int] = {
     (EventType.lj, Category.g10): 3,
     (EventType.lj, Category.g11): 4,
     (EventType.lj, Category.g12): 4,
-    (EventType.hj, Category.j10): 4,
-    (EventType.hj, Category.g10): 4,
-    }
+    (EventType.hj, Category.j10): 3,
+    (EventType.hj, Category.g10): 3,
+}
 
 EventCategoryDuration: dict[tuple[EventType, Category], int] = {
     (EventType.m60, Category.j10): 5,
