@@ -7,6 +7,11 @@ from shared.implement_weights import (
     get_target_weight_kg,
     NORWEGIAN_TO_EVENT_CODE,
 )
+from shared.hurdle_heights import (
+    extract_height_from_event_name,
+    get_target_height_cm,
+    HURDLE_EVENTS,
+)
 
 # Event name mappings from various formats to standardized names
 EVENT_MAPPINGS: Dict[str, str] = {
@@ -209,17 +214,38 @@ def find_best_event_match(
             if weight is None:
                 return float('inf')  # No weight info, deprioritize
             return abs(weight - target_weight)
-        
+
         throwing_matches.sort(key=weight_distance)
         return throwing_matches[0]
-    
+
+    # Check if this is a hurdle event with height specifications
+    target_height = None
+    if standardized_target in HURDLE_EVENTS and category:
+        target_height = get_target_height_cm(standardized_target, category)
+
+    if target_height is not None:
+        def height_distance(event_name: str) -> float:
+            height = extract_height_from_event_name(event_name)
+            if height is None:
+                return float('inf')
+            return abs(height - target_height)
+
+        throwing_matches.sort(key=height_distance)
+        return throwing_matches[0]
+
     # No category provided - fall back to preferring heavier implements (senior weights)
-    def get_weight(event_name: str) -> float:
-        """Extract weight for sorting (higher is better for seniors)."""
+    # or taller hurdles
+    def get_weight_or_height(event_name: str) -> float:
+        """Extract weight/height for sorting (higher is better for seniors)."""
         weight = extract_weight_from_event_name(event_name)
-        return weight if weight is not None else 0.0
-    
-    throwing_matches.sort(key=get_weight, reverse=True)
+        if weight is not None:
+            return weight
+        height = extract_height_from_event_name(event_name)
+        if height is not None:
+            return height
+        return 0.0
+
+    throwing_matches.sort(key=get_weight_or_height, reverse=True)
     return throwing_matches[0]
 
 
