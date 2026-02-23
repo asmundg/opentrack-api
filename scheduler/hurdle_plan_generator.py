@@ -16,6 +16,7 @@ from .models import (
     Category,
     EventGroup,
     available_hurdle_lane_list,
+    get_category_age_order,
     get_hurdle_spec,
     is_hurdles_event,
 )
@@ -155,6 +156,9 @@ def _assign_lanes(
 
     Primary grouping: by distance_between_m (2 gutter lanes between zones).
     Secondary grouping: by height_cm within a distance zone (1 gutter lane).
+
+    When blocked lanes exist, tries to position the layout so blocked lanes
+    coincide with gutter positions (saving a usable lane).
     """
     # Build (category, distance, height, count) for categories with athletes
     cat_info: list[tuple[Category, float, float, int]] = []
@@ -185,54 +189,115 @@ def _assign_lanes(
             current_height = height
         distance_zones[-1][-1].append(item)
 
-    # Count total lanes needed
-    num_athletes = sum(count for _, _, _, count in cat_info)
-    num_height_gutters = sum(max(0, len(hz) - 1) for hz in distance_zones)
-    num_distance_gutters = 2 * max(0, len(distance_zones) - 1)
-    total_lanes = num_athletes + num_height_gutters + num_distance_gutters
+    # Build logical layout: flat sequence of slots to place on physical lanes
+    _ATHLETE = "athlete"
+    _HEIGHT_GUTTER = "height_gutter"
+    _DISTANCE_GUTTER = "distance_gutter"
 
-    # Get available lane numbers (excludes unavailable + age-restricted)
-    categories = [cat for cat, _, _, _ in cat_info]
-    available = available_hurdle_lane_list(categories)
-    offset = (len(available) - total_lanes) // 2
-
-    # Assign lanes using actual available lane numbers
-    lanes: list[_LaneInfo] = []
-    idx = offset
+    layout: list[tuple[str, Category | None, float | None, float | None]] = []
     for dz_idx, dz_height_zones in enumerate(distance_zones):
         if dz_idx > 0:
-            # 2 distance gutter lanes
-            for _ in range(2):
-                lanes.append(_LaneInfo(
-                    lane=available[idx], category=None, height_cm=None,
-                    is_distance_gutter=True,
-                ))
-                idx += 1
+            layout.append((_DISTANCE_GUTTER, None, None, None))
+            layout.append((_DISTANCE_GUTTER, None, None, None))
         for hz_idx, hz in enumerate(dz_height_zones):
             if hz_idx > 0:
-                # 1 height gutter lane
-                lanes.append(_LaneInfo(lane=available[idx], category=None, height_cm=None))
-                idx += 1
+                layout.append((_HEIGHT_GUTTER, None, None, None))
             for cat, dist, height, count in hz:
                 for _ in range(count):
-                    lanes.append(_LaneInfo(
-                        lane=available[idx], category=cat, height_cm=height,
-                        distance_between_m=dist,
-                    ))
-                    idx += 1
+                    layout.append((_ATHLETE, cat, height, dist))
 
-    # Insert unavailable lane markers between first and last assigned lane
+    total_slots = len(layout)
+    gutter_indices = {i for i, (kind, *_) in enumerate(layout) if kind != _ATHLETE}
+    categories = [cat for cat, _, _, _ in cat_info]
+
+    # Compute max lane number (age-limited, but including blocked lanes)
+    max_lane = models.ARENA.total_lanes
+    for cat in categories:
+        age = get_category_age_order(cat)
+        for min_age, limit in models.ARENA.hurdle_lane_limits.items():
+            if age >= min_age:
+                max_lane = min(max_lane, limit)
+
+    blocked = {l for l in models.ARENA.unavailable_hurdle_lanes if 1 <= l <= max_lane}
+
+    # Try contiguous placements: pick one where blocked lanes align with gutters
+    best_start: int | None = None
+    best_score: tuple[int, float] | None = None
+
+    if blocked and gutter_indices:
+        for start in range(1, max_lane - total_slots + 2):
+            valid = True
+            gutter_matches = 0
+            for i in range(total_slots):
+                lane = start + i
+                if lane in blocked:
+                    if i in gutter_indices:
+                        gutter_matches += 1
+                    else:
+                        valid = False
+                        break
+            if not valid:
+                continue
+            center = (1 + max_lane) / 2
+            centering = -abs((start + (total_slots - 1) / 2) - center)
+            score = (gutter_matches, centering)
+            if best_score is None or score > best_score:
+                best_score = score
+                best_start = start
+
+    if best_start is not None and best_score is not None and best_score[0] > 0:
+        # Contiguous placement with blocked lanes aligned to gutters
+        lanes: list[_LaneInfo] = []
+        for i, (kind, cat, height, dist) in enumerate(layout):
+            lane_num = best_start + i
+            is_blocked = lane_num in blocked
+            if kind == _ATHLETE:
+                lanes.append(_LaneInfo(
+                    lane=lane_num, category=cat, height_cm=height,
+                    distance_between_m=dist,
+                ))
+            elif kind == _DISTANCE_GUTTER:
+                lanes.append(_LaneInfo(
+                    lane=lane_num, category=None, height_cm=None,
+                    is_distance_gutter=True, is_unavailable=is_blocked,
+                ))
+            else:  # height gutter
+                lanes.append(_LaneInfo(
+                    lane=lane_num, category=None, height_cm=None,
+                    is_unavailable=is_blocked,
+                ))
+        return lanes
+
+    # Fallback: skip blocked lanes, center in available lanes
+    available = available_hurdle_lane_list(categories)
+    offset = (len(available) - total_slots) // 2
+
+    lanes = []
+    for i, (kind, cat, height, dist) in enumerate(layout):
+        lane_num = available[offset + i]
+        if kind == _ATHLETE:
+            lanes.append(_LaneInfo(
+                lane=lane_num, category=cat, height_cm=height,
+                distance_between_m=dist,
+            ))
+        elif kind == _DISTANCE_GUTTER:
+            lanes.append(_LaneInfo(
+                lane=lane_num, category=None, height_cm=None,
+                is_distance_gutter=True,
+            ))
+        else:  # height gutter
+            lanes.append(_LaneInfo(lane=lane_num, category=None, height_cm=None))
+
+    # Insert blocked lane markers between first and last assigned lane
     if lanes:
         first_lane = lanes[0].lane
         last_lane = lanes[-1].lane
-        for blocked in sorted(models.ARENA.unavailable_hurdle_lanes):
-            if first_lane < blocked < last_lane:
-                # Insert at the right position to keep lanes sorted
-                insert_pos = next(
-                    i for i, l in enumerate(lanes) if l.lane > blocked
-                )
+        assigned = {l.lane for l in lanes}
+        for b in sorted(blocked):
+            if first_lane < b < last_lane and b not in assigned:
+                insert_pos = next(i for i, l in enumerate(lanes) if l.lane > b)
                 lanes.insert(insert_pos, _LaneInfo(
-                    lane=blocked, category=None, height_cm=None,
+                    lane=b, category=None, height_cm=None,
                     is_unavailable=True,
                 ))
 
@@ -307,18 +372,19 @@ def _render_heat(heat: _HurdleHeat) -> str:
 
     rows = ""
     for lane in heat.lanes:
-        if lane.is_unavailable:
+        if lane.is_distance_gutter:
+            label = "SONE-SKILLE (SPERRET)" if lane.is_unavailable else "SONE-SKILLE"
+            rows += (
+                f'        <tr class="distance-gutter">'
+                f"<td>{lane.lane}</td>"
+                f'<td colspan="2">{label}</td>'
+                f"</tr>\n"
+            )
+        elif lane.is_unavailable:
             rows += (
                 f'        <tr class="unavailable">'
                 f"<td>{lane.lane}</td>"
                 f'<td colspan="2">SPERRET</td>'
-                f"</tr>\n"
-            )
-        elif lane.is_distance_gutter:
-            rows += (
-                f'        <tr class="distance-gutter">'
-                f"<td>{lane.lane}</td>"
-                f'<td colspan="2">SONE-SKILLE</td>'
                 f"</tr>\n"
             )
         elif lane.category is None:
