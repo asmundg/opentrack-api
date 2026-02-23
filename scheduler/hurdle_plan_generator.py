@@ -15,6 +15,7 @@ from . import models
 from .models import (
     Category,
     EventGroup,
+    available_hurdle_lane_list,
     get_hurdle_spec,
     is_hurdles_event,
 )
@@ -37,6 +38,7 @@ class _LaneInfo:
     height_cm: float | None
     distance_between_m: float | None = None
     is_distance_gutter: bool = False  # True for 2-lane zone separator
+    is_unavailable: bool = False  # True for blocked/damaged lanes
 
 
 @dataclass
@@ -189,35 +191,50 @@ def _assign_lanes(
     num_distance_gutters = 2 * max(0, len(distance_zones) - 1)
     total_lanes = num_athletes + num_height_gutters + num_distance_gutters
 
-    # Center across available lanes (may be restricted by arena config)
+    # Get available lane numbers (excludes unavailable + age-restricted)
     categories = [cat for cat, _, _, _ in cat_info]
-    max_lanes = models.effective_hurdle_lanes(categories)
-    offset = (max_lanes - total_lanes) // 2
+    available = available_hurdle_lane_list(categories)
+    offset = (len(available) - total_lanes) // 2
 
-    # Assign lanes
+    # Assign lanes using actual available lane numbers
     lanes: list[_LaneInfo] = []
-    lane_num = 1 + offset
+    idx = offset
     for dz_idx, dz_height_zones in enumerate(distance_zones):
         if dz_idx > 0:
             # 2 distance gutter lanes
             for _ in range(2):
                 lanes.append(_LaneInfo(
-                    lane=lane_num, category=None, height_cm=None,
+                    lane=available[idx], category=None, height_cm=None,
                     is_distance_gutter=True,
                 ))
-                lane_num += 1
+                idx += 1
         for hz_idx, hz in enumerate(dz_height_zones):
             if hz_idx > 0:
                 # 1 height gutter lane
-                lanes.append(_LaneInfo(lane=lane_num, category=None, height_cm=None))
-                lane_num += 1
+                lanes.append(_LaneInfo(lane=available[idx], category=None, height_cm=None))
+                idx += 1
             for cat, dist, height, count in hz:
                 for _ in range(count):
                     lanes.append(_LaneInfo(
-                        lane=lane_num, category=cat, height_cm=height,
+                        lane=available[idx], category=cat, height_cm=height,
                         distance_between_m=dist,
                     ))
-                    lane_num += 1
+                    idx += 1
+
+    # Insert unavailable lane markers between first and last assigned lane
+    if lanes:
+        first_lane = lanes[0].lane
+        last_lane = lanes[-1].lane
+        for blocked in sorted(models.ARENA.unavailable_hurdle_lanes):
+            if first_lane < blocked < last_lane:
+                # Insert at the right position to keep lanes sorted
+                insert_pos = next(
+                    i for i, l in enumerate(lanes) if l.lane > blocked
+                )
+                lanes.insert(insert_pos, _LaneInfo(
+                    lane=blocked, category=None, height_cm=None,
+                    is_unavailable=True,
+                ))
 
     return lanes
 
@@ -290,7 +307,14 @@ def _render_heat(heat: _HurdleHeat) -> str:
 
     rows = ""
     for lane in heat.lanes:
-        if lane.is_distance_gutter:
+        if lane.is_unavailable:
+            rows += (
+                f'        <tr class="unavailable">'
+                f"<td>{lane.lane}</td>"
+                f'<td colspan="2">SPERRET</td>'
+                f"</tr>\n"
+            )
+        elif lane.is_distance_gutter:
             rows += (
                 f'        <tr class="distance-gutter">'
                 f"<td>{lane.lane}</td>"
@@ -371,6 +395,10 @@ _CSS = """\
         }
         tr.distance-gutter td {
             background-color: #ffcccc; color: #c62828;
+            font-weight: bold; font-style: italic; text-align: center;
+        }
+        tr.unavailable td {
+            background-color: #fff3e0; color: #e65100;
             font-weight: bold; font-style: italic; text-align: center;
         }
         .marker-icon {

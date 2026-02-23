@@ -553,7 +553,7 @@ def create_field_cards(
                 )
             )
 
-        # Add High Jump instructions (Norwegian)
+        # Add event-specific instructions (Norwegian)
         if is_high_jump:
             if base_event_type == "HJ":
                 elements.append(
@@ -569,6 +569,13 @@ def create_field_cards(
                         small_style,
                     )
                 )
+        else:
+            elements.append(
+                Paragraph(
+                    "<i>Markering: x = dødt forsøk, - = stått over, r = trukket seg</i>",
+                    small_style,
+                )
+            )
 
         elements.append(Spacer(1, 0.3 * cm))
 

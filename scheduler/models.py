@@ -193,7 +193,7 @@ HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     (EventType.m60_hurdles, Category.j14): HurdleSpec(6, 11.5, 7.5, 76.2),
     (EventType.m60_hurdles, Category.j15): HurdleSpec(5, 12, 8, 76.2),
     (EventType.m60_hurdles, Category.j16): HurdleSpec(5, 12, 8, 76.2),
-    (EventType.m60_hurdles, Category.j17): HurdleSpec(5, 13, 8.5, 84),
+    (EventType.m60_hurdles, Category.j17): HurdleSpec(5, 13, 8.5, 76.2),
     (EventType.m60_hurdles, Category.j18_19): HurdleSpec(5, 13, 8.5, 84),
     (EventType.m60_hurdles, Category.ks): HurdleSpec(5, 13, 8.5, 84),
 }
@@ -214,6 +214,8 @@ class ArenaConfig:
     # Age-based lane limits for hurdles: {min_age: max_usable_lanes}
     # E.g., {13: 7} means categories with age >= 13 can use at most 7 lanes.
     hurdle_lane_limits: dict[int, int]
+    # Specific lanes to avoid for hurdles (e.g., damaged lane)
+    unavailable_hurdle_lanes: frozenset[int] = frozenset()
 
 
 ARENA_GENERIC = ArenaConfig(
@@ -235,6 +237,7 @@ ARENA_TROMSOHALLEN = ArenaConfig(
         (13.72, 9.14): ("Blå ball", "circle", "#1E88E5"),
     },
     hurdle_lane_limits={13: 7},
+    unavailable_hurdle_lanes=frozenset({4}),
 )
 
 ARENAS: dict[str, ArenaConfig] = {
@@ -246,15 +249,22 @@ ARENAS: dict[str, ArenaConfig] = {
 ARENA: ArenaConfig = ARENA_GENERIC
 
 
-def effective_hurdle_lanes(categories: list[Category]) -> int:
-    """Max usable lanes for a hurdle heat with these categories, given ARENA config."""
+def available_hurdle_lane_list(categories: list[Category]) -> list[int]:
+    """Sorted list of usable lane numbers for a hurdle heat, given ARENA config."""
     max_lanes = ARENA.total_lanes
     for cat in categories:
         age = get_category_age_order(cat)
         for min_age, limit in ARENA.hurdle_lane_limits.items():
             if age >= min_age:
                 max_lanes = min(max_lanes, limit)
-    return max_lanes
+    return [
+        l for l in range(1, max_lanes + 1) if l not in ARENA.unavailable_hurdle_lanes
+    ]
+
+
+def effective_hurdle_lanes(categories: list[Category]) -> int:
+    """Max usable lanes for a hurdle heat with these categories, given ARENA config."""
+    return len(available_hurdle_lane_list(categories))
 
 
 def hurdle_lane_capacity(event_type: EventType, categories: list[Category]) -> int:
@@ -276,7 +286,8 @@ def hurdle_lane_capacity(event_type: EventType, categories: list[Category]) -> i
 
 
 def mixed_hurdle_lane_capacity(
-    event_type: EventType, categories: list[Category],
+    event_type: EventType,
+    categories: list[Category],
 ) -> int:
     """Calculate lane capacity when mixing hurdle categories with different distances.
 
