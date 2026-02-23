@@ -2,14 +2,19 @@
 
 Generates an HTML document showing hurdle configurations per lane for each
 hurdle heat, for use by the hurdle setup crew.
+
+Supports heats with multiple distance zones (when --mix-hurdle-distances is
+used).  Between distance zones, 2 gutter lanes are inserted and styled as
+"SONE-SKILLE".  Within a distance zone, different heights still get 1 gutter
+lane styled as "LEDIG".
 """
 
 from dataclasses import dataclass
 
+from . import models
 from .models import (
     Category,
     EventGroup,
-    HurdleSpec,
     get_hurdle_spec,
     is_hurdles_event,
 )
@@ -17,33 +22,30 @@ from .types import SchedulingResult
 
 
 @dataclass
+class _DistanceZone:
+    """One group of lanes sharing the same hurdle spacing."""
+    distance_between_m: float
+    first_hurdle_m: float
+    num_hurdles: int
+    marker: tuple[str, str, str] | None  # (label, shape, color)
+
+
+@dataclass
 class _LaneInfo:
     lane: int
     category: Category | None  # None = gutter lane
     height_cm: float | None
+    distance_between_m: float | None = None
+    is_distance_gutter: bool = False  # True for 2-lane zone separator
 
 
 @dataclass
 class _HurdleHeat:
     event_group: EventGroup
     start_time: str
-    num_hurdles: int
-    first_hurdle_m: float
-    distance_between_m: float
+    zones: list[_DistanceZone]
     lanes: list[_LaneInfo]
-    marker: tuple[str, str, str] | None = None  # (label, shape, color)
 
-
-# Floor markers at Tromsøhallen, keyed by (first_hurdle_m, distance_between_m).
-# Values: (label, shape, color) where shape is "cross" or "circle".
-_MARKERS: dict[tuple[float, float], tuple[str, str, str]] = {
-    (11.0, 6.5): ("Gult kryss", "cross", "#DAA520"),
-    (11.0, 7.0): ("Rødt kryss", "cross", "#E53935"),
-    (11.5, 7.5): ("Blått kryss", "cross", "#1E88E5"),
-    (12.0, 8.0): ("Svart kryss", "cross", "#333"),
-    (13.0, 8.5): ("Rød ball", "circle", "#E53935"),
-    (13.72, 9.14): ("Blå ball", "circle", "#1E88E5"),
-}
 
 
 def _marker_icon(shape: str, color: str) -> str:
@@ -106,83 +108,116 @@ def _collect_hurdle_heats(
             time_min = start_hour * 60 + start_minute + slot * result.slot_duration_minutes
             time_str = f"{time_min // 60}:{time_min % 60:02d}"
 
-            spec = _first_spec(eg)
-            if spec is None:
+            zones = _extract_zones(eg)
+            if not zones:
                 continue
 
             lanes = _assign_lanes(eg, athlete_counts)
-
-            marker = _MARKERS.get((spec.first_hurdle_m, spec.distance_between_m))
 
             heats.append(
                 _HurdleHeat(
                     event_group=eg,
                     start_time=time_str,
-                    num_hurdles=spec.num_hurdles,
-                    first_hurdle_m=spec.first_hurdle_m,
-                    distance_between_m=spec.distance_between_m,
+                    zones=zones,
                     lanes=lanes,
-                    marker=marker,
                 )
             )
 
     return heats
 
 
-def _first_spec(eg: EventGroup) -> HurdleSpec | None:
-    """Return the HurdleSpec for the first category that has one."""
+def _extract_zones(eg: EventGroup) -> list[_DistanceZone]:
+    """Extract distinct distance zones from an EventGroup's categories."""
+    # Collect unique (distance, first_hurdle, num_hurdles) combos
+    seen: dict[float, _DistanceZone] = {}  # keyed by distance_between_m
     for ev in eg.events:
         spec = get_hurdle_spec(eg.event_type, ev.age_category)
-        if spec is not None:
-            return spec
-    return None
+        if spec is None:
+            continue
+        if spec.distance_between_m not in seen:
+            marker = models.ARENA.hurdle_markers.get((spec.first_hurdle_m, spec.distance_between_m))
+            seen[spec.distance_between_m] = _DistanceZone(
+                distance_between_m=spec.distance_between_m,
+                first_hurdle_m=spec.first_hurdle_m,
+                num_hurdles=spec.num_hurdles,
+                marker=marker,
+            )
+    return [seen[d] for d in sorted(seen)]
 
 
 def _assign_lanes(
     eg: EventGroup,
     athlete_counts: dict[str, int],
 ) -> list[_LaneInfo]:
-    """Assign lanes for a hurdle heat, inserting gutter lanes between height zones."""
-    # Build (category, height_cm, athlete_count) for categories with athletes
-    cat_info: list[tuple[Category, float, int]] = []
+    """Assign lanes for a hurdle heat.
+
+    Primary grouping: by distance_between_m (2 gutter lanes between zones).
+    Secondary grouping: by height_cm within a distance zone (1 gutter lane).
+    """
+    # Build (category, distance, height, count) for categories with athletes
+    cat_info: list[tuple[Category, float, float, int]] = []
     for ev in eg.events:
         spec = get_hurdle_spec(eg.event_type, ev.age_category)
         if spec is None:
             continue
         count = athlete_counts.get(ev.id, 0)
         if count > 0:
-            cat_info.append((ev.age_category, spec.height_cm, count))
+            cat_info.append((ev.age_category, spec.distance_between_m, spec.height_cm, count))
 
-    # Sort by height, then category name for stability
-    cat_info.sort(key=lambda x: (x[1], x[0].value))
+    # Sort by (distance, height, category) for stable grouping
+    cat_info.sort(key=lambda x: (x[1], x[2], x[0].value))
 
-    # Group by height
-    height_zones: list[list[tuple[Category, float, int]]] = []
+    # Group into distance zones, then height zones within each
+    # Structure: list of distance zones, each containing list of height zones
+    distance_zones: list[list[list[tuple[Category, float, float, int]]]] = []
+    current_distance: float | None = None
     current_height: float | None = None
     for item in cat_info:
-        if current_height is None or item[1] != current_height:
-            height_zones.append([])
-            current_height = item[1]
-        height_zones[-1].append(item)
+        _, dist, height, _ = item
+        if current_distance is None or dist != current_distance:
+            distance_zones.append([])
+            current_distance = dist
+            current_height = None
+        if current_height is None or height != current_height:
+            distance_zones[-1].append([])
+            current_height = height
+        distance_zones[-1][-1].append(item)
 
-    # Count total lanes needed (athletes + gutters)
-    total_lanes = sum(count for _, _, count in cat_info) + max(0, len(height_zones) - 1)
+    # Count total lanes needed
+    num_athletes = sum(count for _, _, _, count in cat_info)
+    num_height_gutters = sum(max(0, len(hz) - 1) for hz in distance_zones)
+    num_distance_gutters = 2 * max(0, len(distance_zones) - 1)
+    total_lanes = num_athletes + num_height_gutters + num_distance_gutters
 
-    # Center across 8 lanes
-    max_lanes = 8
+    # Center across available lanes (may be restricted by arena config)
+    categories = [cat for cat, _, _, _ in cat_info]
+    max_lanes = models.effective_hurdle_lanes(categories)
     offset = (max_lanes - total_lanes) // 2
 
-    # Assign lanes sequentially, gutter between height zones
+    # Assign lanes
     lanes: list[_LaneInfo] = []
     lane_num = 1 + offset
-    for zone_idx, zone in enumerate(height_zones):
-        if zone_idx > 0:
-            lanes.append(_LaneInfo(lane=lane_num, category=None, height_cm=None))
-            lane_num += 1
-        for cat, height, count in zone:
-            for _ in range(count):
-                lanes.append(_LaneInfo(lane=lane_num, category=cat, height_cm=height))
+    for dz_idx, dz_height_zones in enumerate(distance_zones):
+        if dz_idx > 0:
+            # 2 distance gutter lanes
+            for _ in range(2):
+                lanes.append(_LaneInfo(
+                    lane=lane_num, category=None, height_cm=None,
+                    is_distance_gutter=True,
+                ))
                 lane_num += 1
+        for hz_idx, hz in enumerate(dz_height_zones):
+            if hz_idx > 0:
+                # 1 height gutter lane
+                lanes.append(_LaneInfo(lane=lane_num, category=None, height_cm=None))
+                lane_num += 1
+            for cat, dist, height, count in hz:
+                for _ in range(count):
+                    lanes.append(_LaneInfo(
+                        lane=lane_num, category=cat, height_cm=height,
+                        distance_between_m=dist,
+                    ))
+                    lane_num += 1
 
     return lanes
 
@@ -219,14 +254,50 @@ def _render_heat(heat: _HurdleHeat) -> str:
     categories = " / ".join(ev.age_category.value for ev in eg.events)
     header = f"{eg.event_type.value} &mdash; {categories} &mdash; {heat.start_time}"
 
-    marker_html = ""
-    if heat.marker:
-        label, shape, color = heat.marker
-        marker_html = f'&middot; {_marker_icon(shape, color)} <strong>{label}</strong>'
+    # Setup info: one line per zone when multi-zone, single paragraph when single zone
+    if len(heat.zones) == 1:
+        zone = heat.zones[0]
+        marker_html = ""
+        if zone.marker:
+            label, shape, color = zone.marker
+            marker_html = f'&middot; {_marker_icon(shape, color)} <strong>{label}</strong>'
+        setup_html = (
+            f'        <p class="setup-info">\n'
+            f'            {zone.num_hurdles} hekker &middot;\n'
+            f'            f&oslash;rste ved {_fmt(zone.first_hurdle_m)} m &middot;\n'
+            f'            {_fmt(zone.distance_between_m)} m mellomrom\n'
+            f'            {marker_html}\n'
+            f'        </p>'
+        )
+    else:
+        lines = []
+        for i, zone in enumerate(heat.zones):
+            marker_html = ""
+            if zone.marker:
+                label, shape, color = zone.marker
+                marker_html = f'&middot; {_marker_icon(shape, color)} <strong>{label}</strong>'
+            lines.append(
+                f'            <li>Sone {i+1}: {zone.num_hurdles} hekker &middot; '
+                f'f&oslash;rste ved {_fmt(zone.first_hurdle_m)} m &middot; '
+                f'{_fmt(zone.distance_between_m)} m mellomrom '
+                f'{marker_html}</li>'
+            )
+        setup_html = (
+            f'        <ul class="setup-info">\n'
+            + "\n".join(lines)
+            + "\n        </ul>"
+        )
 
     rows = ""
     for lane in heat.lanes:
-        if lane.category is None:
+        if lane.is_distance_gutter:
+            rows += (
+                f'        <tr class="distance-gutter">'
+                f"<td>{lane.lane}</td>"
+                f'<td colspan="2">SONE-SKILLE</td>'
+                f"</tr>\n"
+            )
+        elif lane.category is None:
             rows += (
                 f'        <tr class="gutter">'
                 f"<td>{lane.lane}</td>"
@@ -246,12 +317,7 @@ def _render_heat(heat: _HurdleHeat) -> str:
     return f"""
     <div class="heat">
         <h2>{header}</h2>
-        <p class="setup-info">
-            {heat.num_hurdles} hekker &middot;
-            f&oslash;rste ved {_fmt(heat.first_hurdle_m)} m &middot;
-            {_fmt(heat.distance_between_m)} m mellomrom
-            {marker_html}
-        </p>
+{setup_html}
         <table>
             <thead>
                 <tr><th>Bane</th><th>Klasse</th><th>H&oslash;yde</th></tr>
@@ -287,6 +353,9 @@ _CSS = """\
         .setup-info {
             margin-top: 0; color: #555; font-style: italic;
         }
+        ul.setup-info {
+            padding-left: 20px;
+        }
         table {
             border-collapse: collapse; width: 100%;
         }
@@ -299,6 +368,10 @@ _CSS = """\
         tr.gutter td {
             background-color: #f0f0f0; color: #999;
             font-style: italic; text-align: center;
+        }
+        tr.distance-gutter td {
+            background-color: #ffcccc; color: #c62828;
+            font-weight: bold; font-style: italic; text-align: center;
         }
         .marker-icon {
             width: 18px; height: 18px;

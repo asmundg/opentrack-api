@@ -204,21 +204,104 @@ def get_hurdle_spec(event_type: EventType, category: Category) -> HurdleSpec | N
     return HURDLE_SPECS.get((event_type, category))
 
 
+@dataclass(frozen=True)
+class ArenaConfig:
+    """Venue-specific configuration for lane counts, hurdle markers, etc."""
+
+    name: str
+    total_lanes: int
+    hurdle_markers: dict[tuple[float, float], tuple[str, str, str]]
+    # Age-based lane limits for hurdles: {min_age: max_usable_lanes}
+    # E.g., {13: 7} means categories with age >= 13 can use at most 7 lanes.
+    hurdle_lane_limits: dict[int, int]
+
+
+ARENA_GENERIC = ArenaConfig(
+    name="generic",
+    total_lanes=8,
+    hurdle_markers={},
+    hurdle_lane_limits={},
+)
+
+ARENA_TROMSOHALLEN = ArenaConfig(
+    name="tromsohallen",
+    total_lanes=8,
+    hurdle_markers={
+        (11.0, 6.5): ("Gult kryss", "cross", "#DAA520"),
+        (11.0, 7.0): ("Rødt kryss", "cross", "#E53935"),
+        (11.5, 7.5): ("Blått kryss", "cross", "#1E88E5"),
+        (12.0, 8.0): ("Svart kryss", "cross", "#333"),
+        (13.0, 8.5): ("Rød ball", "circle", "#E53935"),
+        (13.72, 9.14): ("Blå ball", "circle", "#1E88E5"),
+    },
+    hurdle_lane_limits={13: 7},
+)
+
+ARENAS: dict[str, ArenaConfig] = {
+    "generic": ARENA_GENERIC,
+    "tromsohallen": ARENA_TROMSOHALLEN,
+}
+
+# Module-level active config, set by CLI (same pattern as ACTIVE_SECONDARY_VENUES)
+ARENA: ArenaConfig = ARENA_GENERIC
+
+
+def effective_hurdle_lanes(categories: list[Category]) -> int:
+    """Max usable lanes for a hurdle heat with these categories, given ARENA config."""
+    max_lanes = ARENA.total_lanes
+    for cat in categories:
+        age = get_category_age_order(cat)
+        for min_age, limit in ARENA.hurdle_lane_limits.items():
+            if age >= min_age:
+                max_lanes = min(max_lanes, limit)
+    return max_lanes
+
+
 def hurdle_lane_capacity(event_type: EventType, categories: list[Category]) -> int:
     """Calculate lane capacity for a hurdle heat with the given categories.
 
     Categories with different heights need a gutter (empty) lane between
-    height zones, reducing capacity from the standard 8 lanes.
-    Returns 8 - (num_distinct_heights - 1).
+    height zones, reducing capacity from the effective lane count.
+    Returns effective_lanes - (num_distinct_heights - 1).
     """
+    max_lanes = effective_hurdle_lanes(categories)
     heights: set[float] = set()
     for cat in categories:
         spec = get_hurdle_spec(event_type, cat)
         if spec is not None:
             heights.add(spec.height_cm)
     if not heights:
-        return 8
-    return 8 - (len(heights) - 1)
+        return max_lanes
+    return max_lanes - (len(heights) - 1)
+
+
+def mixed_hurdle_lane_capacity(
+    event_type: EventType, categories: list[Category],
+) -> int:
+    """Calculate lane capacity when mixing hurdle categories with different distances.
+
+    Categories are grouped by distance_between_m (distance zones). Between zones,
+    2 gutter lanes are needed. Within a zone, heights still need 1 gutter lane each.
+
+    capacity = effective_lanes - 2*(num_distance_zones - 1) - sum(num_heights_in_zone - 1)
+
+    When all categories share the same distance, this reduces to hurdle_lane_capacity.
+    """
+    max_lanes = effective_hurdle_lanes(categories)
+    # Group categories by distance
+    by_distance: dict[float, set[float]] = {}
+    for cat in categories:
+        spec = get_hurdle_spec(event_type, cat)
+        if spec is None:
+            continue
+        by_distance.setdefault(spec.distance_between_m, set()).add(spec.height_cm)
+
+    if not by_distance:
+        return max_lanes
+
+    distance_gutters = 2 * (len(by_distance) - 1)
+    height_gutters = sum(max(0, len(heights) - 1) for heights in by_distance.values())
+    return max_lanes - distance_gutters - height_gutters
 
 
 def get_track_event_order(event_type: EventType) -> int:

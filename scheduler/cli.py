@@ -82,8 +82,22 @@ def schedule(
         bool,
         typer.Option("--mix-genders", help="Allow mixing genders in track heats (useful for youth events)"),
     ] = False,
+    mix_hurdle_distances: Annotated[
+        bool,
+        typer.Option("--mix-hurdle-distances", help="Allow mixing hurdle distances in one heat (uses 2 gutter lanes per distance boundary)"),
+    ] = False,
+    arena: Annotated[
+        str,
+        typer.Option("--arena", help="Arena name (e.g. 'tromsohallen') for venue-specific lane limits and markers"),
+    ] = "generic",
 ) -> None:
     """Generate a track meet schedule from an Isonen CSV file."""
+    # Configure arena
+    if arena not in models.ARENAS:
+        typer.echo(f"Unknown arena: '{arena}'. Available: {', '.join(models.ARENAS)}", err=True)
+        raise typer.Exit(1)
+    models.ARENA = models.ARENAS[arena]
+
     # Configure secondary venues
     if secondary_venues:
         active = set()
@@ -115,7 +129,7 @@ def schedule(
     if not quiet:
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
 
-    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders)
+    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders, mix_hurdle_distances=mix_hurdle_distances)
 
     if not quiet:
         typer.echo(f"Created {len(event_groups)} event groups")
@@ -282,6 +296,14 @@ def schedule_from_events(
         bool,
         typer.Option("--mix-genders", help="Allow mixing genders in track heats (useful for youth events)"),
     ] = False,
+    mix_hurdle_distances: Annotated[
+        bool,
+        typer.Option("--mix-hurdle-distances", help="Allow mixing hurdle distances in one heat (uses 2 gutter lanes per distance boundary)"),
+    ] = False,
+    arena: Annotated[
+        str,
+        typer.Option("--arena", help="Arena name (e.g. 'tromsohallen') for venue-specific lane limits and markers"),
+    ] = "generic",
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -294,12 +316,18 @@ def schedule_from_events(
     This workflow allows manual adjustments between automated scheduling
     and final output generation.
     """
+    # Configure arena
+    if arena not in models.ARENAS:
+        typer.echo(f"Unknown arena: '{arena}'. Available: {', '.join(models.ARENAS)}", err=True)
+        raise typer.Exit(1)
+    models.ARENA = models.ARENAS[arena]
+
     if not quiet:
         typer.echo(f"Parsing participant data from {input_file}...")
 
     # Parse original data to get event groups and athletes
     events, athletes = parse_isonen_csv(str(input_file))
-    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders)
+    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders, mix_hurdle_distances=mix_hurdle_distances)
 
     if not quiet:
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
