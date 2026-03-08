@@ -8,8 +8,7 @@ import typer
 
 from .functional_scheduler import schedule_track_meet
 from .html_schedule_generator import save_html_schedule
-from .csv_exporter import export_schedule_csv
-from .isonen_parser import parse_isonen_csv
+from .isonen_parser import parse_isonen_xlsx
 from .__main__ import group_events_by_type
 from .models import Event, EventType, SecondaryVenueConfig
 from . import models
@@ -30,7 +29,7 @@ def schedule(
     input_file: Annotated[
         Path,
         typer.Argument(
-            help="Path to the Isonen CSV file with participant data",
+            help="Path to the Isonen XLSX file with participant data",
             exists=True,
             readable=True,
         ),
@@ -91,7 +90,7 @@ def schedule(
         typer.Option("--arena", help="Arena name (e.g. 'tromsohallen') for venue-specific lane limits and markers"),
     ] = "generic",
 ) -> None:
-    """Generate a track meet schedule from an Isonen CSV file."""
+    """Generate a track meet schedule from an Isonen XLSX file."""
     # Configure arena
     if arena not in models.ARENAS:
         typer.echo(f"Unknown arena: '{arena}'. Available: {', '.join(models.ARENAS)}", err=True)
@@ -124,7 +123,7 @@ def schedule(
             typer.echo("Secondary venues: disabled")
         typer.echo(f"Parsing {input_file}...")
 
-    events, athletes = parse_isonen_csv(str(input_file))
+    events, athletes = parse_isonen_xlsx(str(input_file))
 
     if not quiet:
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
@@ -195,17 +194,6 @@ def schedule(
 
     typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
 
-    # Export updated CSV with computed start times
-    csv_output = output.with_suffix(".csv")
-    export_schedule_csv(
-        result=result,
-        original_csv_path=str(input_file),
-        output_path=str(csv_output),
-        start_hour=start_hour,
-        start_minute=start_minute,
-    )
-    typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
-
     # Export event overview CSV for manual editing
     events_csv_output = output.parent / f"{output.stem}_events.csv"
     export_event_overview_csv(
@@ -231,11 +219,11 @@ def schedule(
 def info(
     input_file: Annotated[
         Path,
-        typer.Argument(help="Path to the Isonen CSV file", exists=True, readable=True),
+        typer.Argument(help="Path to the Isonen XLSX file", exists=True, readable=True),
     ],
 ) -> None:
     """Show information about participant data without scheduling."""
-    events, athletes = parse_isonen_csv(str(input_file))
+    events, athletes = parse_isonen_xlsx(str(input_file))
 
     typer.echo(f"Events: {len(events)}")
     typer.echo(f"Athletes: {len(athletes)}")
@@ -267,7 +255,7 @@ def schedule_from_events(
     input_file: Annotated[
         Path,
         typer.Argument(
-            help="Path to the original Isonen CSV file with participant data",
+            help="Path to the original Isonen XLSX file with participant data",
             exists=True,
             readable=True,
         ),
@@ -326,7 +314,7 @@ def schedule_from_events(
         typer.echo(f"Parsing participant data from {input_file}...")
 
     # Parse original data to get event groups and athletes
-    events, athletes = parse_isonen_csv(str(input_file))
+    events, athletes = parse_isonen_xlsx(str(input_file))
     event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders, mix_hurdle_distances=mix_hurdle_distances)
 
     if not quiet:
@@ -390,17 +378,6 @@ def schedule_from_events(
     )
 
     typer.echo(f"\nHTML schedule saved to: {output.absolute()}")
-
-    # Export updated athlete CSV with manual times
-    csv_output = output.with_suffix(".csv")
-    export_schedule_csv(
-        result=result,
-        original_csv_path=str(input_file),
-        output_path=str(csv_output),
-        start_hour=earliest_time.hour,
-        start_minute=earliest_time.minute,
-    )
-    typer.echo(f"CSV schedule saved to: {csv_output.absolute()}")
 
     # Generate hurdle setup plan if there are hurdle events
     hurdle_html = generate_hurdle_plan_html(result, earliest_time.hour, earliest_time.minute)

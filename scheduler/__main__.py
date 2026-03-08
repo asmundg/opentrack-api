@@ -2,7 +2,7 @@ import time
 
 from .functional_scheduler import SchedulingResult, schedule_track_meet
 from .html_schedule_generator import save_html_schedule
-from .isonen_parser import parse_isonen_csv
+from .isonen_parser import parse_isonen_xlsx
 from .models import (
     Athlete, Event, EventGroup, EventType, EventVenueMapping, Venue,
     get_category_age_order, get_hurdle_spec, hurdle_lane_capacity,
@@ -719,7 +719,7 @@ def test_isonen_parser() -> tuple[list[EventGroup], list[Athlete]]:
     print("Testing Isonen CSV parser...")
 
     try:
-        events, athletes = parse_isonen_csv("/Users/asgramme/Downloads/Deltakerliste - Seriestevne 1.csv")
+        events, athletes = parse_isonen_xlsx("/Users/asgramme/Downloads/Deltakerliste - Seriestevne 1.csv")
 
         print(f"\n📊 Parsed Results:")
         print(f"Events: {len(events)}")
@@ -802,17 +802,6 @@ def solve_isonen_test() -> SchedulingResult:
             solution_dict=solution,
             title="Track Meet Schedule - Isonen Data",
             filename="isonen_schedule.html",
-        )
-
-        # Generate updated CSV with computed start times
-        from .csv_exporter import export_schedule_csv
-
-        export_schedule_csv(
-            result=solution,
-            original_csv_path="/Users/asgramme/Downloads/Deltakerliste - Seriestevne 1.csv",
-            output_path="isonen_schedule.csv",
-            start_hour=9,
-            start_minute=0,
         )
 
         # Full schedule will be printed in main

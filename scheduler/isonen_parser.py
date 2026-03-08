@@ -1,8 +1,9 @@
-"""Parser for Isonen CSV exports to convert registration data to events and athletes."""
+"""Parser for Isonen XLSX exports to convert registration data to events and athletes."""
 
-import csv
 from datetime import datetime
 from typing import Any
+
+from openpyxl import load_workbook
 
 from .models import Athlete, Category, Event, EventType
 
@@ -168,106 +169,112 @@ def _calculate_event_duration(
     return base_duration * heats
 
 
-def parse_isonen_csv(csv_file_path: str) -> tuple[list[Event], list[Athlete]]:
+def _read_xlsx_rows(xlsx_path: str) -> list[dict[str, str]]:
+    """Read an XLSX file and return rows as list of dicts (like csv.DictReader)."""
+    wb = load_workbook(xlsx_path, read_only=True, data_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows()
+
+    header_row = next(rows_iter)
+    headers = [str(cell.value).strip() if cell.value is not None else "" for cell in header_row]
+
+    result = []
+    for row in rows_iter:
+        values = [str(cell.value).strip() if cell.value is not None else "" for cell in row]
+        result.append(dict(zip(headers, values)))
+
+    wb.close()
+    return result
+
+
+def parse_isonen_xlsx(xlsx_file_path: str) -> tuple[list[Event], list[Athlete]]:
     """
-    Parse an Isonen CSV export and return events and athletes.
+    Parse an Isonen XLSX export and return events and athletes.
 
     Args:
-        csv_file_path: Path to the CSV file
+        xlsx_file_path: Path to the XLSX file
 
     Returns:
         Tuple of (events, athletes)
 
     Raises:
-        ValueError: If CSV contains invalid data that cannot be parsed
-        FileNotFoundError: If CSV file doesn't exist
+        ValueError: If file contains invalid data that cannot be parsed
+        FileNotFoundError: If file doesn't exist
     """
     events: dict[str, Event] = {}
     athletes_data: dict[str, dict[str, Any]] = {}
 
-    try:
-        with open(csv_file_path, "r", encoding="utf-8-sig") as file:
-            reader = csv.DictReader(file)
+    rows = _read_xlsx_rows(xlsx_file_path)
 
-            for row in reader:
-                # Extract athlete info
-                first_name = row["Fornavn"].strip()
-                last_name = row["Etternavn"].strip()
-                athlete_name = f"{first_name} {last_name}"
+    for row in rows:
+        # Extract athlete info
+        first_name = row.get("Fornavn", "").strip()
+        last_name = row.get("Etternavn", "").strip()
+        athlete_name = f"{first_name} {last_name}"
 
-                # Skip if no name
-                if not first_name and not last_name:
-                    continue
+        # Skip if no name
+        if not first_name and not last_name:
+            continue
 
-                # Extract event info
-                event_name = row["Øvelse"].strip()
-                category_name = row["Klasse"].strip()
-                date_str = row["Dato"].strip()
-                time_str = row["Kl."].strip()
+        # Extract event info
+        event_name = row.get("Øvelse", "").strip()
+        category_name = row.get("Klasse", "").strip()
+        date_str = row.get("Dato", "").strip()
+        time_str = row.get("Kl.", "").strip()
 
-                # Skip if missing essential event data
-                if not event_name or not category_name:
-                    continue
+        # Skip if missing essential event data
+        if not event_name or not category_name:
+            continue
 
-                try:
-                    event_type = parse_event_type(event_name)
-                    category = parse_category(category_name)
-                except ValueError as e:
-                    print(f"Warning: Skipping row due to parsing error: {e}")
-                    continue
+        try:
+            event_type = parse_event_type(event_name)
+            category = parse_category(category_name)
+        except ValueError as e:
+            print(f"Warning: Skipping row due to parsing error: {e}")
+            continue
 
-                # Create unique event ID
-                event_id = f"{event_type.value}_{category.value}"
+        # Create unique event ID
+        event_id = f"{event_type.value}_{category.value}"
 
-                # Parse datetime
-                try:
-                    # Combine date and time into ISO format
-                    if date_str and time_str:
-                        event_datetime = datetime.strptime(
-                            f"{date_str} {time_str}", "%d.%m.%Y %H:%M"
-                        )
-                        start_time = event_datetime.isoformat()
-                    else:
-                        # Default to a reasonable time if not specified
-                        start_time = (
-                            datetime.now()
-                            .replace(hour=9, minute=0, second=0, microsecond=0)
-                            .isoformat()
-                        )
-                except ValueError:
-                    # Fallback if datetime parsing fails
-                    start_time = (
-                        datetime.now()
-                        .replace(hour=9, minute=0, second=0, microsecond=0)
-                        .isoformat()
-                    )
+        # Parse datetime
+        try:
+            if date_str and time_str:
+                event_datetime = datetime.strptime(
+                    f"{date_str} {time_str}", "%d.%m.%Y %H:%M"
+                )
+                start_time = event_datetime.isoformat()
+            else:
+                start_time = (
+                    datetime.now()
+                    .replace(hour=9, minute=0, second=0, microsecond=0)
+                    .isoformat()
+                )
+        except ValueError:
+            start_time = (
+                datetime.now()
+                .replace(hour=9, minute=0, second=0, microsecond=0)
+                .isoformat()
+            )
 
-                # Track athlete-event relationships
-                if athlete_name not in athletes_data:
-                    athletes_data[athlete_name] = {"events": []}
-                athletes_data[athlete_name]["events"].append(event_id)
+        # Track athlete-event relationships
+        if athlete_name not in athletes_data:
+            athletes_data[athlete_name] = {"events": []}
+        athletes_data[athlete_name]["events"].append(event_id)
 
-                # Create or update event (count participants)
-                if event_id not in events:
-                    events[event_id] = Event(
-                        id=event_id,
-                        event_type=event_type,
-                        age_category=category,
-                        start_time=start_time,
-                        duration_minutes=0,  # Will be calculated later
-                        personnel_required=_calculate_personnel_required(event_type),
-                        priority_weight=_calculate_event_priority(event_type, category),
-                    )
-
-    except FileNotFoundError:
-        raise FileNotFoundError(f"CSV file not found: {csv_file_path}")
-    except UnicodeDecodeError:
-        raise ValueError(
-            f"Could not decode CSV file. Please ensure it's UTF-8 encoded: {csv_file_path}"
-        )
+        # Create or update event (count participants)
+        if event_id not in events:
+            events[event_id] = Event(
+                id=event_id,
+                event_type=event_type,
+                age_category=category,
+                start_time=start_time,
+                duration_minutes=0,  # Will be calculated later
+                personnel_required=_calculate_personnel_required(event_type),
+                priority_weight=_calculate_event_priority(event_type, category),
+            )
 
     if not events:
-        raise ValueError("No valid events found in CSV file")
+        raise ValueError("No valid events found in XLSX file")
 
     # Calculate participant counts and update durations
     event_participant_counts: dict[str, int] = {}
@@ -298,7 +305,7 @@ def parse_isonen_csv(csv_file_path: str) -> tuple[list[Event], list[Athlete]]:
     events_list = list(events.values())
 
     print(
-        f"Parsed {len(events_list)} unique events and {len(athletes)} athletes from CSV"
+        f"Parsed {len(events_list)} unique events and {len(athletes)} athletes from XLSX"
     )
 
     return events_list, athletes
