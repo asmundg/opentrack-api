@@ -1004,12 +1004,14 @@ def spread_events_post_process(
     solution: SchedulingSolution,
     problem: SchedulingProblem,
     max_slots: int,
+    min_athlete_gap_slots: int = 0,
 ) -> SchedulingSolution:
     """Greedily spread events apart at each venue by inserting gaps.
 
     Iteratively finds the tightest gap at any venue and shifts subsequent events
     by 1 slot to create breathing room. Prioritizes gaps before 15+ groups (3x weight).
-    Respects athlete conflict constraints — shifts are skipped if they'd cause overlaps.
+    Respects athlete conflict constraints — shifts are skipped if they'd cause overlaps
+    or reduce athlete recovery gaps below min_athlete_gap_slots.
     """
     # Extract event start slots from solution
     event_starts: dict[str, int] = {}
@@ -1055,15 +1057,24 @@ def spread_events_post_process(
                 conflict_pairs.setdefault(g2, set()).add(g1)
 
     def has_conflict(eid: str, new_start: int) -> bool:
-        """Check if moving eid to new_start would overlap with a conflicting event."""
-        end = new_start + problem.event_duration_slots[eid] - 1
+        """Check if moving eid to new_start would overlap or shrink athlete gaps."""
+        new_end = new_start + problem.event_duration_slots[eid] - 1
         for other in conflict_pairs.get(eid, set()):
             if other not in event_starts:
                 continue
             o_start = event_starts[other]
             o_end = o_start + problem.event_duration_slots[other] - 1
-            if end >= o_start and new_start <= o_end:
+            # Check overlap
+            if new_end >= o_start and new_start <= o_end:
                 return True
+            # Check that athlete gap is preserved
+            if min_athlete_gap_slots > 0:
+                if new_start > o_end:
+                    gap = new_start - o_end - 1
+                else:
+                    gap = o_start - new_end - 1
+                if gap < min_athlete_gap_slots:
+                    return True
         return False
 
     # Iteratively insert 1-slot gaps at the tightest positions
@@ -1085,6 +1096,11 @@ def spread_events_post_process(
             for i in range(1, len(eids)):
                 prev_end = event_starts[eids[i - 1]] + problem.event_duration_slots[eids[i - 1]]
                 current_gap = event_starts[eids[i]] - prev_end
+
+                # Cap gaps at 3 slots (15 min) — enough for warm-up without
+                # pushing events so far apart that athlete recovery gaps break
+                if current_gap >= 3:
+                    continue
 
                 # Score: prefer small gaps, prefer 15+ groups
                 is_senior = eids[i] in senior_ids
@@ -1353,35 +1369,49 @@ def solve_with_optimization(
     phase2c_start = time.time()
 
     best_gap = 0
-    # Get baseline solution with young athlete constraints
+    # Baseline solution with compact slot count + young athlete constraints
     best_solution = solve_scheduling_problem(
         problem, timeout_ms,
-        max_slots=problem.config.max_time_slots,
+        max_slots=best_slots,
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,
     )
     if older_athletes:
-        available_extra_slots = problem.config.max_time_slots - best_slots
-        max_possible_gap = min(
-            (available_extra_slots + best_slots) // 3,
-            problem.config.max_time_slots // 4,
-        )
-        max_possible_gap = max(max_possible_gap, best_slots // 2)
+        max_possible_gap = problem.config.max_time_slots // 4
 
         low, high = 1, max_possible_gap
 
         while low <= high:
             mid = (low + high) // 2
-            solution = solve_scheduling_problem(
+            # Find the minimum slots needed to fit this gap
+            gap_solution = solve_scheduling_problem(
                 problem, timeout_ms,
                 max_slots=problem.config.max_time_slots,
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=best_young_finish if young_only_groups else None,
                 older_min_gap_slots=mid,
             )
-            if solution.status == "solved":
+            if gap_solution.status == "solved":
+                # Now compact: find minimum slots that still fits this gap
+                compact_low, compact_high = best_slots, gap_solution.total_slots
+                while compact_low <= compact_high:
+                    compact_mid = (compact_low + compact_high) // 2
+                    compact_solution = solve_scheduling_problem(
+                        problem, timeout_ms,
+                        max_slots=compact_mid,
+                        youngest_finish_slot=best_youngest_finish if youngest_groups else None,
+                        young_finish_slot=best_young_finish if young_only_groups else None,
+                        older_min_gap_slots=mid,
+                    )
+                    if compact_solution.status == "solved":
+                        gap_solution = compact_solution
+                        compact_high = compact_mid - 1
+                    else:
+                        compact_low = compact_mid + 1
+
                 best_gap = mid
-                best_solution = solution
+                best_solution = gap_solution
+                best_slots = best_solution.total_slots
                 low = mid + 1
             else:
                 high = mid - 1
@@ -1397,16 +1427,16 @@ def solve_with_optimization(
     print(f"\n🏟️  Phase 3: Biasing track events to run early...")
     phase3_start = time.time()
 
-    best_track_finish = problem.config.max_time_slots  # Default: no extra constraint
+    best_track_finish = best_slots  # Default: same as compact schedule
     if track_group_ids and track_finish_slot is None:
         min_track_finish = max(problem.event_duration_slots[gid] for gid in track_group_ids)
 
-        low, high = min_track_finish, problem.config.max_time_slots
+        low, high = min_track_finish, best_slots
         while low <= high:
             mid = (low + high) // 2
             solution = solve_scheduling_problem(
                 problem, timeout_ms,
-                max_slots=problem.config.max_time_slots,
+                max_slots=best_slots,
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=best_young_finish if young_only_groups else None,
                 older_min_gap_slots=best_gap,
@@ -1434,7 +1464,9 @@ def solve_with_optimization(
     phase4_start = time.time()
 
     spread_solution = spread_events_post_process(
-        best_solution, problem, max_slots=problem.config.max_time_slots,
+        best_solution, problem,
+        max_slots=problem.config.max_time_slots,
+        min_athlete_gap_slots=best_gap,
     )
     shifts = spread_solution.total_slots - best_solution.total_slots
     best_solution = spread_solution
