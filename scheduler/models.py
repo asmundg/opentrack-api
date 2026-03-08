@@ -146,6 +146,19 @@ TRACK_DISTANCE_ORDER: list[EventType] = [
 ]
 
 
+# Sprint events use the straight track only; round events use the banked oval.
+# The re-rig gap (ArenaConfig.sprint_to_round_gap_minutes) applies at the boundary.
+SPRINT_EVENTS: frozenset[EventType] = frozenset({
+    EventType.m60, EventType.m60_hurdles, EventType.m80_hurdles,
+    EventType.m100, EventType.m100_hurdles,
+})
+
+ROUND_EVENTS: frozenset[EventType] = frozenset({
+    EventType.m200, EventType.m400, EventType.m800,
+    EventType.m1500, EventType.m5000,
+})
+
+
 # Base distances for hurdles (to determine ordering)
 HURDLES_BASE_DISTANCE: dict[EventType, EventType] = {
     EventType.m60_hurdles: EventType.m60,
@@ -218,6 +231,9 @@ class ArenaConfig:
     hurdle_lane_limits: dict[int, int]
     # Specific lanes to avoid for hurdles (e.g., damaged lane)
     unavailable_hurdle_lanes: frozenset[int] = frozenset()
+    # Re-rig gap (minutes) between sprint (straight) and round track events.
+    # 0 = no re-rig needed (e.g., permanent oval track).
+    sprint_to_round_gap_minutes: int = 0
 
 
 ARENA_GENERIC = ArenaConfig(
@@ -240,6 +256,7 @@ ARENA_TROMSOHALLEN = ArenaConfig(
     },
     hurdle_lane_limits={13: 7},
     unavailable_hurdle_lanes=frozenset({4}),
+    sprint_to_round_gap_minutes=60,
 )
 
 ARENAS: dict[str, ArenaConfig] = {

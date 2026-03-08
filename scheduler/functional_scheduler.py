@@ -14,11 +14,14 @@ from typing import Any
 
 import z3  # type: ignore
 
+from . import models as _models
 from .models import (
     Athlete,
     EventGroup,
     EventType,
     EventVenueMapping,
+    ROUND_EVENTS,
+    SPRINT_EVENTS,
     Venue,
     get_venue_for_event,
     is_young_category,
@@ -657,9 +660,17 @@ def add_track_spacing_constraints(
         earlier_duration = problem.event_duration_slots[earlier_id]
 
         # Determine gap size based on event types and athlete ages
-        needs_extra = _needs_extra_spacing(earlier_group.event_type, later_group.event_type)
+        # Re-rig gap: sprint→round transition (e.g., 60m→200m) requires track reconfiguration
+        is_sprint_to_round = (
+            earlier_group.event_type in SPRINT_EVENTS
+            and later_group.event_type in ROUND_EVENTS
+        )
+        re_rig_slots = _models.ARENA.sprint_to_round_gap_minutes // problem.config.slot_duration_minutes
 
-        if needs_extra:
+        if is_sprint_to_round and re_rig_slots > 0:
+            min_gap = re_rig_slots
+            gap_reason = f"sprint→round re-rig ({_models.ARENA.sprint_to_round_gap_minutes}min)"
+        elif _needs_extra_spacing(earlier_group.event_type, later_group.event_type):
             # Switching position or to hurdles - always need 2 slots
             min_gap = 2
             gap_reason = "position/hurdles change"
@@ -1005,6 +1016,8 @@ def spread_events_post_process(
     problem: SchedulingProblem,
     max_slots: int,
     min_athlete_gap_slots: int = 0,
+    youngest_finish_slot: int | None = None,
+    young_finish_slot: int | None = None,
 ) -> SchedulingSolution:
     """Greedily spread events apart at each venue by inserting gaps.
 
@@ -1012,6 +1025,7 @@ def spread_events_post_process(
     by 1 slot to create breathing room. Prioritizes gaps before 15+ groups (3x weight).
     Respects athlete conflict constraints — shifts are skipped if they'd cause overlaps
     or reduce athlete recovery gaps below min_athlete_gap_slots.
+    Also respects youngest/young finish constraints — won't push young events past deadlines.
     """
     # Extract event start slots from solution
     event_starts: dict[str, int] = {}
@@ -1042,6 +1056,17 @@ def spread_events_post_process(
         gid for gid, g in problem.events.items()
         if any(get_category_age_order(e.age_category) >= 15 for e in g.events)
     }
+
+    # Build finish-slot limits for young events
+    finish_limits: dict[str, int] = {}
+    if youngest_finish_slot is not None:
+        for gid in get_youngest_event_groups(problem.events):
+            finish_limits[gid] = youngest_finish_slot
+    if young_finish_slot is not None:
+        youngest_ids = get_youngest_event_groups(problem.events)
+        for gid in get_young_event_groups(problem.events):
+            if gid not in youngest_ids:  # Don't weaken 10-year-old limit
+                finish_limits[gid] = young_finish_slot
 
     # Build athlete conflict pairs (events sharing an athlete)
     conflict_pairs: dict[str, set[str]] = {}
@@ -1077,6 +1102,58 @@ def spread_events_post_process(
                     return True
         return False
 
+    def has_venue_conflict(eid: str, new_start: int) -> bool:
+        """Check if moving eid to new_start would overlap another event at the same venue."""
+        eg = problem.events[eid]
+        first = eg.events[0] if eg.events else None
+        cat = first.age_category if first else None
+        venue = get_venue_for_event(eg.event_type, cat)
+        if venue is None:
+            return False
+        venue_name = venue.value
+        dur = problem.event_duration_slots[eid]
+        new_end = new_start + dur - 1
+        for other_eid in venue_events.get(venue_name, []):
+            if other_eid == eid:
+                continue
+            o_start = event_starts[other_eid]
+            o_end = o_start + problem.event_duration_slots[other_eid] - 1
+            if new_end >= o_start and new_start <= o_end:
+                return True
+        return False
+
+    def has_overlap(eid: str, new_start: int) -> bool:
+        """Check if moving eid to new_start would overlap an athlete's other event (no gap enforcement)."""
+        new_end = new_start + problem.event_duration_slots[eid] - 1
+        for other in conflict_pairs.get(eid, set()):
+            if other not in event_starts:
+                continue
+            o_start = event_starts[other]
+            o_end = o_start + problem.event_duration_slots[other] - 1
+            if new_end >= o_start and new_start <= o_end:
+                return True
+        return False
+
+    # Pull youngest events to earliest feasible slot.
+    # Uses overlap-only check (no gap enforcement) since the minimum gap
+    # constraint is for 13+ athletes, not 10-year-olds.
+    youngest_ids = get_youngest_event_groups(problem.events)
+    for eid in sorted(youngest_ids, key=lambda e: event_starts.get(e, 0), reverse=True):
+        if eid not in event_starts:
+            continue
+        current_start = event_starts[eid]
+        best_start = current_start
+        for candidate in range(0, current_start):
+            if not has_overlap(eid, candidate) and not has_venue_conflict(eid, candidate):
+                best_start = candidate
+                break
+        if best_start != current_start:
+            print(f"   ⬆️  Pulled {eid} from slot {current_start} to {best_start}")
+            event_starts[eid] = best_start
+            # Re-sort venue lists since positions changed
+            for v in venue_events:
+                venue_events[v].sort(key=lambda e: event_starts[e])
+
     # Iteratively insert 1-slot gaps at the tightest positions
     for _ in range(max_slots):
         best_venue = None
@@ -1110,20 +1187,28 @@ def spread_events_post_process(
                     # Check if shifting eids[i:] by 1 is feasible
                     feasible = True
                     for j in range(i, len(eids)):
-                        new_start = event_starts[eids[j]] + 1
-                        if new_start + problem.event_duration_slots[eids[j]] > max_slots:
+                        eid_j = eids[j]
+                        new_start = event_starts[eid_j] + 1
+                        dur_j = problem.event_duration_slots[eid_j]
+                        if new_start + dur_j > max_slots:
                             feasible = False
                             break
-                        if has_conflict(eids[j], new_start):
+                        if has_conflict(eid_j, new_start):
                             feasible = False
                             break
+                        # Don't push young events past their finish deadline
+                        if eid_j in finish_limits:
+                            new_finish = new_start + dur_j - 1
+                            if new_finish > finish_limits[eid_j]:
+                                feasible = False
+                                break
 
                     if feasible:
                         best_venue = venue_name
                         best_pos = i
                         best_score = score
 
-        if best_pos is None:
+        if best_pos is None or best_venue is None:
             break
 
         # Apply the 1-slot shift to all events from best_pos onwards at this venue
@@ -1467,6 +1552,8 @@ def solve_with_optimization(
         best_solution, problem,
         max_slots=problem.config.max_time_slots,
         min_athlete_gap_slots=best_gap,
+        youngest_finish_slot=best_youngest_finish if youngest_groups else None,
+        young_finish_slot=best_young_finish if young_only_groups else None,
     )
     shifts = spread_solution.total_slots - best_solution.total_slots
     best_solution = spread_solution
