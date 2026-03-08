@@ -23,8 +23,10 @@ def parse_event_type(ovelse: str) -> EventType:
         "100 meter hekk": EventType.m100_hurdles,
         "Kule": EventType.sp,
         "Lengde": EventType.lj,
+        "Lengde uten tilløp": EventType.lj_standing,
         "Tresteg": EventType.tj,
         "Høyde": EventType.hj,
+        "Høyde uten tilløp": EventType.hj_standing,
         "Diskos": EventType.dt,
         "Spyd": EventType.jt,
         "Slegge": EventType.ht,
@@ -187,12 +189,17 @@ def _read_xlsx_rows(xlsx_path: str) -> list[dict[str, str]]:
     return result
 
 
-def parse_isonen_xlsx(xlsx_file_path: str) -> tuple[list[Event], list[Athlete]]:
+def parse_isonen_xlsx(
+    xlsx_file_path: str,
+    filter_date: str | None = None,
+) -> tuple[list[Event], list[Athlete]]:
     """
     Parse an Isonen XLSX export and return events and athletes.
 
     Args:
         xlsx_file_path: Path to the XLSX file
+        filter_date: If set, only include rows whose "Dato" column matches
+                     this date string (DD.MM.YYYY format, matching the XLSX).
 
     Returns:
         Tuple of (events, athletes)
@@ -220,6 +227,10 @@ def parse_isonen_xlsx(xlsx_file_path: str) -> tuple[list[Event], list[Athlete]]:
         event_name = row.get("Øvelse", "").strip()
         category_name = row.get("Klasse", "").strip()
         date_str = row.get("Dato", "").strip()
+
+        # Filter by date if specified
+        if filter_date is not None and date_str != filter_date:
+            continue
         time_str = row.get("Kl.", "").strip()
 
         # Skip if missing essential event data
@@ -275,6 +286,21 @@ def parse_isonen_xlsx(xlsx_file_path: str) -> tuple[list[Event], list[Athlete]]:
 
     if not events:
         raise ValueError("No valid events found in XLSX file")
+
+    # Collect distinct dates seen across all rows
+    all_dates = {
+        row.get("Dato", "").strip()
+        for row in rows
+        if row.get("Dato", "").strip()
+        and row.get("Øvelse", "").strip()
+        and row.get("Klasse", "").strip()
+    }
+    if filter_date is None and len(all_dates) > 1:
+        sorted_dates = sorted(all_dates)
+        raise ValueError(
+            f"Multiple dates found in XLSX ({', '.join(sorted_dates)}) "
+            f"but no --date filter specified. Use --date to pick one."
+        )
 
     # Calculate participant counts and update durations
     event_participant_counts: dict[str, int] = {}

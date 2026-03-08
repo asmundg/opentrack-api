@@ -28,8 +28,10 @@ class EventType(Enum):
     m100_hurdles = "100m hekk"
     sp = "Kule"
     lj = "Lengde"
+    lj_standing = "Lengde uten tilløp"
     tj = "Tresteg"
     hj = "Høyde"
+    hj_standing = "Høyde uten tilløp"
     dt = "Diskos"
     jt = "Spyd"
     ht = "Slegge"
@@ -343,9 +345,11 @@ EventVenueMapping: dict[EventType, Venue] = {
     EventType.bt: Venue.JAVELIN_AREA,
     # Horizontal jumping events - use jumping pits
     EventType.lj: Venue.JUMPING_PIT,
+    EventType.lj_standing: Venue.JUMPING_PIT,
     EventType.tj: Venue.JUMPING_PIT,
     # Vertical jumping events - each has its own area
     EventType.hj: Venue.HIGH_JUMP_AREA,
+    EventType.hj_standing: Venue.HIGH_JUMP_AREA,
     EventType.pv: Venue.HIGH_JUMP_AREA,
 }
 
@@ -452,9 +456,11 @@ EventDuration: dict[EventType, int] = {
     EventType.bt: 3,
     # Horizontal jump
     EventType.lj: 6,
+    EventType.lj_standing: 4,
     EventType.tj: 6,
     # Vertical jump
     EventType.hj: 6,
+    EventType.hj_standing: 4,
     EventType.pv: 12,
 }
 

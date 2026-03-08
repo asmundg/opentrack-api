@@ -89,6 +89,10 @@ def schedule(
         str,
         typer.Option("--arena", help="Arena name (e.g. 'tromsohallen') for venue-specific lane limits and markers"),
     ] = "generic",
+    date: Annotated[
+        str | None,
+        typer.Option("--date", help="Only schedule events on this date (DD.MM.YYYY format, matching the XLSX Dato column)"),
+    ] = None,
 ) -> None:
     """Generate a track meet schedule from an Isonen XLSX file."""
     # Configure arena
@@ -123,9 +127,11 @@ def schedule(
             typer.echo("Secondary venues: disabled")
         typer.echo(f"Parsing {input_file}...")
 
-    events, athletes = parse_isonen_xlsx(str(input_file))
+    events, athletes = parse_isonen_xlsx(str(input_file), filter_date=date)
 
     if not quiet:
+        if date:
+            typer.echo(f"Filtering to events on {date}")
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
 
     event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders, mix_hurdle_distances=mix_hurdle_distances)
@@ -221,9 +227,13 @@ def info(
         Path,
         typer.Argument(help="Path to the Isonen XLSX file", exists=True, readable=True),
     ],
+    date: Annotated[
+        str | None,
+        typer.Option("--date", help="Only show events on this date (DD.MM.YYYY format)"),
+    ] = None,
 ) -> None:
     """Show information about participant data without scheduling."""
-    events, athletes = parse_isonen_xlsx(str(input_file))
+    events, athletes = parse_isonen_xlsx(str(input_file), filter_date=date)
 
     typer.echo(f"Events: {len(events)}")
     typer.echo(f"Athletes: {len(athletes)}")
@@ -292,6 +302,10 @@ def schedule_from_events(
         str,
         typer.Option("--arena", help="Arena name (e.g. 'tromsohallen') for venue-specific lane limits and markers"),
     ] = "generic",
+    date: Annotated[
+        str | None,
+        typer.Option("--date", help="Only include events on this date (DD.MM.YYYY format)"),
+    ] = None,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -314,10 +328,12 @@ def schedule_from_events(
         typer.echo(f"Parsing participant data from {input_file}...")
 
     # Parse original data to get event groups and athletes
-    events, athletes = parse_isonen_xlsx(str(input_file))
+    events, athletes = parse_isonen_xlsx(str(input_file), filter_date=date)
     event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders, mix_hurdle_distances=mix_hurdle_distances)
 
     if not quiet:
+        if date:
+            typer.echo(f"Filtering to events on {date}")
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
         typer.echo(f"Created {len(event_groups)} event groups")
         typer.echo(f"\nImporting event schedule from {events_csv}...")
