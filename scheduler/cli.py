@@ -72,7 +72,7 @@ def schedule(
             "--secondary-venues",
             help="Comma-separated event types for secondary venues (e.g. 'hj,sp'), or empty to disable",
         ),
-    ] = "hj,sp",
+    ] = "",
     max_track_duration: Annotated[
         int | None,
         typer.Option("--max-track-duration", help="Maximum track duration in minutes (track ends earlier than field)"),
@@ -119,6 +119,12 @@ def schedule(
         models.ACTIVE_SECONDARY_VENUES = active
     else:
         models.ACTIVE_SECONDARY_VENUES = set()
+    # Inject date into output filename
+    if date:
+        parts = date.split(".")
+        date_slug = f"{parts[2]}-{parts[1]}-{parts[0]}"
+        output = output.parent / f"{output.stem}_{date_slug}{output.suffix}"
+
     if not quiet:
         if models.ACTIVE_SECONDARY_VENUES:
             names = ", ".join(et.name for et in models.ACTIVE_SECONDARY_VENUES)
@@ -150,7 +156,6 @@ def schedule(
         total_personnel=personnel,
         max_time_slots=max_slots,
         timeout_ms=timeout * 1000,
-        optimization_timeout_ms=timeout * 1000,
         max_track_duration=max_track_duration,
     )
 
@@ -323,6 +328,12 @@ def schedule_from_events(
         typer.echo(f"Unknown arena: '{arena}'. Available: {', '.join(models.ARENAS)}", err=True)
         raise typer.Exit(1)
     models.ARENA = models.ARENAS[arena]
+
+    # Inject date into output filename
+    if date:
+        parts = date.split(".")
+        date_slug = f"{parts[2]}-{parts[1]}-{parts[0]}"
+        output = output.parent / f"{output.stem}_{date_slug}{output.suffix}"
 
     if not quiet:
         typer.echo(f"Parsing participant data from {input_file}...")

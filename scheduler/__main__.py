@@ -617,7 +617,7 @@ _FIELD_TIERS_SPLIT: list[tuple[list[str], str]] = [
 ]
 
 # Maximum athletes per field event group before splitting
-_MAX_FIELD_GROUP_ATHLETES = 15
+_MAX_FIELD_GROUP_ATHLETES = 8
 
 # If two field groups at different venues share more than this many athletes,
 # the 11-14 tier is too wide and should be split into 11-12 / 13-14.
@@ -777,7 +777,6 @@ def solve_isonen_test() -> SchedulingResult:
         total_personnel=30,  # Increased for larger event set
         max_time_slots=24,  # 2 hours - spread events to use available time
         timeout_ms=10000,
-        optimization_timeout_ms=10000,
     )
 
     if solution.status == "solved":

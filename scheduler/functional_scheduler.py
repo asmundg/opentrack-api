@@ -570,6 +570,7 @@ def add_venue_conflict_constraints(
     return constraint_count
 
 
+
 def _needs_extra_spacing(earlier_type: EventType, later_type: EventType) -> bool:
     """Check if transition between two track event types needs extra spacing.
 
@@ -999,6 +1000,150 @@ def extract_solution(
     )
 
 
+def spread_events_post_process(
+    solution: SchedulingSolution,
+    problem: SchedulingProblem,
+    max_slots: int,
+) -> SchedulingSolution:
+    """Greedily spread events apart at each venue by inserting gaps.
+
+    Iteratively finds the tightest gap at any venue and shifts subsequent events
+    by 1 slot to create breathing room. Prioritizes gaps before 15+ groups (3x weight).
+    Respects athlete conflict constraints — shifts are skipped if they'd cause overlaps.
+    """
+    # Extract event start slots from solution
+    event_starts: dict[str, int] = {}
+    for slot, entries in solution.schedule.items():
+        for entry in entries:
+            eid = entry["id"]
+            if eid not in event_starts or slot < event_starts[eid]:
+                event_starts[eid] = slot
+
+    if not event_starts:
+        return solution
+
+    # Group by venue, sorted by start slot
+    venue_events: dict[str, list[str]] = {}
+    for eid in event_starts:
+        eg = problem.events[eid]
+        first = eg.events[0] if eg.events else None
+        cat = first.age_category if first else None
+        venue = get_venue_for_event(eg.event_type, cat)
+        if venue is not None:
+            venue_events.setdefault(venue.value, []).append(eid)
+
+    for v in venue_events:
+        venue_events[v].sort(key=lambda eid: event_starts[eid])
+
+    # Identify 15+ groups
+    senior_ids = {
+        gid for gid, g in problem.events.items()
+        if any(get_category_age_order(e.age_category) >= 15 for e in g.events)
+    }
+
+    # Build athlete conflict pairs (events sharing an athlete)
+    conflict_pairs: dict[str, set[str]] = {}
+    for athlete in problem.athletes:
+        group_ids = []
+        for ev in athlete.events:
+            for gid, eg in problem.events.items():
+                if ev in eg.events and gid in event_starts:
+                    group_ids.append(gid)
+        for i, g1 in enumerate(group_ids):
+            for g2 in group_ids[i + 1:]:
+                conflict_pairs.setdefault(g1, set()).add(g2)
+                conflict_pairs.setdefault(g2, set()).add(g1)
+
+    def has_conflict(eid: str, new_start: int) -> bool:
+        """Check if moving eid to new_start would overlap with a conflicting event."""
+        end = new_start + problem.event_duration_slots[eid] - 1
+        for other in conflict_pairs.get(eid, set()):
+            if other not in event_starts:
+                continue
+            o_start = event_starts[other]
+            o_end = o_start + problem.event_duration_slots[other] - 1
+            if end >= o_start and new_start <= o_end:
+                return True
+        return False
+
+    # Iteratively insert 1-slot gaps at the tightest positions
+    for _ in range(max_slots):
+        best_venue = None
+        best_pos = None
+        best_score = -1.0
+
+        for venue_name, eids in venue_events.items():
+            if len(eids) < 2:
+                continue
+
+            # Check if last event already hits the wall
+            last_eid = eids[-1]
+            last_end = event_starts[last_eid] + problem.event_duration_slots[last_eid]
+            if last_end >= max_slots:
+                continue
+
+            for i in range(1, len(eids)):
+                prev_end = event_starts[eids[i - 1]] + problem.event_duration_slots[eids[i - 1]]
+                current_gap = event_starts[eids[i]] - prev_end
+
+                # Score: prefer small gaps, prefer 15+ groups
+                is_senior = eids[i] in senior_ids
+                score = (3.0 if is_senior else 1.0) / (current_gap + 1)
+
+                if score > best_score:
+                    # Check if shifting eids[i:] by 1 is feasible
+                    feasible = True
+                    for j in range(i, len(eids)):
+                        new_start = event_starts[eids[j]] + 1
+                        if new_start + problem.event_duration_slots[eids[j]] > max_slots:
+                            feasible = False
+                            break
+                        if has_conflict(eids[j], new_start):
+                            feasible = False
+                            break
+
+                    if feasible:
+                        best_venue = venue_name
+                        best_pos = i
+                        best_score = score
+
+        if best_pos is None:
+            break
+
+        # Apply the 1-slot shift to all events from best_pos onwards at this venue
+        eids = venue_events[best_venue]
+        for j in range(best_pos, len(eids)):
+            event_starts[eids[j]] += 1
+
+    # Rebuild schedule in the same dict format as extract_solution
+    new_schedule: dict[int, list[dict[str, Any]]] = {}
+    for eid, start in event_starts.items():
+        dur = problem.event_duration_slots[eid]
+        for s in range(start, start + dur):
+            if s not in new_schedule:
+                new_schedule[s] = []
+            new_schedule[s].append({
+                "event": problem.events[eid],
+                "id": eid,
+                "start_slot": start,
+                "duration_slots": dur,
+                "is_start": s == start,
+                "slot_offset": s - start,
+            })
+
+    total_slots = (max(new_schedule.keys()) + 1) if new_schedule else 0
+
+    return SchedulingSolution(
+        status="solved",
+        schedule=new_schedule,
+        total_slots=total_slots,
+        total_duration_minutes=total_slots * problem.config.slot_duration_minutes,
+        slot_duration_minutes=problem.config.slot_duration_minutes,
+        events_per_slot={s: len(entries) for s, entries in new_schedule.items()},
+        slots_with_events=len(new_schedule),
+    )
+
+
 def solve_scheduling_problem(
     problem: SchedulingProblem,
     timeout_ms: int = 30000,
@@ -1008,7 +1153,7 @@ def solve_scheduling_problem(
     older_min_gap_slots: int = 0,
     track_finish_slot: int | None = None,
 ) -> SchedulingSolution:
-    """Solve the scheduling problem with timeout, optional slot limit, and spacing constraints.
+    """Solve the scheduling problem with timeout and optional slot limit.
 
     Args:
         problem: Scheduling problem data
@@ -1077,7 +1222,6 @@ def solve_scheduling_problem(
 def solve_with_optimization(
     problem: SchedulingProblem,
     timeout_ms: int = 10000,
-    optimization_timeout_ms: int = 10000,  # noqa: ARG001 - reserved for future use
     print_schedules: bool = True,
     track_finish_slot: int | None = None,
 ) -> SchedulingSolution:
@@ -1202,24 +1346,21 @@ def solve_with_optimization(
         if g.event_type in TRACK_DISTANCE_ORDER
     ]
 
-    # Phase 2c: Maximize older athlete recovery gaps (before track-early bias)
-    # Use the full time budget (max_time_slots) to allow spreading events for better recovery
-    # Runs BEFORE track-early so that gaps take priority and track-early doesn't lock things down.
+    # Phase 2c: Maximize older athlete recovery gaps
     print(f"\n🏃 Phase 2c: Maximizing older athlete recovery gaps...")
     print(f"   Time budget: {problem.config.max_time_slots} slots ({problem.config.max_time_slots * problem.config.slot_duration_minutes} min)")
     print(f"   Minimum needed: {best_slots} slots ({best_slots * problem.config.slot_duration_minutes} min)")
     phase2c_start = time.time()
 
     best_gap = 0
-    # Get baseline solution with young athlete constraints (no gap or track finish constraint yet)
+    # Get baseline solution with young athlete constraints
     best_solution = solve_scheduling_problem(
         problem, timeout_ms,
-        max_slots=problem.config.max_time_slots,  # Allow full time budget
+        max_slots=problem.config.max_time_slots,
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,
     )
     if older_athletes:
-        # Binary search for maximum feasible gap within time budget
         available_extra_slots = problem.config.max_time_slots - best_slots
         max_possible_gap = min(
             (available_extra_slots + best_slots) // 3,
@@ -1253,7 +1394,6 @@ def solve_with_optimization(
     phase2_time = phase2a_time + phase2b_time + phase2c_time
 
     # Phase 3: Minimize track finish slot (bias track events early)
-    # Runs AFTER gaps so we keep the gap guarantee while pushing track events earlier.
     print(f"\n🏟️  Phase 3: Biasing track events to run early...")
     phase3_start = time.time()
 
@@ -1287,6 +1427,20 @@ def solve_with_optimization(
         print("   No track events to optimize")
 
     phase3_time = time.time() - phase3_start
+
+    # Phase 4: Spread events apart (greedy post-processing)
+    # Iteratively inserts 1-slot gaps at tightest positions, prioritizing 15+ groups.
+    print(f"\n🕐 Phase 4: Spreading events apart...")
+    phase4_start = time.time()
+
+    spread_solution = spread_events_post_process(
+        best_solution, problem, max_slots=problem.config.max_time_slots,
+    )
+    shifts = spread_solution.total_slots - best_solution.total_slots
+    best_solution = spread_solution
+    print(f"   Inserted {shifts} gap slots")
+
+    phase4_time = time.time() - phase4_start
     total_time = time.time() - total_start_time
 
     # Print final schedule
@@ -1302,7 +1456,7 @@ def solve_with_optimization(
     print(f"   11/12-year-olds finish by: slot {best_young_finish} ({best_young_finish * problem.config.slot_duration_minutes} min)")
     print(f"   Track events finish by: slot {best_track_finish} ({best_track_finish * problem.config.slot_duration_minutes} min)")
     print(f"   Older athlete min gap: {best_gap} slots ({best_gap * problem.config.slot_duration_minutes} min)")
-    print(f"   ⏱️  Time: {total_time:.2f}s (P1: {phase1_time:.2f}s, P2: {phase2_time:.2f}s, P3: {phase3_time:.2f}s)")
+    print(f"   ⏱️  Time: {total_time:.2f}s (P1: {phase1_time:.2f}s, P2: {phase2_time:.2f}s, P3: {phase3_time:.2f}s, P4: {phase4_time:.2f}s)")
 
     # Add optimization metadata to solution
     optimization_stats: dict[str, Any] = {
@@ -1315,6 +1469,7 @@ def solve_with_optimization(
         "phase1_time": phase1_time,
         "phase2_time": phase2_time,
         "phase3_time": phase3_time,
+        "phase4_time": phase4_time,
         "total_time": total_time,
     }
 
@@ -1337,7 +1492,6 @@ def schedule_track_meet(
     total_personnel: int,
     max_time_slots: int,
     timeout_ms: int = 10000,
-    optimization_timeout_ms: int = 10000,
     print_schedules: bool = False,
     max_track_duration: int | None = None,
 ) -> SchedulingResult:
@@ -1362,7 +1516,7 @@ def schedule_track_meet(
         print(f"🏃 Track finish constraint: {max_track_duration} min = slot {track_finish_slot}")
 
     solution = solve_with_optimization(
-        problem, timeout_ms, optimization_timeout_ms, print_schedules,
+        problem, timeout_ms, print_schedules=print_schedules,
         track_finish_slot=track_finish_slot,
     )
 
@@ -1413,18 +1567,7 @@ def add_all_constraints(
     older_min_gap_slots: int = 0,
     track_finish_slot: int | None = None,
 ) -> None:
-    """Add all constraints to the solver in the correct order.
-
-    Args:
-        solver: Z3 solver instance
-        problem: Scheduling problem data
-        variables: Z3 variables
-        verbose: Whether to print progress
-        youngest_finish_slot: If set, 10 year olds must finish by this slot (highest priority)
-        young_finish_slot: If set, 11/12 year olds must finish by this slot
-        older_min_gap_slots: Minimum gap in slots between events for older athletes (13+)
-        track_finish_slot: If set, all track events must finish by this slot
-    """
+    """Add all constraints to the solver in the correct order."""
     if verbose:
         print("Adding track precedence constraints...")
     add_track_precedence_constraints(solver, problem, variables)
@@ -1465,3 +1608,4 @@ def add_all_constraints(
         if verbose:
             print(f"Adding track finish constraints (finish by slot {track_finish_slot})...")
         add_track_finish_constraint(solver, problem, variables, track_finish_slot)
+
