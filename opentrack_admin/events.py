@@ -28,7 +28,9 @@ CHECKPOINT_DIR = Path("checkpoints")
 EVENT_NAMES = {
     # Jumps
     "HJ": "Høyde",
+    "SHJ": "Høyde uten tilløp",
     "LJ": "Lengde",
+    "SLJ": "Lengde uten tilløp",
     "TJ": "Tresteg",
     "PV": "Stav",
     # Throws
@@ -42,6 +44,7 @@ EVENT_NAMES = {
     "200m": "200 meter",
     "400m": "400 meter",
     # Middle/Long distance
+    "600m": "600 meter",
     "800m": "800 meter",
     "1500m": "1500 meter",
     "3000m": "3000 meter",
@@ -283,11 +286,15 @@ def get_event_name(code: str) -> str:
     Raises:
         KeyError: If the event code is not in the mapping.
     """
-    if code not in EVENT_NAMES:
-        raise KeyError(
-            f"Unknown event code: '{code}'. Add it to EVENT_NAMES in events.py"
-        )
-    return EVENT_NAMES[code]
+    if code in EVENT_NAMES:
+        return EVENT_NAMES[code]
+    # Handle generic distance codes like "300m" -> "300 meter"
+    m = re.match(r"^(\d+)m$", code)
+    if m:
+        return f"{m.group(1)} meter"
+    raise KeyError(
+        f"Unknown event code: '{code}'. Add it to EVENT_NAMES in events.py"
+    )
 
 
 def normalize_category(category: str) -> str:
@@ -318,16 +325,16 @@ def get_category_age(category: str) -> int | None:
 
 def is_field_event(event_code: str) -> bool:
     """Check if event code is a field event (jumps/throws)."""
-    return event_code in {"HJ", "LJ", "TJ", "PV", "SP", "DT", "JT", "HT"}
+    return event_code in {"HJ", "SHJ", "LJ", "SLJ", "TJ", "PV", "SP", "DT", "JT", "HT"}
 
 
 def is_horizontal_field_event(event_code: str) -> bool:
     """Check if event code is a horizontal field event (has attempts).
 
     Horizontal jumps and throws have a fixed number of attempts.
-    Vertical jumps (HJ, PV) are height-based and don't use attempts.
+    Vertical jumps (HJ, SHJ, PV) are height-based and don't use attempts.
     """
-    return event_code in {"LJ", "TJ", "SP", "DT", "JT", "HT"}
+    return event_code in {"LJ", "SLJ", "TJ", "SP", "DT", "JT", "HT"}
 
 
 @dataclass
@@ -484,12 +491,17 @@ class EventScheduler:
         raise RuntimeError(f"No event found for: {schedule.search_term}")
 
     @screenshot_on_error
-    def set_event_start_time(self, start_time: time) -> None:
-        """Set the start time for the currently open event.
+    def set_event_start_time(self, start_time: time, day: int | None = None) -> None:
+        """Set the start time (and optionally day) for the currently open event.
 
         Assumes we're on an event detail page.
         """
         page = self.page
+
+        # Set day if provided (for multi-day meets)
+        if day is not None:
+            logger.info(f"Setting day to: {day}")
+            page.locator("#id_day").fill(str(day))
 
         # Format time as HH:MM
         time_str = start_time.strftime("%H:%M")
@@ -876,11 +888,12 @@ class EventScheduler:
         # Fill in the PB values
         return self.fill_pb_sb_values(pb_lookup)
 
-    def schedule_event(self, schedule: EventSchedule) -> bool:
+    def schedule_event(self, schedule: EventSchedule, day: int | None = None) -> bool:
         """Find an event, set its start time, and configure attempts/weights for field events.
 
         Args:
             schedule: Event with category, code, and start time
+            day: Day number for multi-day meets (1-based)
 
         Returns:
             True if successful
@@ -892,7 +905,7 @@ class EventScheduler:
             f"=== Scheduling: {schedule.search_term} @ {schedule.start_time} ==="
         )
         self.find_and_click_event(schedule)
-        self.set_event_start_time(schedule.start_time)
+        self.set_event_start_time(schedule.start_time, day=day)
 
         # Configure attempts for horizontal field events (not HJ/PV)
         if schedule.is_horizontal_field_event:
@@ -906,7 +919,7 @@ class EventScheduler:
         return True
 
     def schedule_events(
-        self, schedules: list[EventSchedule], checkpoint_name: str | None = None
+        self, schedules: list[EventSchedule], checkpoint_name: str | None = None, day: int | None = None
     ) -> dict[str, bool]:
         """Schedule multiple events.
 
@@ -914,6 +927,7 @@ class EventScheduler:
             schedules: List of events to schedule
             checkpoint_name: Optional name for checkpoint file to allow resuming.
                            If provided, completed events are skipped on restart.
+            day: Day number for multi-day meets (1-based)
 
         Returns:
             Dict mapping search terms to success status
@@ -947,7 +961,7 @@ class EventScheduler:
                 continue
 
             logger.info(f"Processing event {i}/{len(schedules)}")
-            self.schedule_event(schedule)
+            self.schedule_event(schedule, day=day)
             results[schedule.search_term] = True
 
             # Mark as done in checkpoint
@@ -1010,6 +1024,44 @@ def parse_schedule_csv(content: str) -> list[EventSchedule]:
     return schedules
 
 
+def parse_schedule_xlsx(xlsx_path: Path) -> list[EventSchedule]:
+    """Parse an Isonen-format XLSX file to extract unique event schedules.
+
+    Same logic as parse_schedule_csv but reads from XLSX directly.
+    Expected columns: Klasse, Øvelse (Kl. is optional, defaults to 00:00).
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(xlsx_path, read_only=True, data_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows()
+
+    header_row = next(rows_iter)
+    headers = [str(cell.value).strip() if cell.value is not None else "" for cell in header_row]
+
+    schedules: list[EventSchedule] = []
+    seen: set[tuple[str, str]] = set()
+
+    for row in rows_iter:
+        values = {h: (str(c.value).strip() if c.value is not None else "") for h, c in zip(headers, row)}
+        try:
+            category = _normalize_isonen_category(values["Klasse"])
+            event = _normalize_isonen_event(values["Øvelse"])
+            start_time = parse_time(values["Kl."]) if values.get("Kl.") else time(0, 0)
+
+            key = (category, event)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            schedules.append(EventSchedule(category=category, event=event, start_time=start_time))
+        except (KeyError, ValueError):
+            continue
+
+    wb.close()
+    return schedules
+
+
 # Mapping from Isonen event names to event codes
 ISONEN_EVENT_CODES: dict[str, str] = {
     # Track events
@@ -1017,6 +1069,7 @@ ISONEN_EVENT_CODES: dict[str, str] = {
     "100 meter": "100m",
     "200 meter": "200m",
     "400 meter": "400m",
+    "600 meter": "600m",
     "800 meter": "800m",
     "1500 meter": "1500m",
     "3000 meter": "3000m",
@@ -1029,7 +1082,9 @@ ISONEN_EVENT_CODES: dict[str, str] = {
     "400 meter hekk": "400H",
     # Field events
     "Høyde": "HJ",
+    "Høyde uten tilløp": "SHJ",
     "Lengde": "LJ",
+    "Lengde uten tilløp": "SLJ",
     "Tresteg": "TJ",
     "Stavsprang": "PV",
     "Kule": "SP",
@@ -1089,5 +1144,53 @@ def _normalize_isonen_event(event: str) -> str:
     """
     if event in ISONEN_EVENT_CODES:
         return ISONEN_EVENT_CODES[event]
-    # Fallback: return as-is
+    # Handle "NNN meter" / "NNN meter hekk" patterns generically
+    m = re.match(r"^(\d+) meter hekk$", event)
+    if m:
+        return f"{m.group(1)}H"
+    m = re.match(r"^(\d+) meter$", event)
+    if m:
+        return f"{m.group(1)}m"
     return event
+
+
+# Reverse mapping from Norwegian event names (as used in scheduler EventType values)
+# to admin event codes. Covers both Isonen names and scheduler-specific variants.
+_EVENT_NAME_TO_CODE: dict[str, str] = {v: k for k, v in EVENT_NAMES.items()}
+_EVENT_NAME_TO_CODE.update({
+    # Scheduler uses different names than EVENT_NAMES for some events
+    "Stavsprang": "PV",
+    "Liten ball": "BT",
+    "60m hekk": "60H",
+    "80m hekk": "80H",
+    "100m hekk": "100H",
+})
+
+
+def parse_event_schedule_csv(path: Path) -> list[EventSchedule]:
+    """Parse a schedule_events.csv (event overview from scheduler).
+
+    Each row has combined categories (e.g., "G14,J14") which are split
+    into individual EventSchedule entries sharing the same start time.
+
+    Expected columns: event_type, categories, start_time
+    """
+    schedules: list[EventSchedule] = []
+
+    with path.open(encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for line_num, row in enumerate(reader, start=2):
+            event_name = row["event_type"].strip()
+            # Look up event code, fall back to identity (handles "60m" etc.)
+            event_code = _EVENT_NAME_TO_CODE.get(event_name, event_name)
+            start = parse_time(row["start_time"])
+
+            for cat in row["categories"].split(","):
+                cat = cat.strip()
+                schedules.append(EventSchedule(
+                    category=cat,
+                    event=event_code,
+                    start_time=start,
+                ))
+
+    return schedules

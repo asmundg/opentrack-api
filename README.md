@@ -21,11 +21,11 @@ cp .env.example .env
 ### Create Competition
 
 ```bash
-uv run python main.py admin create "Seriestevne 2" "bultf-ser2-26" 2026-02-23 bultromsofriidrett@gmail.com BULTF --website https://bul-tromso.no/bul-troms%C3%B8/friidrett --entry-link https://isonen.no/event/cmjszsar000are3010ml8gvrc/
+opentrack admin create "Seriestevne 2" "bultf-ser2-26" 2026-02-23 bultromsofriidrett@gmail.com BULTF --website https://bul-tromso.no/bul-troms%C3%B8/friidrett --entry-link https://isonen.no/event/cmjszsar000are3010ml8gvrc/
 ```
 
 ```bash
-uv run python main.py admin import-athletes https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.xlsx 
+opentrack admin import-athletes https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.xlsx 
 ```
 
 ### Schedule
@@ -41,6 +41,10 @@ opentrack scheduler from-events ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.csv
 ```
 
 ### Sync events
+
+```bash
+opentrack admin schedule https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 schedule.csv
+```
 
 ```bash
 opentrack admin update-pbs https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 schedule.csv

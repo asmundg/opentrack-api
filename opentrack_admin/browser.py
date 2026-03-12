@@ -7,8 +7,11 @@ from pathlib import Path
 from typing import Callable, Generator, ParamSpec, TypeVar
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+from playwright_stealth import Stealth
 
 from .config import OpenTrackConfig
+
+_stealth = Stealth()
 
 # Directory for error screenshots
 SCREENSHOT_DIR = Path("screenshots")
@@ -75,7 +78,8 @@ def create_browser(config: OpenTrackConfig) -> Generator[tuple[Browser, BrowserC
             viewport={"width": 1280, "height": 720},
         )
         page = context.new_page()
-        
+        _stealth.apply_stealth_sync(page)
+
         try:
             yield browser, context, page
         finally:
@@ -103,6 +107,7 @@ class OpenTrackSession:
             viewport={"width": 1280, "height": 720},
         )
         self._page = self._context.new_page()
+        _stealth.apply_stealth_sync(self._page)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

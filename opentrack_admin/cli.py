@@ -11,7 +11,7 @@ import typer
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig
-from .events import EventSchedule, EventScheduler, parse_schedule_csv, Checkpoint
+from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_xlsx, parse_event_schedule_csv, Checkpoint
 from pblookup import PBLookupService
 
 # Create the typer app for admin commands
@@ -180,7 +180,8 @@ def import_athletes(
 @app.command()
 def schedule(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
-    file: Annotated[Path, typer.Argument(help="Isonen-format schedule CSV (schedule.csv from scheduler)")],
+    file: Annotated[Path, typer.Argument(help="Schedule CSV: either schedule_events.csv (event overview) or Isonen-format schedule.csv")],
+    day: Annotated[Optional[int], typer.Option("--day", help="Day number for multi-day meets (1-based)")] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
 ) -> None:
@@ -198,11 +199,15 @@ def schedule(
         print(f"❌ Schedule file not found: {file}")
         raise typer.Exit(1)
     
-    schedules = parse_schedule_csv(file.read_text())
-    
+    # Detect format: event overview CSV has "event_type" header, Isonen has "Klasse"
+    header = file.read_text().split("\n", 1)[0]
+    if "event_type" in header:
+        schedules = parse_event_schedule_csv(file)
+    else:
+        schedules = parse_schedule_csv(file.read_text())
+
     if not schedules:
         print("❌ No valid events found in schedule file.")
-        print("   Expected CSV format: category,event,start_time")
         raise typer.Exit(1)
 
     print(f"📅 Scheduling {len(schedules)} events...")
@@ -230,7 +235,7 @@ def schedule(
         scheduler = EventScheduler(session)
         
         try:
-            scheduler.schedule_events(schedules, checkpoint_name=checkpoint_name)
+            scheduler.schedule_events(schedules, checkpoint_name=checkpoint_name, day=day)
             print()
             print(f"✅ All {len(schedules)} events scheduled successfully!")
         except Exception as e:
@@ -242,7 +247,7 @@ def schedule(
 @app.command("update-pbs")
 def update_pbs(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
-    file: Annotated[Optional[Path], typer.Argument(help="Isonen-format schedule CSV (schedule.csv from scheduler)")] = None,
+    file: Annotated[Optional[Path], typer.Argument(help="Isonen-format CSV or XLSX file with events")] = None,
     event: Annotated[Optional[str], typer.Option("--event", "-e", help="Single event code (e.g., 'LJ', 'SP', '100m')")] = None,
     category: Annotated[Optional[str], typer.Option("--category", "-c", help="Single event category (e.g., 'G14', 'J15')")] = None,
     club: Annotated[str, typer.Option("--club", help="Default club name for PB lookups (e.g., 'Tyrving')")] = "",
@@ -252,7 +257,7 @@ def update_pbs(
 ) -> None:
     """Update PB/SB values for competitors in events.
 
-    Either provide a CSV file with all events, or use --event and --category for a single event.
+    Provide an Isonen XLSX/CSV file, or use --event and --category for a single event.
     """
     setup_logging(verbose=verbose)
     logger = logging.getLogger(__name__)
@@ -274,16 +279,18 @@ def update_pbs(
             print(f"❌ Schedule file not found: {file}")
             raise typer.Exit(1)
 
-        schedules = parse_schedule_csv(file.read_text())
+        if file.suffix.lower() == ".xlsx":
+            schedules = parse_schedule_xlsx(file)
+        else:
+            schedules = parse_schedule_csv(file.read_text())
 
         if not schedules:
-            print("❌ No valid events found in schedule file.")
-            print("   Expected CSV format: category,event,start_time")
+            print("❌ No valid events found in file.")
             raise typer.Exit(1)
 
         print(f"📊 Updating PBs for {len(schedules)} events...")
     else:
-        print("❌ Either provide a CSV file or use --event and --category")
+        print("❌ Provide a CSV/XLSX file or use --event and --category")
         raise typer.Exit(1)
     if club:
         print(f"   Default club: {club}")

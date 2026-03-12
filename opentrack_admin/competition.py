@@ -85,18 +85,22 @@ class CompetitionDetails:
     start_date: date
     contact_email: str
     organiser_search: str  # Search term to find organiser, e.g., "BULTF"
-    
+
     # Optional with defaults
     short_name: str = ""  # If empty, OpenTrack may auto-generate
     end_date: date | None = None  # None = same as start_date
-    competition_type: Literal["track", "indoor", "road", "cross_country", "trail"] = "track"
-    
+    competition_type: Literal["track", "indoor", "road", "cross_country", "trail"] = (
+        "track"
+    )
+
     # Display settings
     website: str = ""
     external_entry_link: str = ""  # e.g., Isonen link
 
     # Scoring settings
-    combined_events_table: Literal["world_athletics", "tyrving"] | None = None  # None = use default
+    combined_events_table: Literal["world_athletics", "tyrving"] | None = (
+        None  # None = use default
+    )
 
     def __post_init__(self):
         if self.end_date is None:
@@ -173,9 +177,13 @@ class CompetitionCreator:
         logger.debug("Setting dates: %s to %s", details.start_date, details.end_date)
         page.get_by_role("textbox", name="* Date:").fill(details.start_date.isoformat())
         if details.end_date and details.end_date != details.start_date:
-            page.get_by_role("textbox", name="Finish Date:").fill(details.end_date.isoformat())
+            page.get_by_role("textbox", name="Finish Date:").fill(
+                details.end_date.isoformat()
+            )
         else:
-            page.get_by_role("textbox", name="Finish Date:").fill(details.start_date.isoformat())
+            page.get_by_role("textbox", name="Finish Date:").fill(
+                details.start_date.isoformat()
+            )
 
         # Slug
         logger.debug("Setting slug: %s", details.slug)
@@ -225,7 +233,7 @@ class CompetitionCreator:
             hide_checkbox.check()
 
         logger.debug("Saving advanced settings")
-        page.locator("button[name=\"adv_submit\"]").click()
+        page.locator('button[name="adv_submit"]').click()
         page.wait_for_load_state("networkidle")
 
     def _configure_display_settings(self, details: CompetitionDetails) -> None:
@@ -245,7 +253,9 @@ class CompetitionCreator:
         # External entry link (e.g., Isonen)
         if details.external_entry_link:
             logger.debug("Setting external entry link: %s", details.external_entry_link)
-            page.get_by_role("textbox", name="External entry link:").fill(details.external_entry_link)
+            page.get_by_role("textbox", name="External entry link:").fill(
+                details.external_entry_link
+            )
 
         # Hide results and competitors (useful during setup)
         logger.debug("Hiding results and competitors")
@@ -285,7 +295,9 @@ class CompetitionCreator:
 
         # Select the combined events table
         if details.combined_events_table:
-            table_value = COMBINED_EVENTS_TABLES.get(details.combined_events_table, "WA")
+            table_value = COMBINED_EVENTS_TABLES.get(
+                details.combined_events_table, "WA"
+            )
             logger.debug("Setting combined events table: %s", table_value)
             page.get_by_label("Combined Events tables:").select_option(table_value)
 
@@ -324,7 +336,7 @@ class CompetitionCreator:
         # Accept the "Are you sure?" confirmation dialog
         logger.info("Processing athletes...")
         page.once("dialog", lambda dialog: dialog.accept())
-        page.locator("button[name=process]").click()
+        page.locator("button[name=process]").click(timeout=240_000)
         page.wait_for_load_state("networkidle")
         self._wait_for_background_task("process")
         logger.info("Athletes imported successfully")
@@ -353,12 +365,16 @@ class CompetitionCreator:
 
         # Enable photofinish file generation
         logger.debug("Enabling photofinish settings")
-        photofinish_files = page.get_by_role("checkbox", name="Photofinish files should")
+        photofinish_files = page.get_by_role(
+            "checkbox", name="Photofinish files should"
+        )
         if not photofinish_files.is_checked():
             photofinish_files.check()
 
         # Enable results from photofinish
-        results_from_photofinish = page.get_by_role("checkbox", name="Results from photofinish")
+        results_from_photofinish = page.get_by_role(
+            "checkbox", name="Results from photofinish"
+        )
         if not results_from_photofinish.is_checked():
             results_from_photofinish.check()
 
