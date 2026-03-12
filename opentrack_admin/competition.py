@@ -342,16 +342,9 @@ class CompetitionCreator:
         logger.info("Athletes imported successfully")
 
     def prepare_athletes(self) -> None:
-        """Number competitors and apply random seeding.
-
-        Run this after athletes have been imported into the competition.
-        """
-        logger.info("Step 1/2: Numbering competitors...")
+        """Number competitors after import."""
+        logger.info("Numbering competitors...")
         self._number_competitors()
-
-        logger.info("Step 2/2: Applying random seeding...")
-        self._apply_random_seeding()
-
         logger.info("Athletes prepared successfully")
 
     def _configure_photofinish(self) -> None:

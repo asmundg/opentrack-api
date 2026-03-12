@@ -136,7 +136,7 @@ def import_athletes(
     file: Annotated[Path, typer.Argument(help="XLSX file with athlete data to import")],
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
 ) -> None:
-    """Import athletes from XLSX, number competitors and apply random seeding."""
+    """Import athletes from XLSX and number competitors."""
     setup_logging(verbose=verbose)
 
     config = OpenTrackConfig.from_env()
@@ -171,7 +171,7 @@ def import_athletes(
         try:
             creator.import_athletes(file)
             creator.prepare_athletes()
-            print("✅ Athletes imported, numbered and seeded")
+            print("✅ Athletes imported and numbered")
         except Exception as e:
             print(f"❌ Error: {e}")
             raise typer.Exit(1)
