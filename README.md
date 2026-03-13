@@ -25,27 +25,33 @@ opentrack admin create "Seriestevne 2" "bultf-ser2-26" 2026-02-23 bultromsofriid
 ```
 
 ```bash
-opentrack admin import-athletes https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.xlsx 
+opentrack admin import-athletes <opentrack url> <isonen xlsx>
 ```
 
 ### Schedule
 
 ```bash
-opentrack scheduler schedule ~/Downloads/Deltakerliste\ -\ Tromsølekene\ 2026\ -\ inne.xlsx --date 13.03.2026 --start-hour 19 --arena tromsohallen --max-duration 120
+opentrack scheduler schedule <isonen xlsx> --date <date> --start-hour <start> --arena <arena> --max-duration <duration>
 ```
 
 Make adjustments in schedule_events.csv, then recompute
 
 ```bash
-opentrack scheduler from-events ~/Downloads/Deltakerliste\ -\ Seriestevne\ 2.csv schedule_events.csv --mix-genders
+opentrack scheduler from-events <schedule_events.csv> --mix-genders
 ```
 
 ### Sync events
 
 ```bash
-opentrack admin schedule https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 schedule.csv
+opentrack admin schedule <opentrack-url> schedule.csv
 ```
 
 ```bash
-opentrack admin update-pbs https://norway.opentrack.run/en-gb/x/2026/NOR/bultf-ser2-26 schedule.csv
+opentrack admin update-pbs <opentrack-url> schedule.csv
+```
+
+### Reports
+
+```bash
+opentrack reports competitors-by-club <opentrack-url>
 ```

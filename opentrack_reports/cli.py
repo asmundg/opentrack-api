@@ -1,7 +1,6 @@
 """Command-line interface for OpenTrack reports and documents."""
 
-import sys
-from pathlib import Path
+from datetime import date, datetime
 from typing import Annotated, Optional
 
 import typer
@@ -20,6 +19,18 @@ from .opentrack_utils import (
     validate_events,
 )
 from .start_lists import create_start_lists, load_data_from_source
+
+
+def _date_to_day_number(data: dict, filter_date: date) -> int:
+    """Convert a date to a day number relative to the meeting's start date."""
+    meeting_date = datetime.strptime(data["date"], "%Y-%m-%d").date()
+    day_number = (filter_date - meeting_date).days + 1
+    if day_number < 1:
+        raise ValueError(
+            f"Date {filter_date} is before the meeting start date {meeting_date}"
+        )
+    return day_number
+
 
 # Create the typer app for reports commands
 app = typer.Typer(
@@ -48,9 +59,9 @@ def start_lists(
         bool,
         typer.Option("--all-events", help="Process all track events found in the data"),
     ] = False,
-    day: Annotated[
-        Optional[int],
-        typer.Option("--day", "-d", help="Filter events by day number (e.g., 1, 2, 3)"),
+    filter_date: Annotated[
+        Optional[str],
+        typer.Option("--date", "-d", help="Filter events by date (YYYY-MM-DD)"),
     ] = None,
 ) -> None:
     """Generate start lists PDF for track events."""
@@ -62,6 +73,12 @@ def start_lists(
         print("Pre-validation of all events in dataset...")
         validate_events(data, strict_mode=True)
         print("All events recognized successfully.")
+
+        # Convert date to day number
+        day = None
+        if filter_date is not None:
+            parsed_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
+            day = _date_to_day_number(data, parsed_date)
 
         # Determine which events to process
         events_to_process = None
@@ -117,9 +134,9 @@ def field_cards(
         bool,
         typer.Option("--all-events", help="Process all field events found in the data"),
     ] = False,
-    day: Annotated[
-        Optional[int],
-        typer.Option("--day", "-d", help="Filter events by day number (e.g., 1, 2, 3)"),
+    filter_date: Annotated[
+        Optional[str],
+        typer.Option("--date", "-d", help="Filter events by date (YYYY-MM-DD)"),
     ] = None,
 ) -> None:
     """Generate field cards PDF for athletic events."""
@@ -133,6 +150,12 @@ def field_cards(
         print("Pre-validation of all events in dataset...")
         validate_events(data, strict_mode=True)
         print("All events recognized successfully.")
+
+        # Convert date to day number
+        day = None
+        if filter_date is not None:
+            parsed_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
+            day = _date_to_day_number(data, parsed_date)
 
         # Determine which events to process
         events_to_process = None

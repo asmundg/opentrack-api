@@ -17,7 +17,8 @@ from shared.hurdle_heights import (
 EVENT_MAPPINGS: Dict[str, str] = {
     # Norwegian to English track events
     "100 meter": "100m",
-    "200 meter": "200m", 
+    "200 meter": "200m",
+    "300 meter": "300m",
     "400 meter": "400m",
     "600 meter": "600m",
     "800 meter": "800m",
@@ -89,7 +90,7 @@ EVENT_MAPPINGS: Dict[str, str] = {
 
 # Events where lower values are better (time events)
 TIME_EVENTS: Set[str] = {
-    "60m", "100m", "200m", "400m", "600m", "800m", "1500m", "3000m", "5000m", "10000m",
+    "60m", "100m", "200m", "300m", "400m", "600m", "800m", "1500m", "3000m", "5000m", "10000m",
     "60m_hurdles", "100m_hurdles", "110m_hurdles", "400m_hurdles",
     "3000m_steeplechase", "marathon", "half_marathon", "10k", "5k",
     "200m_indoor", "400m_indoor", "600m_indoor", "800m_indoor", "1500m_indoor", "3000m_indoor"
