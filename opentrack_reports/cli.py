@@ -259,6 +259,7 @@ def tyrving_csv(
         output_file = output or f"tyrvingpoeng_{safe_meeting_name}.csv"
 
         parsed_data = parse_opentrack_json(json_data)
+        parsed_data.sort(key=lambda r: int(r['Tyrvingpoeng']), reverse=True)
         save_to_csv(parsed_data, output_file)
 
     except Exception as e:

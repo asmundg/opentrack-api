@@ -1,10 +1,6 @@
 import csv
-import sys
 from typing import Any
-from opentrack_utils import (
-    fetch_json_data, get_meeting_name, clean_event_name, 
-    process_local_json, create_safe_filename, load_opentrack_data
-)
+from .opentrack_utils import clean_event_name, get_meeting_name
 
 def parse_opentrack_json(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Parse OpenTrack JSON and extract required fields."""
@@ -84,29 +80,3 @@ def save_to_csv(data: list[dict[str, Any]], filename: str = 'opentrack_results.c
             writer.writerow(row)
     
     print(f"Data saved to {filename}")
-
-def main() -> None:
-    # Check if argument is provided
-    if len(sys.argv) <= 1:
-        sys.exit("Please provide either a URL or a local JSON file path.")
-    
-    input_source = sys.argv[1]
-    
-    # Load data using utility function
-    try:
-        json_data = load_opentrack_data(input_source)
-        meeting_name = get_meeting_name(json_data)
-        safe_meeting_name = create_safe_filename(meeting_name)
-        output_file = f"tyrvingpoeng_{safe_meeting_name}.csv"
-        
-        # Override with command line argument if provided
-        if len(sys.argv) > 2:
-            output_file = sys.argv[2]
-        
-        parsed_data = parse_opentrack_json(json_data)
-        save_to_csv(parsed_data, output_file)
-    except Exception as e:
-        sys.exit(f"Error: {str(e)}")
-
-if __name__ == "__main__":
-    main()
