@@ -473,22 +473,39 @@ class EventScheduler:
         # Wait for table to filter
         page.wait_for_load_state("networkidle")
 
-        # Find event links (T01, T02, etc. for track, F01, F02, etc. for field) in the filtered results
-        # These are links starting with "T" or "F" followed by digits
-        event_link = page.locator("a").filter(has_text=re.compile(r"^[TF]\d+$"))
+        # Find matching rows by checking the event name column for an exact match.
+        # The search box returns partial matches (e.g., "Høyde" matches both
+        # "Høyde" and "Høyde uten tilløp"), so we must verify the name cell.
+        expected_name = schedule.search_term  # e.g., "J18-19 Høyde"
+        rows = page.locator("tr").filter(
+            has=page.locator("a").filter(has_text=re.compile(r"^[TF]\d+$"))
+        )
 
-        count = event_link.count()
-        logger.info(f"Found {count} event link(s)")
+        count = rows.count()
+        logger.info(f"Found {count} candidate row(s) for '{expected_name}'")
 
-        if count > 0:
-            first_link = event_link.first
-            logger.info(f"Clicking event link: {first_link.text_content()}")
-            first_link.click()
-            page.wait_for_load_state("networkidle")
-            return True
+        for i in range(count):
+            row = rows.nth(i)
+            name_cell = row.locator("td[data-mdb-field='name']")
+            if name_cell.count() == 0:
+                continue
+            row_name = (name_cell.text_content() or "").strip()
+            if row_name == expected_name:
+                link = row.locator("a").filter(has_text=re.compile(r"^[TF]\d+$")).first
+                logger.info(f"Exact match: '{row_name}' — clicking {link.text_content()}")
+                link.click()
+                page.wait_for_load_state("networkidle")
+                return True
 
-        # No event found - raise error (screenshot taken by wrapper)
-        raise RuntimeError(f"No event found for: {schedule.search_term}")
+        # No exact match found - raise error (screenshot taken by wrapper)
+        found_names = []
+        for i in range(count):
+            name_cell = rows.nth(i).locator("td[data-mdb-field='name']")
+            if name_cell.count() > 0:
+                found_names.append((name_cell.text_content() or "").strip())
+        raise RuntimeError(
+            f"No exact match for '{expected_name}'. Found: {found_names}"
+        )
 
     @screenshot_on_error
     def set_event_start_time(self, start_time: time, day: int | None = None) -> None:
