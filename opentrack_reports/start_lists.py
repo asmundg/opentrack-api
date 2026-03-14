@@ -159,6 +159,21 @@ def create_start_lists(
         if "bib" in competitor:
             bib_to_competitor[competitor["bib"]] = competitor
 
+    # Create a mapping of relay team bibs to relay team info
+    bib_to_relay_team = {}
+    for relay_team in data.get("relayTeams", []):
+        bib = str(relay_team["bib"])
+        runner_names = relay_team.get("runnerNames", [])
+        bib_to_relay_team[bib] = {
+            "name": ", ".join(runner_names) if runner_names else relay_team["name"],
+            "club": relay_team["name"],
+            "category": relay_team.get("relayTeamId", ""),
+            "bib": bib,
+            "events": set(),
+            "pb_by_event": {},
+            "sb_by_event": {},
+        }
+
     # Initialize the PDF document in portrait orientation (standard for start lists)
     doc = SimpleDocTemplate(
         output_filename,
@@ -191,6 +206,14 @@ def create_start_lists(
         alignment=TA_CENTER,
         spaceAfter=6,
         spaceBefore=12,
+    )
+
+    cell_style = ParagraphStyle(
+        name="CellStyle",
+        parent=styles["Normal"],
+        fontSize=8,
+        fontName="Helvetica",
+        leading=10,
     )
 
     heat_title_style = ParagraphStyle(
@@ -288,13 +311,16 @@ def create_start_lists(
                     lane = result["lane"]
                     bib = result["bib"]
 
-                    # Get competitor info - fail if bib not found
-                    if bib not in bib_to_competitor:
+                    # Get competitor info from individual or relay team lookup
+                    if bib in bib_to_competitor:
+                        competitor_info = bib_to_competitor[bib]
+                    elif bib in bib_to_relay_team:
+                        competitor_info = bib_to_relay_team[bib]
+                    else:
                         print(
-                            f"ERROR: Competitor with bib {bib} not found in competitor data"
+                            f"ERROR: Bib {bib} not found in competitor or relay team data"
                         )
                         continue
-                    competitor_info = bib_to_competitor[bib]
 
                     time_groups[time_key]["all_heats"][unique_heat_id].append(
                         {
@@ -506,7 +532,7 @@ def create_start_lists(
                         pb = pb_by_event.get(event_id, "")
                         sb = sb_by_event.get(event_id, "")
 
-                        table_data.append([lane, bib, name, club, category, pb, sb])
+                        table_data.append([lane, bib, Paragraph(name, cell_style), Paragraph(club, cell_style), category, pb, sb])
 
                     # Create table with styling for this specific heat
                     table = Table(
