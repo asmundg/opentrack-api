@@ -6,6 +6,11 @@ dist/
 wheels/
 *.egg-info
 
+# outputs
+*.csv
+*.html
+*.pdf
+
 # Virtual environments
 .venv
 
@@ -21,6 +26,9 @@ checkpoints/
 .pytest_cache/
 htmlcov/
 .coverage
+
+# Cached data
+.tyrving_coefficients.json
 
 # IDE
 .idea/

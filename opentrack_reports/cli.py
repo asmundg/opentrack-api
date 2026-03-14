@@ -246,11 +246,40 @@ def tyrving_csv(
     output: Annotated[
         Optional[str], typer.Option("--output", "-o", help="Output CSV filename")
     ] = None,
+    participants: Annotated[
+        Optional[str],
+        typer.Option(
+            "--participants",
+            "-p",
+            help="Participant xlsx with birth dates for exact age class lookup",
+        ),
+    ] = None,
+    refresh_coefficients: Annotated[
+        bool,
+        typer.Option(
+            "--refresh-coefficients",
+            help="Force re-fetch of Tyrving coefficient table",
+        ),
+    ] = False,
 ) -> None:
-    """Convert OpenTrack data to Tyrving points CSV format."""
-    from .opentrack_to_tyrving_csv import parse_opentrack_json, save_to_csv
+    """Convert OpenTrack data to Tyrving points CSV format.
+
+    Automatically backfills missing points (e.g. for 18/19 age groups)
+    using the official Tyrving coefficient table.
+    """
+    from .opentrack_to_tyrving_csv import (
+        load_birth_years,
+        parse_opentrack_json,
+        save_to_csv,
+    )
+    from .tyrving_calculator import refresh_coefficients as do_refresh
 
     try:
+        if refresh_coefficients:
+            do_refresh()
+
+        birth_years = load_birth_years(participants) if participants else None
+
         # Load data using utility function
         json_data = load_opentrack_data(source)
         meeting_name = get_meeting_name(json_data)
@@ -258,7 +287,7 @@ def tyrving_csv(
 
         output_file = output or f"tyrvingpoeng_{safe_meeting_name}.csv"
 
-        parsed_data = parse_opentrack_json(json_data)
+        parsed_data = parse_opentrack_json(json_data, birth_years=birth_years)
         parsed_data.sort(key=lambda r: int(r['Tyrvingpoeng']), reverse=True)
         save_to_csv(parsed_data, output_file)
 
