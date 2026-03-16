@@ -1,7 +1,6 @@
 """Shared configuration modules for opentrack automation."""
 from .implement_weights import (
     IMPLEMENT_WEIGHTS_KG,
-    IMPLEMENT_WEIGHTS_DISPLAY,
     THROWING_EVENTS,
     EVENT_CODE_TO_NORWEGIAN,
     NORWEGIAN_TO_EVENT_CODE,
@@ -14,7 +13,6 @@ from .implement_weights import (
 
 __all__ = [
     "IMPLEMENT_WEIGHTS_KG",
-    "IMPLEMENT_WEIGHTS_DISPLAY",
     "THROWING_EVENTS",
     "EVENT_CODE_TO_NORWEGIAN",
     "NORWEGIAN_TO_EVENT_CODE",
