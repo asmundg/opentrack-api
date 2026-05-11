@@ -1164,6 +1164,10 @@ def spread_events_post_process(
     for eid in sorted(youngest_ids, key=lambda e: event_starts.get(e, 0), reverse=True):
         if eid not in event_starts:
             continue
+        # Skip field events: goldens show 10yo throws/jumps run AFTER older
+        # categories at the same venue, so pulling them to slot 0 is wrong.
+        if problem.events[eid].event_type not in TRACK_DISTANCE_ORDER:
+            continue
         current_start = event_starts[eid]
         best_start = current_start
         for candidate in range(0, current_start):
@@ -1194,7 +1198,7 @@ def spread_events_post_process(
         eid for eid in event_starts
         if problem.events[eid].event_type not in TRACK_DISTANCE_ORDER
     ]
-    field_ids.sort(key=lambda e: (-_field_age(e), event_starts[e]))
+    field_ids.sort(key=lambda e: event_starts[e])
     for eid in field_ids:
         current_start = event_starts[eid]
         if current_start == 0:
@@ -1525,10 +1529,10 @@ def solve_with_optimization(
         young_finish_slot=best_young_finish if young_only_groups else None,
     )
     if older_athletes:
-        # Cap at 4 slots (20 min) or 1/4 of the compact schedule, whichever is
-        # smaller. Anything beyond ~20 min trades schedule duration for marginal
-        # recovery benefit and doesn't match real-world scheduling practice.
-        max_possible_gap = min(best_slots // 4, 4)
+        # Cap at 2 slots (10 min) or 1/4 of the compact schedule, whichever is
+        # smaller. Empirically (vs goldens), gaps beyond ~10 min trade schedule
+        # duration for marginal recovery benefit.
+        max_possible_gap = min(best_slots // 4, 2)
 
         low, high = 1, max_possible_gap
 
@@ -1603,7 +1607,7 @@ def solve_with_optimization(
         # Allow up to 3 slots (15 min) of expansion for warm-up breathing room.
         # Without this cap, Phase 4 can spread events all the way to the
         # default 4-hour budget.
-        max_slots=min(problem.config.max_time_slots, best_solution.total_slots + 3),
+        max_slots=min(problem.config.max_time_slots, best_solution.total_slots),
         min_athlete_gap_slots=best_gap,
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,
