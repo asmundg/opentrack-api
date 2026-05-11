@@ -24,10 +24,12 @@ class EventType(Enum):
     m600 = "600m"
     m800 = "800m"
     m1500 = "1500m"
+    m3000 = "3000m"
     m5000 = "5000m"
     m60_hurdles = "60m hekk"
     m80_hurdles = "80m hekk"
     m100_hurdles = "100m hekk"
+    m200_hurdles = "200m hekk"
     sp = "Kule"
     lj = "Lengde"
     lj_standing = "Lengde uten tilløp"
@@ -141,10 +143,12 @@ TRACK_DISTANCE_ORDER: list[EventType] = [
     EventType.m100,
     EventType.m100_hurdles,
     EventType.m200,  # 200m to goal
+    EventType.m200_hurdles,  # 200m to goal, hurdles
     EventType.m600,  # 600m = 400+200, starts at 200m-to-goal
     EventType.m5000,  # 200m to goal (12×400 + 200)
     EventType.m300,  # 300m to goal
     EventType.m1500,  # 300m to goal (3×400 + 300)
+    EventType.m3000,  # 300m to goal (7×400 + 300)
     EventType.m400,  # Full lap, at finish area
     EventType.m800,  # 2 laps, at finish area
 ]
@@ -158,8 +162,8 @@ SPRINT_EVENTS: frozenset[EventType] = frozenset({
 })
 
 ROUND_EVENTS: frozenset[EventType] = frozenset({
-    EventType.m200, EventType.m300, EventType.m400, EventType.m600,
-    EventType.m800, EventType.m1500, EventType.m5000,
+    EventType.m200, EventType.m200_hurdles, EventType.m300, EventType.m400,
+    EventType.m600, EventType.m800, EventType.m1500, EventType.m3000, EventType.m5000,
 })
 
 
@@ -168,6 +172,7 @@ HURDLES_BASE_DISTANCE: dict[EventType, EventType] = {
     EventType.m60_hurdles: EventType.m60,
     EventType.m80_hurdles: EventType.m60,  # 80m hurdles follows 60m block
     EventType.m100_hurdles: EventType.m100,
+    EventType.m200_hurdles: EventType.m200,
 }
 
 HURDLES_EVENTS: frozenset[EventType] = frozenset(
@@ -356,10 +361,12 @@ EventVenueMapping: dict[EventType, Venue] = {
     EventType.m600: Venue.TRACK,
     EventType.m800: Venue.TRACK,
     EventType.m1500: Venue.TRACK,
+    EventType.m3000: Venue.TRACK,
     EventType.m5000: Venue.TRACK,
     EventType.m60_hurdles: Venue.TRACK,
     EventType.m80_hurdles: Venue.TRACK,
     EventType.m100_hurdles: Venue.TRACK,
+    EventType.m200_hurdles: Venue.TRACK,
     # Throwing events - use throwing circles/areas
     EventType.sp: Venue.SHOT_PUT_CIRCLE,
     EventType.dt: Venue.THROWING_CIRCLE,
@@ -468,10 +475,12 @@ EventDuration: dict[EventType, int] = {
     EventType.m600: 5,
     EventType.m800: 5,
     EventType.m1500: 10,
+    EventType.m3000: 15,
     EventType.m5000: 15,
     EventType.m60_hurdles: 5,
     EventType.m80_hurdles: 5,
     EventType.m100_hurdles: 5,
+    EventType.m200_hurdles: 5,
     # Field events take time x number of participants
     # Throw
     EventType.sp: 6,

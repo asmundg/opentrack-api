@@ -19,10 +19,12 @@ def parse_event_type(ovelse: str) -> EventType:
         "600 meter": EventType.m600,
         "800 meter": EventType.m800,
         "1500 meter": EventType.m1500,
+        "3000 meter": EventType.m3000,
         "5000 meter": EventType.m5000,
         "60 meter hekk": EventType.m60_hurdles,
         "80 meter hekk": EventType.m80_hurdles,
         "100 meter hekk": EventType.m100_hurdles,
+        "200 meter hekk": EventType.m200_hurdles,
         "Kule": EventType.sp,
         "Lengde": EventType.lj,
         "Lengde uten tilløp": EventType.lj_standing,
@@ -34,6 +36,7 @@ def parse_event_type(ovelse: str) -> EventType:
         "Slegge": EventType.ht,
         "Liten ball": EventType.bt,
         "Stavsprang": EventType.pv,
+        "Stav": EventType.pv,
     }
 
     if ovelse not in mapping:
@@ -93,10 +96,12 @@ def _calculate_event_priority(event_type: EventType, category: Category) -> int:
         EventType.m600,
         EventType.m800,
         EventType.m1500,
+        EventType.m3000,
         EventType.m5000,
         EventType.m60_hurdles,
         EventType.m80_hurdles,
         EventType.m100_hurdles,
+        EventType.m200_hurdles,
     }
 
     base_priority = 10 if event_type in track_events else 8
@@ -120,10 +125,12 @@ def _calculate_personnel_required(event_type: EventType) -> int:
         EventType.m600,
         EventType.m800,
         EventType.m1500,
+        EventType.m3000,
         EventType.m5000,
         EventType.m60_hurdles,
         EventType.m80_hurdles,
         EventType.m100_hurdles,
+        EventType.m200_hurdles,
     }
 
     if event_type in track_events:

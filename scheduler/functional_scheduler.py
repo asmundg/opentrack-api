@@ -1181,6 +1181,38 @@ def spread_events_post_process(
             for v in venue_events:
                 venue_events[v].sort(key=lambda e: event_starts[e])
 
+    # Pull older field events to earliest feasible slot. Goldens consistently
+    # show field events running OLDEST categories first at each venue. We can
+    # only do this when slot 0 is actually free at the venue — swapping with
+    # a younger event already at slot 0 would push the younger event's field
+    # slot past their track event in a way that breaks the recovery gap.
+    def _field_age(eid: str) -> int:
+        eg = problem.events[eid]
+        return max((get_category_age_order(e.age_category) for e in eg.events), default=0)
+
+    field_ids = [
+        eid for eid in event_starts
+        if problem.events[eid].event_type not in TRACK_DISTANCE_ORDER
+    ]
+    field_ids.sort(key=lambda e: (-_field_age(e), event_starts[e]))
+    for eid in field_ids:
+        current_start = event_starts[eid]
+        if current_start == 0:
+            continue
+        best_start = current_start
+        for candidate in range(0, current_start):
+            if (
+                not has_conflict(eid, candidate)
+                and not has_venue_conflict(eid, candidate)
+            ):
+                best_start = candidate
+                break
+        if best_start != current_start:
+            print(f"   ⬆️  Pulled field {eid} from slot {current_start} to {best_start}")
+            event_starts[eid] = best_start
+            for v in venue_events:
+                venue_events[v].sort(key=lambda e: event_starts[e])
+
     # Iteratively insert 1-slot gaps at the tightest positions
     for _ in range(max_slots):
         best_venue = None

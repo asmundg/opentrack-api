@@ -1,0 +1,5951 @@
+{
+  "competitors": [
+    {
+      "_id": {
+        "$oid": "684873c7046c60ae9b07d5c4"
+      }, 
+      "ageGroup": "14", 
+      "category": "G14", 
+      "checkedIn": false, 
+      "competitorId": "1", 
+      "eventsEntered": [], 
+      "excludeFromEvents": false, 
+      "firstName": "Kolbj\u00f8rn", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Baade", 
+      "nationalId": "135475176", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-14", 
+      "sortBib": "00001", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5bf"
+      }, 
+      "ageGroup": "15", 
+      "category": "G15", 
+      "checkedIn": false, 
+      "competitorId": "10", 
+      "eventsEntered": [], 
+      "excludeFromEvents": false, 
+      "firstName": "Audun", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "B\u00f8rve-Jensen", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-15", 
+      "sortBib": "00010", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d5a4"
+      }, 
+      "ageGroup": "V40", 
+      "category": "M40", 
+      "checkedIn": false, 
+      "competitorId": "100", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Peter Vedal", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Utnes", 
+      "nationalId": "131022873", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "2-40", 
+      "sortBib": "00100", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684970d10ab6e32224c806ed"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "101", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 7, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Christoffer", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "hasPassedMedExam": true, 
+      "isTeamEntry": false, 
+      "lastName": "Pedersen", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00101", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "6849940edf5853c62f29dbf4"
+      }, 
+      "ageGroup": "V40", 
+      "category": "M40", 
+      "checkedIn": false, 
+      "competitorId": "102", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 8, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Odd Levi", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Paulsen", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "2-40", 
+      "sortBib": "00102", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5c1"
+      }, 
+      "ageGroup": "11", 
+      "category": "G11", 
+      "checkedIn": false, 
+      "competitorId": "11", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T02", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F18", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F03", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Filip", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Flaa", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-11", 
+      "sortBib": "00011", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5a8"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "112", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Markus L\u00f8kke", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/KLIP.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Granaas", 
+      "nationalId": "130526619", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00112", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "KLIP", 
+      "teamName": "U & IL Klippen", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5bb"
+      }, 
+      "ageGroup": "V35", 
+      "category": "W35", 
+      "checkedIn": false, 
+      "competitorId": "119", 
+      "eventsEntered": [], 
+      "excludeFromEvents": false, 
+      "firstName": "Ina Isabella", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "H\u00f8iland", 
+      "nationalId": "134351154", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "2-35", 
+      "sortBib": "00119", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5bd"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "123", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 6, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Simon Andre", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Janssen", 
+      "nationalId": "147073746", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00123", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d5a1"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "126", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "August", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Krokan", 
+      "nationalId": "125868208", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00126", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b9"
+      }, 
+      "ageGroup": "V40", 
+      "category": "M40", 
+      "checkedIn": false, 
+      "competitorId": "129", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 5, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Tom Arne", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Lund", 
+      "nationalId": "123526238", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "2-40", 
+      "sortBib": "00129", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b3"
+      }, 
+      "ageGroup": "10", 
+      "category": "G10", 
+      "checkedIn": false, 
+      "competitorId": "13", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "idx": 6, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "idx": 6, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "idx": 6, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Ludvig Norbakken", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Granslo", 
+      "nationalId": "132696840", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-10", 
+      "sortBib": "00013", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b4"
+      }, 
+      "ageGroup": "13", 
+      "category": "J13", 
+      "checkedIn": false, 
+      "competitorId": "14", 
+      "eventsEntered": [
+        {
+          "eventCode": "HJ", 
+          "eventId": "F06", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "60", 
+          "eventId": "T06", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Ingeborg Norbakken", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Granslo", 
+      "nationalId": "132644576", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-13", 
+      "sortBib": "00014", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b6"
+      }, 
+      "ageGroup": "12", 
+      "category": "G12", 
+      "checkedIn": false, 
+      "competitorId": "15", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T03", 
+          "idx": 1, 
+          "pb": "12.47", 
+          "qp": "12.47", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F09", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Einar ", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Hallanger", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-12", 
+      "sortBib": "00015", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c7046c60ae9b07d5c2"
+      }, 
+      "ageGroup": "16", 
+      "category": "G16", 
+      "checkedIn": false, 
+      "competitorId": "16", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T11", 
+          "idx": 4, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "DT", 
+          "eventId": "F21", 
+          "idx": 2, 
+          "pb": "21.87", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Leonard Aleksander", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Hausner", 
+      "nationalId": "139230114", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-16", 
+      "sortBib": "00016", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5c0"
+      }, 
+      "ageGroup": "11", 
+      "category": "G11", 
+      "checkedIn": false, 
+      "competitorId": "17", 
+      "eventsEntered": [
+        {
+          "eventCode": "SP", 
+          "eventId": "F03", 
+          "idx": 2, 
+          "pb": "5.86", 
+          "qp": "5.86", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F18", 
+          "idx": 2, 
+          "pb": "1.10", 
+          "qp": "1.10", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "DT", 
+          "eventId": "F15", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Jonathan Gr\u00f8nberg", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Holmlund", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-11", 
+      "sortBib": "00017", 
+      "sortEventCode": "3_00000_HJ", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5af"
+      }, 
+      "ageGroup": "16", 
+      "category": "G16", 
+      "checkedIn": false, 
+      "competitorId": "18", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T11", 
+          "idx": 2, 
+          "pb": "7.83", 
+          "qp": "7.83", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Theo", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "H\u00f8gstad", 
+      "nationalId": "144985744", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-16", 
+      "sortBib": "00018", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5ac"
+      }, 
+      "ageGroup": "15", 
+      "category": "J15", 
+      "checkedIn": false, 
+      "competitorId": "2", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T08", 
+          "idx": 1, 
+          "pb": "9.66", 
+          "qp": "9.66", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "200", 
+          "eventId": "T19", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F13", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Emilia Marl\u00e9n Marthinsen", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Baastad", 
+      "nationalId": "131227860", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-15", 
+      "sortBib": "00002", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5b1"
+      }, 
+      "ageGroup": "12", 
+      "category": "J12", 
+      "checkedIn": false, 
+      "competitorId": "20", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T05", 
+          "idx": 1, 
+          "pb": "9.84", 
+          "qp": "9.84", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F05", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Sunniva", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Inderberg", 
+      "nationalId": "132843814", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-12", 
+      "sortBib": "00020", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5ad"
+      }, 
+      "ageGroup": "14", 
+      "category": "J14", 
+      "checkedIn": false, 
+      "competitorId": "21", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T07", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "200", 
+          "eventId": "T18", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Ljudmila", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Itkin", 
+      "nationalId": "None", 
+      "nationality": "SLO", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-14", 
+      "sortBib": "00021", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5ae"
+      }, 
+      "ageGroup": "14", 
+      "category": "J14", 
+      "checkedIn": false, 
+      "competitorId": "22", 
+      "eventsEntered": [
+        {
+          "eventCode": "200", 
+          "eventId": "T18", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "60", 
+          "eventId": "T07", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "DT", 
+          "eventId": "F17", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Vesna", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Itkin", 
+      "nationalId": "None", 
+      "nationality": "SLO", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-14", 
+      "sortBib": "00022", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5a9"
+      }, 
+      "ageGroup": "9", 
+      "category": "G9", 
+      "checkedIn": false, 
+      "competitorId": "24", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "idx": 5, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "idx": 5, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "idx": 5, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Jarle Lieng", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Jensen", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-9", 
+      "sortBib": "00024", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5ab"
+      }, 
+      "ageGroup": "11", 
+      "category": "J11", 
+      "checkedIn": false, 
+      "competitorId": "25", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T04", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F04", 
+          "idx": 2, 
+          "pb": "3.47", 
+          "qp": "3.47", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F14", 
+          "idx": 2, 
+          "pb": "0.90", 
+          "qp": "0.90", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Ingeborg Andreassen", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Kjoshaug", 
+      "nationalId": "144151180", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-11", 
+      "sortBib": "00025", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d5a3"
+      }, 
+      "ageGroup": "10", 
+      "category": "G10", 
+      "checkedIn": false, 
+      "competitorId": "27", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "idx": 4, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "idx": 4, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "idx": 4, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Ola ", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Kuttner", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-10", 
+      "sortBib": "00027", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5a7"
+      }, 
+      "ageGroup": "14", 
+      "category": "J14", 
+      "checkedIn": false, 
+      "competitorId": "28", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T07", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "200", 
+          "eventId": "T18", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Elsa M\u00e6kel\u00e6", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Lindblad", 
+      "nationalId": "144479219", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-14", 
+      "sortBib": "00028", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b8"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "3", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 4, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Thomas", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Bentsen", 
+      "nationalId": "139928162", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00003", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5a5"
+      }, 
+      "ageGroup": "11", 
+      "category": "J11", 
+      "checkedIn": false, 
+      "competitorId": "30", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T04", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F14", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F04", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Lea Johansen", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Maisenh\u00f8lder", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-11", 
+      "sortBib": "00030", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d59d"
+      }, 
+      "ageGroup": "11", 
+      "category": "G11", 
+      "checkedIn": false, 
+      "competitorId": "31", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T02", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F18", 
+          "idx": 1, 
+          "pb": "1.15", 
+          "qp": "1.15", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F03", 
+          "idx": 1, 
+          "pb": "5.83", 
+          "qp": "5.83", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Sigurd Aarseth", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Markussen", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-11", 
+      "sortBib": "00031", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d5a0"
+      }, 
+      "ageGroup": "7", 
+      "category": "G7", 
+      "checkedIn": false, 
+      "competitorId": "32", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "idx": 3, 
+          "pb": "2.64", 
+          "qp": "2.64", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Samuel Helmer Porserud", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Norvik", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-7", 
+      "sortBib": "00032", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d59f"
+      }, 
+      "ageGroup": "9", 
+      "category": "G9", 
+      "checkedIn": false, 
+      "competitorId": "33", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "idx": 2, 
+          "pb": "0.90", 
+          "qp": "0.90", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "idx": 2, 
+          "pb": "4.39", 
+          "qp": "4.39", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Viljar Herman Porserud", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Norvik", 
+      "nationalId": "135590552", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-9", 
+      "sortBib": "00033", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5aa"
+      }, 
+      "ageGroup": "14", 
+      "category": "G14", 
+      "checkedIn": false, 
+      "competitorId": "34", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T09", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "200", 
+          "eventId": "T21", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Mathias Nordheim", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Olaisen", 
+      "nationalId": "132699356", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-14", 
+      "sortBib": "00034", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5b0"
+      }, 
+      "ageGroup": "16", 
+      "category": "G16", 
+      "checkedIn": false, 
+      "competitorId": "35", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T11", 
+          "idx": 3, 
+          "pb": "7.49", 
+          "qp": "7.49", 
+          "sb": "7.49", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Magnus Somying", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Olsen", 
+      "nationalId": "130509680", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-16", 
+      "sortBib": "00035", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d59e"
+      }, 
+      "ageGroup": "8", 
+      "category": "G8", 
+      "checkedIn": false, 
+      "competitorId": "36", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Jeppe ", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Rinde", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-8", 
+      "sortBib": "00036", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c7046c60ae9b07d5c3"
+      }, 
+      "ageGroup": "15", 
+      "category": "G15", 
+      "checkedIn": false, 
+      "competitorId": "37", 
+      "eventsEntered": [], 
+      "excludeFromEvents": false, 
+      "firstName": "Leon Aleksander", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "R\u00f8berg", 
+      "nationalId": "136261153", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-15", 
+      "sortBib": "00037", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c5046c60ae9b07d5a6"
+      }, 
+      "ageGroup": "16", 
+      "category": "G16", 
+      "checkedIn": false, 
+      "competitorId": "39", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T11", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "DT", 
+          "eventId": "F21", 
+          "idx": 1, 
+          "pb": "19.73", 
+          "qp": "19.73", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Matheus", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "T\u00f8nsaas", 
+      "nationalId": "147479372", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-16", 
+      "sortBib": "00039", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b5"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "4", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Bendik", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Blix", 
+      "nationalId": "137003455", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00004", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b2"
+      }, 
+      "ageGroup": "14", 
+      "category": "J14", 
+      "checkedIn": false, 
+      "competitorId": "5", 
+      "eventsEntered": [
+        {
+          "eventCode": "PV", 
+          "eventId": "F01", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "DT", 
+          "eventId": "F17", 
+          "idx": 2, 
+          "pb": "26.29", 
+          "qp": "26.29", 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "60", 
+          "eventId": "T07", 
+          "idx": 4, 
+          "pb": "9.37", 
+          "qp": "9.37", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Julianne Allern", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Brose", 
+      "nationalId": "149380990", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-14", 
+      "sortBib": "00005", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c4046c60ae9b07d5a2"
+      }, 
+      "ageGroup": "V55", 
+      "category": "M55", 
+      "checkedIn": false, 
+      "competitorId": "6", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Rune", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/TRL.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Brustad", 
+      "nationalId": "106886864", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "2-55", 
+      "sortBib": "00006", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "TRL", 
+      "teamName": "Troms\u00f8 L\u00f8peklubb", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5ba"
+      }, 
+      "ageGroup": "17", 
+      "category": "G17", 
+      "checkedIn": false, 
+      "competitorId": "7", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T12", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Trym", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Bugge-Olsen", 
+      "nationalId": "131008997", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-17", 
+      "sortBib": "00007", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5bc"
+      }, 
+      "ageGroup": "11", 
+      "category": "J11", 
+      "checkedIn": false, 
+      "competitorId": "8", 
+      "eventsEntered": [
+        {
+          "eventCode": "60", 
+          "eventId": "T04", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "HJ", 
+          "eventId": "F14", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "SP", 
+          "eventId": "F04", 
+          "idx": 3, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Tiril", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "Byrkjeland", 
+      "nationalId": "139233290", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-11", 
+      "sortBib": "00008", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5be"
+      }, 
+      "ageGroup": "13", 
+      "category": "J13", 
+      "checkedIn": false, 
+      "competitorId": "9", 
+      "eventsEntered": [
+        {
+          "eventCode": "SP", 
+          "eventId": "F12", 
+          "idx": 1, 
+          "timeCheckedIn": null
+        }, 
+        {
+          "eventCode": "60", 
+          "eventId": "T06", 
+          "idx": 2, 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Ane", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/BULTF.png", 
+      "gender": "F", 
+      "isTeamEntry": false, 
+      "lastName": "B\u00f8rve-Jensen", 
+      "nationalId": "None", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "3-13", 
+      "sortBib": "00009", 
+      "sortEventCode": "1_00060_60", 
+      "teamId": "BULTF", 
+      "teamName": "IL i BUL Tromso", 
+      "yellowCard": false
+    }, 
+    {
+      "_id": {
+        "$oid": "684873c6046c60ae9b07d5b7"
+      }, 
+      "ageGroup": "SEN", 
+      "category": "MS", 
+      "checkedIn": false, 
+      "competitorId": "98", 
+      "eventsEntered": [
+        {
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "idx": 1, 
+          "pb": "8:57.04", 
+          "qp": "8:59.37", 
+          "timeCheckedIn": null
+        }
+      ], 
+      "excludeFromEvents": false, 
+      "firstName": "Kim-Roger", 
+      "flagUrl": "//files.opentrack.run/live/clubflags/NOR/HIND.png", 
+      "gender": "M", 
+      "isTeamEntry": false, 
+      "lastName": "Tr\u00f8ite", 
+      "nationalId": "139202402", 
+      "nationality": "NOR", 
+      "nonScorer": false, 
+      "notablePerformances": [], 
+      "numbered": true, 
+      "sortAgeGroup": "1-SEN", 
+      "sortBib": "00098", 
+      "sortEventCode": "1_03000_3000", 
+      "teamId": "HIND", 
+      "teamName": "IK Hind", 
+      "yellowCard": false
+    }
+  ], 
+  "contactDetails": "bultromsofriidrett@gmail.com", 
+  "country": "NOR", 
+  "date": "2025-06-11", 
+  "events": [
+    {
+      "ageGroups": [
+        "14"
+      ], 
+      "cachedCount": 1, 
+      "category": "J14", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "PV", 
+      "eventId": "F01", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J14 Stav", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:00", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "cad124e3-747e-4471-8fcb-8a4907a9ab90", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 20:37:53.534000", 
+          "day": 1, 
+          "eventCode": "PV", 
+          "eventId": "F01", 
+          "eventName": "J14 Stav", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "heights": [
+            "1.30", 
+            "1.50", 
+            "1.60", 
+            "1.70", 
+            "1.84", 
+            "1.90", 
+            "1.95", 
+            "2.00", 
+            "2.05"
+          ], 
+          "id": "cad124e3-747e-4471-8fcb-8a4907a9ab90", 
+          "initialHeight": "1.30", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "plannedHeights": [], 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 584, 
+              "bib": "5", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "2.00", 
+              "place": 1, 
+              "sortBib": 0, 
+              "waPoints": 362
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:00", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205250, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "5", 
+              "height": "1.30", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.50", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.60", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.70", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.84", 
+              "result": "x"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.84", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.90", 
+              "result": "x"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.90", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "1.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "2.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "5", 
+              "height": "2.05", 
+              "result": "x"
+            }, 
+            {
+              "bib": "5", 
+              "height": "2.05", 
+              "result": "r"
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "10"
+      ], 
+      "cachedCount": 3, 
+      "category": "G10", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "HJ", 
+      "eventId": "F02", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G10 H\u00f8yde", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:05", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "b2747a7d-e463-4108-b78c-542441960802", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 17:50:22.520000", 
+          "day": 1, 
+          "eventCode": "HJ", 
+          "eventId": "F02", 
+          "eventName": "G10 H\u00f8yde", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "heights": [
+            "0.85", 
+            "0.90", 
+            "0.95", 
+            "1.00", 
+            "1.05", 
+            "1.10", 
+            "1.15", 
+            "1.20"
+          ], 
+          "id": "b2747a7d-e463-4108-b78c-542441960802", 
+          "initialHeight": "0.85", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "plannedHeights": [], 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 930, 
+              "bib": "13", 
+              "catpos": 1, 
+              "order": 2, 
+              "performance": "1.15", 
+              "place": 1, 
+              "sortBib": 0, 
+              "waPoints": 194
+            }, 
+            {
+              "athlonPoints": 860, 
+              "bib": "27", 
+              "catpos": 2, 
+              "order": 4, 
+              "performance": "1.05", 
+              "place": 2, 
+              "sortBib": 0, 
+              "waPoints": 113
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "24", 
+              "catpos": 1, 
+              "order": 5, 
+              "performance": "0.95", 
+              "place": 3, 
+              "sortBib": 0, 
+              "waPoints": 32
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:05", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205243, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "13", 
+              "height": "0.85", 
+              "result": "o"
+            }, 
+            {
+              "bib": "27", 
+              "height": "0.85", 
+              "result": "o"
+            }, 
+            {
+              "bib": "24", 
+              "height": "0.85", 
+              "result": "o"
+            }, 
+            {
+              "bib": "13", 
+              "height": "0.90", 
+              "result": "o"
+            }, 
+            {
+              "bib": "27", 
+              "height": "0.90", 
+              "result": "o"
+            }, 
+            {
+              "bib": "24", 
+              "height": "0.90", 
+              "result": "x"
+            }, 
+            {
+              "bib": "24", 
+              "height": "0.90", 
+              "result": "o"
+            }, 
+            {
+              "bib": "13", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "27", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "24", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "27", 
+              "height": "1.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "24", 
+              "height": "1.00", 
+              "result": "x"
+            }, 
+            {
+              "bib": "24", 
+              "height": "1.00", 
+              "result": "x"
+            }, 
+            {
+              "bib": "24", 
+              "height": "1.00", 
+              "result": "x"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.05", 
+              "result": "o"
+            }, 
+            {
+              "bib": "27", 
+              "height": "1.05", 
+              "result": "o"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.10", 
+              "result": "o"
+            }, 
+            {
+              "bib": "27", 
+              "height": "1.10", 
+              "result": "x"
+            }, 
+            {
+              "bib": "27", 
+              "height": "1.10", 
+              "result": "x"
+            }, 
+            {
+              "bib": "27", 
+              "height": "1.10", 
+              "result": "x"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.15", 
+              "result": "o"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.20", 
+              "result": "x"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.20", 
+              "result": "x"
+            }, 
+            {
+              "bib": "13", 
+              "height": "1.20", 
+              "result": "x"
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 3, 
+      "category": "G11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "SP", 
+      "eventId": "F03", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 4, 
+      "name": "G11 Kule", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:20", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "6931e022-092e-4c10-9731-c03b564cb2b2", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:36:43.152000", 
+          "day": 1, 
+          "eventCode": "SP", 
+          "eventId": "F03", 
+          "eventName": "G11 Kule", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "6931e022-092e-4c10-9731-c03b564cb2b2", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 508, 
+              "bib": "17", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "5.35", 
+              "place": 1, 
+              "sortBib": 0, 
+              "sp": "5.86", 
+              "weight": "2.00"
+            }, 
+            {
+              "athlonPoints": 480, 
+              "bib": "31", 
+              "catpos": 2, 
+              "order": 2, 
+              "performance": "5.12", 
+              "place": 2, 
+              "sortBib": 0, 
+              "sp": "5.83", 
+              "weight": "2.00"
+            }, 
+            {
+              "athlonPoints": 391, 
+              "bib": "11", 
+              "catpos": 3, 
+              "order": 3, 
+              "performance": "4.38", 
+              "place": 3, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "17:20", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205251, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "17", 
+              "result": "4.97", 
+              "round": 1
+            }, 
+            {
+              "bib": "31", 
+              "result": "4.47", 
+              "round": 1
+            }, 
+            {
+              "bib": "11", 
+              "result": "3.94", 
+              "round": 1
+            }, 
+            {
+              "bib": "17", 
+              "result": "4.76", 
+              "round": 2
+            }, 
+            {
+              "bib": "31", 
+              "result": "4.64", 
+              "round": 2
+            }, 
+            {
+              "bib": "11", 
+              "result": "4.38", 
+              "round": 2
+            }, 
+            {
+              "bib": "17", 
+              "result": "4.79", 
+              "round": 3
+            }, 
+            {
+              "bib": "31", 
+              "result": "5.01", 
+              "round": 3
+            }, 
+            {
+              "bib": "11", 
+              "result": "4.02", 
+              "round": 3
+            }, 
+            {
+              "bib": "17", 
+              "result": "5.35", 
+              "round": 4
+            }, 
+            {
+              "bib": "31", 
+              "result": "5.12", 
+              "round": 4
+            }, 
+            {
+              "bib": "11", 
+              "result": "4.00", 
+              "round": 4
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 2, 
+      "category": "J11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "SP", 
+      "eventId": "F04", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 4, 
+      "name": "J11 Kule", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:20", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "2dde8957-e21f-49d2-8d2e-4d2fa79aec67", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:58:40.904000", 
+          "day": 1, 
+          "eventCode": "SP", 
+          "eventId": "F04", 
+          "eventName": "J11 Kule", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "2dde8957-e21f-49d2-8d2e-4d2fa79aec67", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 560, 
+              "bib": "30", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "4.26", 
+              "place": 1, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }, 
+            {
+              "athlonPoints": 550, 
+              "bib": "8", 
+              "catpos": 2, 
+              "order": 2, 
+              "performance": "4.18", 
+              "place": 2, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "17:20", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205252, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "30", 
+              "result": "3.70", 
+              "round": 1
+            }, 
+            {
+              "bib": "8", 
+              "result": "3.44", 
+              "round": 1
+            }, 
+            {
+              "bib": "30", 
+              "result": "x", 
+              "round": 2
+            }, 
+            {
+              "bib": "8", 
+              "result": "3.71", 
+              "round": 2
+            }, 
+            {
+              "bib": "30", 
+              "result": "3.73", 
+              "round": 3
+            }, 
+            {
+              "bib": "8", 
+              "result": "3.50", 
+              "round": 3
+            }, 
+            {
+              "bib": "30", 
+              "result": "4.26", 
+              "round": 4
+            }, 
+            {
+              "bib": "8", 
+              "result": "4.18", 
+              "round": 4
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "12"
+      ], 
+      "cachedCount": 1, 
+      "category": "J12", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "SP", 
+      "eventId": "F05", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 4, 
+      "name": "J12 Kule", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:20", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "ec8b65d9-900d-42f9-9c71-86bbd916b0ad", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:32:26.048000", 
+          "day": 1, 
+          "eventCode": "SP", 
+          "eventId": "F05", 
+          "eventName": "J12 Kule", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "ec8b65d9-900d-42f9-9c71-86bbd916b0ad", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 556, 
+              "bib": "20", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "5.49", 
+              "place": 1, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "17:20", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205253, 
+          "status": "unscheduled", 
+          "trials": [
+            {
+              "bib": "20", 
+              "result": "3.91", 
+              "round": 1
+            }, 
+            {
+              "bib": "20", 
+              "result": "4.79", 
+              "round": 2
+            }, 
+            {
+              "bib": "20", 
+              "result": "5.20", 
+              "round": 3
+            }, 
+            {
+              "bib": "20", 
+              "result": "5.49", 
+              "round": 4
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "13"
+      ], 
+      "cachedCount": 1, 
+      "category": "J13", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "HJ", 
+      "eventId": "F06", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J13 H\u00f8yde", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:45", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "c1f8213c-7cfb-4001-adb2-126c907e498f", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 17:53:14.525000", 
+          "day": 1, 
+          "eventCode": "HJ", 
+          "eventId": "F06", 
+          "eventName": "J13 H\u00f8yde", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "heights": [
+            "1.10", 
+            "1.15", 
+            "1.20", 
+            "1.25", 
+            "1.30", 
+            "1.35"
+          ], 
+          "id": "c1f8213c-7cfb-4001-adb2-126c907e498f", 
+          "initialHeight": "1.10", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "plannedHeights": [], 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 835, 
+              "bib": "14", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "1.30", 
+              "place": 1, 
+              "sortBib": 0, 
+              "waPoints": 546
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:45", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205244, 
+          "status": "unscheduled", 
+          "trials": [
+            {
+              "bib": "14", 
+              "height": "1.10", 
+              "result": "o"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.15", 
+              "result": "o"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.20", 
+              "result": "o"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.25", 
+              "result": "o"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.30", 
+              "result": "x"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.30", 
+              "result": "x"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.30", 
+              "result": "o"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.35", 
+              "result": "x"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.35", 
+              "result": "x"
+            }, 
+            {
+              "bib": "14", 
+              "height": "1.35", 
+              "result": "x"
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "10"
+      ], 
+      "cachedCount": 3, 
+      "category": "G10", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "SP", 
+      "eventId": "F08", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 3, 
+      "name": "G10 Kule", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "17:50", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "6a11c1cb-1cec-4691-8b5b-fbfa9f1c02ed", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:35:57.842000", 
+          "day": 1, 
+          "eventCode": "SP", 
+          "eventId": "F08", 
+          "eventName": "G10 Kule", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "6a11c1cb-1cec-4691-8b5b-fbfa9f1c02ed", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 709, 
+              "bib": "27", 
+              "catpos": 2, 
+              "order": 1, 
+              "performance": "5.23", 
+              "place": 1, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }, 
+            {
+              "athlonPoints": 684, 
+              "bib": "13", 
+              "catpos": 1, 
+              "order": 2, 
+              "performance": "5.02", 
+              "place": 2, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "24", 
+              "catpos": 1, 
+              "order": 3, 
+              "performance": "4.07", 
+              "place": 3, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "17:50", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205254, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "27", 
+              "result": "5.02", 
+              "round": 1
+            }, 
+            {
+              "bib": "13", 
+              "result": "4.46", 
+              "round": 1
+            }, 
+            {
+              "bib": "24", 
+              "result": "4.07", 
+              "round": 1
+            }, 
+            {
+              "bib": "27", 
+              "result": "5.15", 
+              "round": 2
+            }, 
+            {
+              "bib": "13", 
+              "result": "5.02", 
+              "round": 2
+            }, 
+            {
+              "bib": "24", 
+              "result": "3.65", 
+              "round": 2
+            }, 
+            {
+              "bib": "27", 
+              "result": "5.23", 
+              "round": 3
+            }, 
+            {
+              "bib": "13", 
+              "result": "5.00", 
+              "round": 3
+            }, 
+            {
+              "bib": "24", 
+              "result": "3.58", 
+              "round": 3
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "12"
+      ], 
+      "cachedCount": 1, 
+      "category": "G12", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "HJ", 
+      "eventId": "F09", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G12 H\u00f8yde", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:10", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "c0c71620-fee1-4aa4-aed1-fd6cccf1c5a0", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 20:46:34.144000", 
+          "day": 1, 
+          "eventCode": "HJ", 
+          "eventId": "F09", 
+          "eventName": "G12 H\u00f8yde", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "heights": [
+            "0.90", 
+            "0.95", 
+            "1.00", 
+            "1.05"
+          ], 
+          "id": "c0c71620-fee1-4aa4-aed1-fd6cccf1c5a0", 
+          "initialHeight": "0.90", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "plannedHeights": [], 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 650, 
+              "bib": "15", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "1.00", 
+              "place": 1, 
+              "sortBib": 0, 
+              "waPoints": 72
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "18:10", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205246, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "15", 
+              "height": "0.90", 
+              "result": "o"
+            }, 
+            {
+              "bib": "15", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "15", 
+              "height": "1.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "15", 
+              "height": "1.05", 
+              "result": "x"
+            }, 
+            {
+              "bib": "15", 
+              "height": "1.05", 
+              "result": "x"
+            }, 
+            {
+              "bib": "15", 
+              "height": "1.05", 
+              "result": "x"
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "13"
+      ], 
+      "cachedCount": 1, 
+      "category": "J13", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "SP", 
+      "eventId": "F12", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 4, 
+      "name": "J13 Kule", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:10", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "fe9100ae-3921-4952-b1bb-a0f72dae34b6", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:57:21.710000", 
+          "day": 1, 
+          "eventCode": "SP", 
+          "eventId": "F12", 
+          "eventName": "J13 Kule", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "fe9100ae-3921-4952-b1bb-a0f72dae34b6", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 694, 
+              "bib": "9", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "7.54", 
+              "place": 1, 
+              "sortBib": 0, 
+              "weight": "2.00"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "18:10", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205256, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "9", 
+              "result": "7.11", 
+              "round": 1
+            }, 
+            {
+              "bib": "9", 
+              "result": "7.26", 
+              "round": 2
+            }, 
+            {
+              "bib": "9", 
+              "result": "7.54", 
+              "round": 3
+            }, 
+            {
+              "bib": "9", 
+              "result": "7.13", 
+              "round": 4
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "15"
+      ], 
+      "cachedCount": 1, 
+      "category": "J15", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "SP", 
+      "eventId": "F13", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J15 Kule", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:10", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "d12f63f3-e41c-4ce5-8284-d31676d19ff5", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 20:49:47.631000", 
+          "day": 1, 
+          "eventCode": "SP", 
+          "eventId": "F13", 
+          "eventName": "J15 Kule", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "d12f63f3-e41c-4ce5-8284-d31676d19ff5", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 366, 
+              "bib": "2", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "4.98", 
+              "place": 1, 
+              "sortBib": 0, 
+              "weight": "3.00"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "18:10", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205257, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "2", 
+              "result": "4.53", 
+              "round": 1
+            }, 
+            {
+              "bib": "2", 
+              "result": "4.98", 
+              "round": 2
+            }, 
+            {
+              "bib": "2", 
+              "result": "4.63", 
+              "round": 3
+            }, 
+            {
+              "bib": "2", 
+              "result": "4.36", 
+              "round": 4
+            }, 
+            {
+              "bib": "2", 
+              "result": "4.27", 
+              "round": 5
+            }, 
+            {
+              "bib": "2", 
+              "result": "4.40", 
+              "round": 6
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 1, 
+      "category": "J11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "HJ", 
+      "eventId": "F14", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J11 H\u00f8yde", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:30", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "fefdaca8-ea45-4689-a584-4e3bd8ed4d4c", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 20:52:08.226000", 
+          "day": 1, 
+          "eventCode": "HJ", 
+          "eventId": "F14", 
+          "eventName": "J11 H\u00f8yde", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "heights": [
+            "0.90", 
+            "0.95", 
+            "1.00", 
+            "1.05", 
+            "1.10", 
+            "1.15"
+          ], 
+          "id": "fefdaca8-ea45-4689-a584-4e3bd8ed4d4c", 
+          "initialHeight": "0.90", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "plannedHeights": [], 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 820, 
+              "bib": "8", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "1.10", 
+              "place": 1, 
+              "sortBib": 0, 
+              "waPoints": 361
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "18:30", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205248, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "8", 
+              "height": "0.90", 
+              "result": "o"
+            }, 
+            {
+              "bib": "8", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "8", 
+              "height": "1.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "8", 
+              "height": "1.05", 
+              "result": "o"
+            }, 
+            {
+              "bib": "8", 
+              "height": "1.10", 
+              "result": "o"
+            }, 
+            {
+              "bib": "8", 
+              "height": "1.15", 
+              "result": "x"
+            }, 
+            {
+              "bib": "8", 
+              "height": "1.15", 
+              "result": "x"
+            }, 
+            {
+              "bib": "8", 
+              "height": "1.15", 
+              "result": "x"
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 1, 
+      "category": "G11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "DT", 
+      "eventId": "F15", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 4, 
+      "name": "G11 Diskos", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:40", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "be6fddf7-d94c-4c0e-b2b6-e060d412c22b", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:42:27.043000", 
+          "day": 1, 
+          "eventCode": "DT", 
+          "eventId": "F15", 
+          "eventName": "G11 Diskos", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "be6fddf7-d94c-4c0e-b2b6-e060d412c22b", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 390, 
+              "bib": "17", 
+              "catpos": 1, 
+              "order": 1, 
+              "performance": "13.00", 
+              "place": 1, 
+              "sortBib": 0, 
+              "weight": "0.60"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "18:40", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205258, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "17", 
+              "result": "12.84", 
+              "round": 1
+            }, 
+            {
+              "bib": "17", 
+              "result": "13.00", 
+              "round": 2
+            }, 
+            {
+              "bib": "17", 
+              "result": "x", 
+              "round": 3
+            }, 
+            {
+              "bib": "17", 
+              "result": "x", 
+              "round": 4
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "14"
+      ], 
+      "cachedCount": 2, 
+      "category": "J14", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "DT", 
+      "eventId": "F17", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 4, 
+      "name": "J14 Diskos", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:40", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "4914b70e-bfc4-48e5-9ccb-cafdb4f59dc3", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:39:57.932000", 
+          "day": 1, 
+          "eventCode": "DT", 
+          "eventId": "F17", 
+          "eventName": "J14 Diskos", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "4914b70e-bfc4-48e5-9ccb-cafdb4f59dc3", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 0, 
+              "bib": "22", 
+              "catpos": 2, 
+              "order": 1, 
+              "performance": "13.46", 
+              "place": 2, 
+              "sortBib": 0, 
+              "weight": "0.75"
+            }, 
+            {
+              "athlonPoints": 614, 
+              "bib": "5", 
+              "catpos": 1, 
+              "note": "PB", 
+              "order": 2, 
+              "performance": "27.77", 
+              "place": 1, 
+              "sortBib": 0, 
+              "sp": "26.29", 
+              "weight": "0.75"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "18:40", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205260, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "22", 
+              "result": "12.33", 
+              "round": 1
+            }, 
+            {
+              "bib": "5", 
+              "result": "x", 
+              "round": 1
+            }, 
+            {
+              "bib": "22", 
+              "result": "13.46", 
+              "round": 2
+            }, 
+            {
+              "bib": "5", 
+              "result": "25.93", 
+              "round": 2
+            }, 
+            {
+              "bib": "22", 
+              "result": "x", 
+              "round": 3
+            }, 
+            {
+              "bib": "5", 
+              "result": "27.77", 
+              "round": 3
+            }, 
+            {
+              "bib": "22", 
+              "result": "x", 
+              "round": 4
+            }, 
+            {
+              "bib": "5", 
+              "result": "x", 
+              "round": 4
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 2, 
+      "category": "G11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "HJ", 
+      "eventId": "F18", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G11 H\u00f8yde", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:55", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "225ea10a-8c50-4428-9a0d-ea44d756a474", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:52:24.646000", 
+          "day": 1, 
+          "eventCode": "HJ", 
+          "eventId": "F18", 
+          "eventName": "G11 H\u00f8yde", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "heights": [
+            "0.95", 
+            "1.00", 
+            "1.05", 
+            "1.10", 
+            "1.15", 
+            "1.20"
+          ], 
+          "id": "225ea10a-8c50-4428-9a0d-ea44d756a474", 
+          "initialHeight": "0.95", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "plannedHeights": [], 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 839, 
+              "bib": "31", 
+              "catpos": 1, 
+              "note": "=PB", 
+              "order": 1, 
+              "performance": "1.15", 
+              "place": 1, 
+              "sortBib": 0, 
+              "sp": "1.15", 
+              "waPoints": 194
+            }, 
+            {
+              "athlonPoints": 734, 
+              "bib": "17", 
+              "catpos": 2, 
+              "order": 3, 
+              "performance": "1.00", 
+              "place": 2, 
+              "sortBib": 0, 
+              "sp": "1.10", 
+              "waPoints": 72
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "18:55", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205249, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "31", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "17", 
+              "height": "0.95", 
+              "result": "o"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "17", 
+              "height": "1.00", 
+              "result": "o"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.05", 
+              "result": "o"
+            }, 
+            {
+              "bib": "17", 
+              "height": "1.05", 
+              "result": "x"
+            }, 
+            {
+              "bib": "17", 
+              "height": "1.05", 
+              "result": "x"
+            }, 
+            {
+              "bib": "17", 
+              "height": "1.05", 
+              "result": "x"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.10", 
+              "result": "o"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.15", 
+              "result": "x"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.15", 
+              "result": "x"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.15", 
+              "result": "o"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.20", 
+              "result": "x"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.20", 
+              "result": "x"
+            }, 
+            {
+              "bib": "31", 
+              "height": "1.20", 
+              "result": "x"
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "16"
+      ], 
+      "cachedCount": 1, 
+      "category": "G16", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 0, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "DT", 
+      "eventId": "F21", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G16 Diskos", 
+      "poolOrder": "random", 
+      "r1Status": "complete", 
+      "r1Time": "18:55", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "ab700135-0199-4ab3-91ec-3cd78aba03f7", 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:49:18.421000", 
+          "day": 1, 
+          "eventCode": "DT", 
+          "eventId": "F21", 
+          "eventName": "G16 Diskos", 
+          "heat": 1, 
+          "heatName": "Pool 1", 
+          "id": "ab700135-0199-4ab3-91ec-3cd78aba03f7", 
+          "modifiedBy": "sveinungolsen", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 172, 
+              "bib": "16", 
+              "catpos": 1, 
+              "note": "PB", 
+              "order": 1, 
+              "performance": "23.95", 
+              "place": 1, 
+              "sortBib": 0, 
+              "sp": "21.87", 
+              "weight": "1.50"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "rounds": 6, 
+          "scheduledStartTime": "18:55", 
+          "showAthleteDetails": true, 
+          "showPartials": true, 
+          "showPoints": false, 
+          "sqlUnitId": 205263, 
+          "status": "finished", 
+          "trials": [
+            {
+              "bib": "16", 
+              "result": "x", 
+              "round": 1
+            }, 
+            {
+              "bib": "16", 
+              "result": "x", 
+              "round": 2
+            }, 
+            {
+              "bib": "16", 
+              "result": "23.95", 
+              "round": 3
+            }, 
+            {
+              "bib": "16", 
+              "result": "x", 
+              "round": 4
+            }, 
+            {
+              "bib": "16", 
+              "result": "23.90", 
+              "round": 5
+            }, 
+            {
+              "bib": "16", 
+              "result": "20.96", 
+              "round": 6
+            }
+          ]
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "10"
+      ], 
+      "cachedCount": 3, 
+      "category": "G10", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T01", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G10 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:00", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "1fc05ee7-9937-4e63-aa54-f3153f41cdda", 
+          "actualStartTime": {
+            "$date": 1749661744954
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-12 18:02:13.161000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T01", 
+          "eventName": "G10 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "1fc05ee7-9937-4e63-aa54-f3153f41cdda", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 557, 
+              "bib": "13", 
+              "lane": 6, 
+              "performance": "10.84", 
+              "perfsource": "lif", 
+              "rawTime": "10.831", 
+              "sortBib": 0
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "24", 
+              "lane": 4, 
+              "performance": "11.95", 
+              "perfsource": "lif", 
+              "rawTime": "11.947", 
+              "sortBib": 0
+            }, 
+            {
+              "athlonPoints": 589, 
+              "bib": "27", 
+              "lane": 5, 
+              "performance": "10.72", 
+              "perfsource": "lif", 
+              "rawTime": "10.718", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:00", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T01-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205223, 
+          "status": "finished", 
+          "windAssistance": "+0.5"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 2, 
+      "category": "G11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T02", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G11 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:10", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "55d39ed7-a1ba-4bf0-bc04-509802d29281", 
+          "actualStartTime": {
+            "$date": 1749662067138
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 16:15:59.396000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T02", 
+          "eventName": "G11 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "55d39ed7-a1ba-4bf0-bc04-509802d29281", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 584, 
+              "bib": "31", 
+              "catpos": 1, 
+              "lane": 3, 
+              "performance": "10.34", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "10.335", 
+              "sortBib": 0
+            }, 
+            {
+              "athlonPoints": 314, 
+              "bib": "11", 
+              "catpos": 2, 
+              "lane": 4, 
+              "performance": "11.34", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "11.332", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:10", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T02-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205226, 
+          "status": "finished", 
+          "windAssistance": "+0.4"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "12"
+      ], 
+      "cachedCount": 1, 
+      "category": "G12", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T03", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G12 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:10", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "488f913e-a144-4de1-a8bc-bbb5a7331ecb", 
+          "actualStartTime": {
+            "$date": 1749662067138
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 16:16:39.171000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T03", 
+          "eventName": "G12 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "488f913e-a144-4de1-a8bc-bbb5a7331ecb", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 0, 
+              "bib": "15", 
+              "catpos": 1, 
+              "lane": 5, 
+              "performance": "12.74", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "12.738", 
+              "sortBib": 0, 
+              "sp": "12.47"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:10", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T03-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205227, 
+          "status": "finished", 
+          "windAssistance": "+0.4"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "11"
+      ], 
+      "cachedCount": 2, 
+      "category": "J11", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T04", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J11 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:15", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "ea742abf-784c-4ae1-8924-0d52f6ccc55a", 
+          "actualStartTime": {
+            "$date": 1749662337925
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:39:15.250000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T04", 
+          "eventName": "J11 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "ea742abf-784c-4ae1-8924-0d52f6ccc55a", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 732, 
+              "bib": "8", 
+              "catpos": 1, 
+              "lane": 3, 
+              "performance": "9.84", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "9.835", 
+              "sortBib": 0
+            }, 
+            {
+              "athlonPoints": 570, 
+              "bib": "30", 
+              "catpos": 2, 
+              "lane": 5, 
+              "performance": "10.44", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "10.439", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:15", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T04-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205232, 
+          "status": "finished", 
+          "windAssistance": "+0.2"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "12"
+      ], 
+      "cachedCount": 1, 
+      "category": "J12", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T05", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J12 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:15", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "18f41148-c520-48b9-a498-c2349fcdf66d", 
+          "actualStartTime": {
+            "$date": 1749662337925
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 16:19:59.193000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T05", 
+          "eventName": "J12 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "18f41148-c520-48b9-a498-c2349fcdf66d", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 794, 
+              "bib": "20", 
+              "catpos": 1, 
+              "lane": 6, 
+              "note": "PB", 
+              "performance": "9.31", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "9.306", 
+              "sortBib": 0, 
+              "sp": "9.84"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:15", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T05-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205233, 
+          "status": "finished", 
+          "windAssistance": "+0.2"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "13"
+      ], 
+      "cachedCount": 2, 
+      "category": "J13", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T06", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J13 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:20", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "cf795454-af13-42c5-8dd5-ab4f5f863de6", 
+          "actualStartTime": {
+            "$date": 1749662693096
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 16:28:46.907000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T06", 
+          "eventName": "J13 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "cf795454-af13-42c5-8dd5-ab4f5f863de6", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 603, 
+              "bib": "14", 
+              "catpos": 1, 
+              "lane": 1, 
+              "performance": "9.87", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "9.870", 
+              "sortBib": 0
+            }, 
+            {
+              "athlonPoints": 568, 
+              "bib": "9", 
+              "catpos": 2, 
+              "lane": 2, 
+              "performance": "10.00", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "10.000", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:20", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T06-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205234, 
+          "status": "finished", 
+          "windAssistance": "+0.8"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "14"
+      ], 
+      "cachedCount": 2, 
+      "category": "J14", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T07", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J14 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:20", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "c53ffe33-dba5-454e-92c3-b57673cfc7a8", 
+          "actualStartTime": {
+            "$date": 1749662693096
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:40:02.534000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T07", 
+          "eventName": "J14 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "c53ffe33-dba5-454e-92c3-b57673cfc7a8", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 751, 
+              "bib": "28", 
+              "catpos": 1, 
+              "lane": 6, 
+              "performance": "9.17", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "9.161", 
+              "sortBib": 0
+            }, 
+            {
+              "athlonPoints": 724, 
+              "bib": "22", 
+              "catpos": 2, 
+              "lane": 4, 
+              "performance": "9.27", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "9.270", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:20", 
+          "showAthleteDetails": true, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T07-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205224, 
+          "status": "finished", 
+          "windAssistance": "+0.8"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "15"
+      ], 
+      "cachedCount": 1, 
+      "category": "J15", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T08", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J15 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:20", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "e4197706-148c-4512-bc2f-24627ba944c2", 
+          "actualStartTime": {
+            "$date": 1749662693096
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 16:26:13.954000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T08", 
+          "eventName": "J15 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "e4197706-148c-4512-bc2f-24627ba944c2", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 708, 
+              "bib": "2", 
+              "catpos": 1, 
+              "lane": 7, 
+              "note": "PB", 
+              "performance": "9.23", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "9.228", 
+              "sortBib": 0, 
+              "sp": "9.66"
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:20", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T08-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205225, 
+          "status": "finished", 
+          "windAssistance": "+0.8"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "14"
+      ], 
+      "cachedCount": 1, 
+      "category": "G14", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T09", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G14 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:25", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "73178c08-3e03-4762-bdc3-dfd5dae92919", 
+          "actualStartTime": {
+            "$date": 1749663034142
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:36:59.869000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T09", 
+          "eventName": "G14 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "73178c08-3e03-4762-bdc3-dfd5dae92919", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 859, 
+              "bib": "34", 
+              "catpos": 1, 
+              "lane": 3, 
+              "performance": "8.27", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "8.264", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:25", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T09-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205228, 
+          "status": "finished", 
+          "windAssistance": "+0.9"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "16"
+      ], 
+      "cachedCount": 3, 
+      "category": "G16", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T11", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G16 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:30", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "2f9d6ae9-84e8-4e1f-b886-fefaaad32b70", 
+          "actualStartTime": {
+            "$date": 1749663226746
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 18:38:21.909000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T11", 
+          "eventName": "G16 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "2f9d6ae9-84e8-4e1f-b886-fefaaad32b70", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 956, 
+              "bib": "35", 
+              "catpos": 1, 
+              "lane": 4, 
+              "performance": "7.56", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "7.556", 
+              "sortBib": 0, 
+              "sp": "7.49"
+            }, 
+            {
+              "athlonPoints": 940, 
+              "bib": "18", 
+              "catpos": 2, 
+              "lane": 5, 
+              "note": "PB", 
+              "performance": "7.62", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "7.616", 
+              "sortBib": 0, 
+              "sp": "7.83"
+            }, 
+            {
+              "athlonPoints": 773, 
+              "bib": "16", 
+              "catpos": 3, 
+              "lane": 3, 
+              "performance": "8.24", 
+              "perfsource": "lif", 
+              "place": 3, 
+              "rawTime": "8.234", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:30", 
+          "showAthleteDetails": true, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T11-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205230, 
+          "status": "finished", 
+          "windAssistance": "+0.6"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "17"
+      ], 
+      "cachedCount": 1, 
+      "category": "G17", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "60", 
+      "eventId": "T12", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G17 60 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:30", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "7275bb00-b4a2-4e80-8d78-2d208bc75f16", 
+          "actualStartTime": {
+            "$date": 1749663226746
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 16:36:59.895000", 
+          "day": 1, 
+          "distance": 60, 
+          "eventCode": "60", 
+          "eventId": "T12", 
+          "eventName": "G17 60 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "7275bb00-b4a2-4e80-8d78-2d208bc75f16", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 829, 
+              "bib": "7", 
+              "catpos": 1, 
+              "lane": 6, 
+              "performance": "7.93", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "7.922", 
+              "sortBib": 0
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:30", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T12-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205231, 
+          "status": "finished", 
+          "windAssistance": "+0.6"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "SEN"
+      ], 
+      "cachedCount": 8, 
+      "category": "MS", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "3000", 
+      "eventId": "T14", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 9, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "MS 3000 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "17:40", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "93ddc339-ae99-4fad-b421-3ff793120eab", 
+          "actualStartTime": {
+            "$date": 1749663868886
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 21:41:05.910000", 
+          "day": 1, 
+          "distance": 3000, 
+          "eventCode": "3000", 
+          "eventId": "T14", 
+          "eventName": "MS 3000 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "93ddc339-ae99-4fad-b421-3ff793120eab", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 0, 
+              "bib": "112", 
+              "catpos": 1, 
+              "lane": 1, 
+              "performance": "8:32.69", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "8:32.69", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "33.94", 
+                  "lapTime": "33.94"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "1:42.96", 
+                  "lapTime": "1:09.02"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "2:52.40", 
+                  "lapTime": "1:09.44"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "3:59.66", 
+                  "lapTime": "1:07.27"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "5:08.93", 
+                  "lapTime": "1:09.27"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "6:18.78", 
+                  "lapTime": "1:09.86"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "7:27.69", 
+                  "lapTime": "1:08.91"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "8:32.69", 
+                  "lapTime": "1:05.00"
+                }
+              ], 
+              "waPoints": 873
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "4", 
+              "catpos": 2, 
+              "lane": 1, 
+              "performance": "8:41.17", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "8:41.17", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "33.70", 
+                  "lapTime": "33.70"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "1:42.70", 
+                  "lapTime": "1:09.00"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "2:52.63", 
+                  "lapTime": "1:09.94"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "4:00.20", 
+                  "lapTime": "1:07.57"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "5:10.23", 
+                  "lapTime": "1:10.04"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "6:20.76", 
+                  "lapTime": "1:10.53"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "7:31.43", 
+                  "lapTime": "1:10.68"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "8:41.17", 
+                  "lapTime": "1:09.74"
+                }
+              ], 
+              "waPoints": 828
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "98", 
+              "catpos": 3, 
+              "lane": 1, 
+              "performance": "9:13.28", 
+              "perfsource": "lif", 
+              "place": 3, 
+              "rawTime": "9:13.28", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "35.70", 
+                  "lapTime": "35.70"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "1:48.95", 
+                  "lapTime": "1:13.25"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "3:03.42", 
+                  "lapTime": "1:14.47"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "4:16.37", 
+                  "lapTime": "1:12.96"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "5:29.76", 
+                  "lapTime": "1:13.39"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "6:43.55", 
+                  "lapTime": "1:13.80"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "7:58.31", 
+                  "lapTime": "1:14.77"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "9:13.28", 
+                  "lapTime": "1:14.97"
+                }
+              ], 
+              "waPoints": 669
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "126", 
+              "catpos": 4, 
+              "lane": 1, 
+              "performance": "9:24.07", 
+              "perfsource": "lif", 
+              "place": 4, 
+              "rawTime": "9:24.07", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "36.66", 
+                  "lapTime": "36.66"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "1:51.03", 
+                  "lapTime": "1:14.38"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "3:06.81", 
+                  "lapTime": "1:15.78"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "4:22.57", 
+                  "lapTime": "1:15.76"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "5:38.61", 
+                  "lapTime": "1:16.05"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "6:55.28", 
+                  "lapTime": "1:16.67"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "8:10.96", 
+                  "lapTime": "1:15.69"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "9:24.07", 
+                  "lapTime": "1:13.12"
+                }
+              ], 
+              "waPoints": 620
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "101", 
+              "catpos": 5, 
+              "lane": 1, 
+              "performance": "9:36.79", 
+              "perfsource": "lif", 
+              "place": 5, 
+              "rawTime": "9:36.79", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "36.99", 
+                  "lapTime": "36.99"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "1:51.33", 
+                  "lapTime": "1:14.34"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "3:07.12", 
+                  "lapTime": "1:15.79"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "4:22.89", 
+                  "lapTime": "1:15.78"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "5:42.30", 
+                  "lapTime": "1:19.41"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "7:01.53", 
+                  "lapTime": "1:19.24"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "8:21.30", 
+                  "lapTime": "1:19.77"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "9:36.79", 
+                  "lapTime": "1:15.50"
+                }
+              ], 
+              "waPoints": 564
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "123", 
+              "catpos": 6, 
+              "lane": 1, 
+              "performance": "10:30.71", 
+              "perfsource": "lif", 
+              "place": 6, 
+              "rawTime": "10:30.71", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "39.11", 
+                  "lapTime": "39.11"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "1:59.17", 
+                  "lapTime": "1:20.07"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "3:22.55", 
+                  "lapTime": "1:23.38"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "4:47.83", 
+                  "lapTime": "1:25.29"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "6:13.67", 
+                  "lapTime": "1:25.84"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "7:39.71", 
+                  "lapTime": "1:26.04"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "9:06.53", 
+                  "lapTime": "1:26.83"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "10:30.71", 
+                  "lapTime": "1:24.19"
+                }
+              ], 
+              "waPoints": 356
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "6", 
+              "catpos": 1, 
+              "lane": 1, 
+              "performance": "10:51.67", 
+              "perfsource": "lif", 
+              "place": 7, 
+              "rawTime": "10:51.67", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "40.25", 
+                  "lapTime": "40.25"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "2:03.69", 
+                  "lapTime": "1:23.44"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "3:30.93", 
+                  "lapTime": "1:27.25"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "4:58.78", 
+                  "lapTime": "1:27.85"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "6:27.87", 
+                  "lapTime": "1:29.10"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "7:56.46", 
+                  "lapTime": "1:28.59"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "9:27.18", 
+                  "lapTime": "1:30.72"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "10:51.67", 
+                  "lapTime": "1:24.49"
+                }
+              ], 
+              "waPoints": 289
+            }, 
+            {
+              "athlonPoints": 0, 
+              "bib": "129", 
+              "catpos": 1, 
+              "lane": 1, 
+              "performance": "11:23.24", 
+              "perfsource": "lif", 
+              "place": 8, 
+              "rawTime": "11:23.24", 
+              "sortBib": 0, 
+              "splits": [
+                {
+                  "distance": 200, 
+                  "elapsedTime": "42.34", 
+                  "lapTime": "42.34"
+                }, 
+                {
+                  "distance": 400, 
+                  "elapsedTime": "2:07.87", 
+                  "lapTime": "1:25.53"
+                }, 
+                {
+                  "distance": 600, 
+                  "elapsedTime": "3:37.84", 
+                  "lapTime": "1:29.97"
+                }, 
+                {
+                  "distance": 800, 
+                  "elapsedTime": "5:10.06", 
+                  "lapTime": "1:32.22"
+                }, 
+                {
+                  "distance": 1000, 
+                  "elapsedTime": "6:42.73", 
+                  "lapTime": "1:32.67"
+                }, 
+                {
+                  "distance": 1200, 
+                  "elapsedTime": "8:17.30", 
+                  "lapTime": "1:34.58"
+                }, 
+                {
+                  "distance": 1400, 
+                  "elapsedTime": "9:53.76", 
+                  "lapTime": "1:36.47"
+                }, 
+                {
+                  "distance": 1600, 
+                  "elapsedTime": "11:23.24", 
+                  "lapTime": "1:29.48"
+                }
+              ], 
+              "waPoints": 200
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "17:40", 
+          "showAthleteDetails": true, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T14-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205241, 
+          "status": "finished", 
+          "windAssistance": "+0.4"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "14"
+      ], 
+      "cachedCount": 2, 
+      "category": "J14", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "200", 
+      "eventId": "T18", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J14 200 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "18:35", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "7c1443b6-e70f-4aec-a0d9-54a0f184f7a8", 
+          "actualStartTime": {
+            "$date": 1749666737888
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 17:38:52.012000", 
+          "day": 1, 
+          "distance": 200, 
+          "eventCode": "200", 
+          "eventId": "T18", 
+          "eventName": "J14 200 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "7c1443b6-e70f-4aec-a0d9-54a0f184f7a8", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 667, 
+              "bib": "22", 
+              "catpos": 1, 
+              "lane": 4, 
+              "performance": "31.36", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "31.358", 
+              "sortBib": 0, 
+              "waPoints": 448
+            }, 
+            {
+              "athlonPoints": 515, 
+              "bib": "28", 
+              "catpos": 2, 
+              "lane": 5, 
+              "performance": "33.31", 
+              "perfsource": "lif", 
+              "place": 2, 
+              "rawTime": "33.309", 
+              "sortBib": 0, 
+              "waPoints": 333
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "18:35", 
+          "showAthleteDetails": true, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T18-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205238, 
+          "status": "finished", 
+          "windAssistance": "+0.8"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "15"
+      ], 
+      "cachedCount": 1, 
+      "category": "J15", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "200", 
+      "eventId": "T19", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "F", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "J15 200 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "18:35", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "01922d3a-64bc-4f1c-8253-5b1730998e08", 
+          "actualStartTime": {
+            "$date": 1749666737888
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-10 15:59:03.302000", 
+          "dateModified": "2025-06-11 17:35:58.795000", 
+          "day": 1, 
+          "distance": 200, 
+          "eventCode": "200", 
+          "eventId": "T19", 
+          "eventName": "J15 200 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "01922d3a-64bc-4f1c-8253-5b1730998e08", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 654, 
+              "bib": "2", 
+              "catpos": 1, 
+              "lane": 7, 
+              "performance": "30.93", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "30.928", 
+              "sortBib": 0, 
+              "waPoints": 475
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "18:35", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T19-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205239, 
+          "status": "finished", 
+          "windAssistance": "+0.8"
+        }
+      ]
+    }, 
+    {
+      "ageGroups": [
+        "14"
+      ], 
+      "cachedCount": 1, 
+      "category": "G14", 
+      "ceScoreFormula": "x", 
+      "cutAfterRound": 3, 
+      "cutSurvivors": 8, 
+      "day": 1, 
+      "eventCode": "200", 
+      "eventId": "T21", 
+      "excludeFromPerEventCheckins": false, 
+      "excludeFromScoringSystem": false, 
+      "genders": "M", 
+      "heatTimeCalculation": "AUTO", 
+      "hideInTimetable": false, 
+      "includeDnfAthletes": false, 
+      "includeDnsAthletes": false, 
+      "includeDqAthletes": false, 
+      "lanes": 8, 
+      "lanesR2": 8, 
+      "lanesR3": 8, 
+      "maxFieldAttempts": 6, 
+      "name": "G14 200 meter", 
+      "poolOrder": "random", 
+      "qualByPlace": 0, 
+      "qualFastestLosers": 0, 
+      "r1Status": "complete", 
+      "r1Time": "18:30", 
+      "r2Day": 1, 
+      "r2Status": "none", 
+      "r3Day": 1, 
+      "r3Status": "none", 
+      "r4Day": 1, 
+      "r4Status": "none", 
+      "rankBy": "DEFAULT", 
+      "reorderLastRound": false, 
+      "requireCallroomOverride": false, 
+      "rounds": "1", 
+      "seeding": "open_meet", 
+      "seedingMethod": "fastest_last", 
+      "seedingMethodR3": "fastest_last", 
+      "showFormGuide": false, 
+      "status": "complete", 
+      "teamTypes": "INHERIT", 
+      "units": [
+        {
+          "_id": "f0a8369c-9b69-4756-8adf-ff0af52cff6c", 
+          "actualStartTime": {
+            "$date": 1749666737888
+          }, 
+          "createdBy": "system", 
+          "dateCreated": "2025-06-11 15:08:52.210000", 
+          "dateModified": "2025-06-11 17:37:44.665000", 
+          "day": 1, 
+          "distance": 200, 
+          "eventCode": "200", 
+          "eventId": "T21", 
+          "eventName": "G14 200 meter", 
+          "heat": 1, 
+          "heatName": "Heat 1", 
+          "id": "f0a8369c-9b69-4756-8adf-ff0af52cff6c", 
+          "modifiedBy": "bul-troms-friidrett", 
+          "originalResultsStatus": "none", 
+          "overrideCeScores": false, 
+          "overridePlaces": false, 
+          "paces": [], 
+          "precision": 2, 
+          "published": true, 
+          "results": [
+            {
+              "athlonPoints": 704, 
+              "bib": "34", 
+              "catpos": 1, 
+              "lane": 6, 
+              "performance": "28.28", 
+              "perfsource": "lif", 
+              "place": 1, 
+              "rawTime": "28.280", 
+              "sortBib": 0, 
+              "waPoints": 264
+            }
+          ], 
+          "resultsStatus": "official", 
+          "round": 1, 
+          "roundName": "Round 1", 
+          "scheduledStartTime": "18:30", 
+          "showAthleteDetails": false, 
+          "showHandicap": false, 
+          "showPoints": false, 
+          "showRawTime": false, 
+          "showReactionTime": false, 
+          "source": "T21-1-01.lif", 
+          "splitDistances": [], 
+          "splitsLap": 200, 
+          "splitsStart": 200, 
+          "sqlUnitId": 205500, 
+          "status": "finished", 
+          "windAssistance": "+0.8"
+        }
+      ]
+    }
+  ], 
+  "finishDate": "2025-06-11", 
+  "fullName": "Seriestevne 4-2025", 
+  "id": "5c4c2c55-60f7-4847-a20d-f310e0077c2b", 
+  "organiser": "e2c767ee-09c3-4e3e-8e19-1a79cf671e1a", 
+  "relayTeams": [], 
+  "slug": "ser4-25", 
+  "teamTypes": "ORG", 
+  "teams": [], 
+  "type": "TRACK", 
+  "venue": {
+    "altitude": null, 
+    "capacity": null, 
+    "certification": "", 
+    "country": "NOR", 
+    "englishName": "", 
+    "floodlit": false, 
+    "formalName": "Valhall stadion", 
+    "id": "9f3bbcd1-36d0-4a9b-af1d-7f30dfda91f6", 
+    "indoor": false, 
+    "isDemo": false, 
+    "isDirty": true, 
+    "latitude": 69.66033985885633, 
+    "length": 400, 
+    "localName": "", 
+    "locationText": "", 
+    "longitude": 18.95597362505214, 
+    "ngbCode": "", 
+    "nickname": "Valhall stadion", 
+    "numLanesCurve": 8, 
+    "numLanesStraight": 8, 
+    "osmWayId": null, 
+    "region1": "Troms og Finnmark", 
+    "region2": "Troms\u00f8", 
+    "region3": "Troms\u00f8", 
+    "region4": "", 
+    "slug": "", 
+    "straightOnly": false, 
+    "street": "Fv862", 
+    "venueType": "TRACK", 
+    "verified": true, 
+    "waId": null, 
+    "waterJump": ""
+  }, 
+  "year": 2025
+}
