@@ -1137,14 +1137,41 @@ def spread_events_post_process(
     # Pull youngest events to earliest feasible slot.
     # Uses overlap-only check (no gap enforcement) since the minimum gap
     # constraint is for 13+ athletes, not 10-year-olds.
+    # Track events must still respect distance/hurdle/age ordering — we can
+    # only pull a track group to a slot that doesn't violate precedence
+    # against other track groups in the schedule.
     youngest_ids = get_youngest_event_groups(problem.events)
+
+    def violates_track_precedence(eid: str, new_start: int) -> bool:
+        """Check if moving eid to new_start would break track precedence."""
+        eg = problem.events[eid]
+        if eg.event_type not in TRACK_DISTANCE_ORDER:
+            return False
+        eid_order = _get_event_group_sort_key(eg)
+        for other_eid, other_eg in problem.events.items():
+            if other_eid == eid or other_eg.event_type not in TRACK_DISTANCE_ORDER:
+                continue
+            if other_eid not in event_starts:
+                continue
+            other_order = _get_event_group_sort_key(other_eg)
+            other_start = event_starts[other_eid]
+            if eid_order < other_order and new_start > other_start:
+                return True
+            if eid_order > other_order and new_start < other_start:
+                return True
+        return False
+
     for eid in sorted(youngest_ids, key=lambda e: event_starts.get(e, 0), reverse=True):
         if eid not in event_starts:
             continue
         current_start = event_starts[eid]
         best_start = current_start
         for candidate in range(0, current_start):
-            if not has_overlap(eid, candidate) and not has_venue_conflict(eid, candidate):
+            if (
+                not has_overlap(eid, candidate)
+                and not has_venue_conflict(eid, candidate)
+                and not violates_track_precedence(eid, candidate)
+            ):
                 best_start = candidate
                 break
         if best_start != current_start:
@@ -1447,7 +1474,11 @@ def solve_with_optimization(
         if g.event_type in TRACK_DISTANCE_ORDER
     ]
 
-    # Phase 2c: Maximize older athlete recovery gaps
+    # Phase 2c: Maximize older athlete recovery gaps (capped).
+    # CONSTRAINTS.md ranks total duration above recovery gap, so we cap the
+    # gap so we don't trade unbounded amounts of duration for marginal recovery.
+    # Empirically (vs the goldens), gaps beyond ~4 slots (20 min) don't reflect
+    # how real meets are scheduled.
     print(f"\n🏃 Phase 2c: Maximizing older athlete recovery gaps...")
     print(f"   Time budget: {problem.config.max_time_slots} slots ({problem.config.max_time_slots * problem.config.slot_duration_minutes} min)")
     print(f"   Minimum needed: {best_slots} slots ({best_slots * problem.config.slot_duration_minutes} min)")
@@ -1462,41 +1493,28 @@ def solve_with_optimization(
         young_finish_slot=best_young_finish if young_only_groups else None,
     )
     if older_athletes:
-        max_possible_gap = problem.config.max_time_slots // 4
+        # Cap at 4 slots (20 min) or 1/4 of the compact schedule, whichever is
+        # smaller. Anything beyond ~20 min trades schedule duration for marginal
+        # recovery benefit and doesn't match real-world scheduling practice.
+        max_possible_gap = min(best_slots // 4, 4)
 
         low, high = 1, max_possible_gap
 
         while low <= high:
             mid = (low + high) // 2
-            # Find the minimum slots needed to fit this gap
+            # Look for a gap that fits within the current compact schedule.
+            # CONSTRAINTS.md ranks duration over recovery, so we won't trade
+            # slots for gap — if mid can't fit in best_slots, drop it.
             gap_solution = solve_scheduling_problem(
                 problem, timeout_ms,
-                max_slots=problem.config.max_time_slots,
+                max_slots=best_slots,
                 youngest_finish_slot=best_youngest_finish if youngest_groups else None,
                 young_finish_slot=best_young_finish if young_only_groups else None,
                 older_min_gap_slots=mid,
             )
             if gap_solution.status == "solved":
-                # Now compact: find minimum slots that still fits this gap
-                compact_low, compact_high = best_slots, gap_solution.total_slots
-                while compact_low <= compact_high:
-                    compact_mid = (compact_low + compact_high) // 2
-                    compact_solution = solve_scheduling_problem(
-                        problem, timeout_ms,
-                        max_slots=compact_mid,
-                        youngest_finish_slot=best_youngest_finish if youngest_groups else None,
-                        young_finish_slot=best_young_finish if young_only_groups else None,
-                        older_min_gap_slots=mid,
-                    )
-                    if compact_solution.status == "solved":
-                        gap_solution = compact_solution
-                        compact_high = compact_mid - 1
-                    else:
-                        compact_low = compact_mid + 1
-
                 best_gap = mid
                 best_solution = gap_solution
-                best_slots = best_solution.total_slots
                 low = mid + 1
             else:
                 high = mid - 1
@@ -1550,7 +1568,10 @@ def solve_with_optimization(
 
     spread_solution = spread_events_post_process(
         best_solution, problem,
-        max_slots=problem.config.max_time_slots,
+        # Allow up to 3 slots (15 min) of expansion for warm-up breathing room.
+        # Without this cap, Phase 4 can spread events all the way to the
+        # default 4-hour budget.
+        max_slots=min(problem.config.max_time_slots, best_solution.total_slots + 3),
         min_athlete_gap_slots=best_gap,
         youngest_finish_slot=best_youngest_finish if youngest_groups else None,
         young_finish_slot=best_young_finish if young_only_groups else None,

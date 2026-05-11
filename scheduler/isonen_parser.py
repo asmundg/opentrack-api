@@ -14,7 +14,9 @@ def parse_event_type(ovelse: str) -> EventType:
         "60 meter": EventType.m60,
         "100 meter": EventType.m100,
         "200 meter": EventType.m200,
+        "300 meter": EventType.m300,
         "400 meter": EventType.m400,
+        "600 meter": EventType.m600,
         "800 meter": EventType.m800,
         "1500 meter": EventType.m1500,
         "5000 meter": EventType.m5000,
@@ -86,7 +88,9 @@ def _calculate_event_priority(event_type: EventType, category: Category) -> int:
         EventType.m60,
         EventType.m100,
         EventType.m200,
+        EventType.m300,
         EventType.m400,
+        EventType.m600,
         EventType.m800,
         EventType.m1500,
         EventType.m5000,
@@ -111,7 +115,9 @@ def _calculate_personnel_required(event_type: EventType) -> int:
         EventType.m60,
         EventType.m100,
         EventType.m200,
+        EventType.m300,
         EventType.m400,
+        EventType.m600,
         EventType.m800,
         EventType.m1500,
         EventType.m5000,
@@ -174,9 +180,20 @@ def _calculate_event_duration(
 def _read_xlsx_rows(xlsx_path: str) -> list[dict[str, str]]:
     """Read an XLSX file and return rows as list of dicts (like csv.DictReader)."""
     wb = load_workbook(xlsx_path, read_only=True, data_only=True)
-    ws = wb.active
-    rows_iter = ws.iter_rows()
 
+    # Find the sheet that looks like an Isonen registration export
+    # (has "Fornavn" as the first header cell). Some Isonen exports have
+    # multiple sheets with a "Tidsplan" or summary sheet active.
+    ws = None
+    for candidate in wb.worksheets:
+        first_row = next(candidate.iter_rows(values_only=True), None)
+        if first_row and first_row[0] == "Fornavn":
+            ws = candidate
+            break
+    if ws is None:
+        ws = wb.active
+
+    rows_iter = ws.iter_rows()
     header_row = next(rows_iter)
     headers = [str(cell.value).strip() if cell.value is not None else "" for cell in header_row]
 

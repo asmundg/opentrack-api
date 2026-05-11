@@ -19,7 +19,9 @@ class EventType(Enum):
     m60 = "60m"
     m100 = "100m"
     m200 = "200m"
+    m300 = "300m"
     m400 = "400m"
+    m600 = "600m"
     m800 = "800m"
     m1500 = "1500m"
     m5000 = "5000m"
@@ -139,7 +141,9 @@ TRACK_DISTANCE_ORDER: list[EventType] = [
     EventType.m100,
     EventType.m100_hurdles,
     EventType.m200,  # 200m to goal
+    EventType.m600,  # 600m = 400+200, starts at 200m-to-goal
     EventType.m5000,  # 200m to goal (12×400 + 200)
+    EventType.m300,  # 300m to goal
     EventType.m1500,  # 300m to goal (3×400 + 300)
     EventType.m400,  # Full lap, at finish area
     EventType.m800,  # 2 laps, at finish area
@@ -154,8 +158,8 @@ SPRINT_EVENTS: frozenset[EventType] = frozenset({
 })
 
 ROUND_EVENTS: frozenset[EventType] = frozenset({
-    EventType.m200, EventType.m400, EventType.m800,
-    EventType.m1500, EventType.m5000,
+    EventType.m200, EventType.m300, EventType.m400, EventType.m600,
+    EventType.m800, EventType.m1500, EventType.m5000,
 })
 
 
@@ -256,7 +260,7 @@ ARENA_TROMSOHALLEN = ArenaConfig(
     },
     hurdle_lane_limits={13: 7},
     unavailable_hurdle_lanes=frozenset({4}),
-    sprint_to_round_gap_minutes=60,
+    sprint_to_round_gap_minutes=15,
 )
 
 ARENAS: dict[str, ArenaConfig] = {
@@ -347,7 +351,9 @@ EventVenueMapping: dict[EventType, Venue] = {
     EventType.m60: Venue.TRACK,
     EventType.m100: Venue.TRACK,
     EventType.m200: Venue.TRACK,
+    EventType.m300: Venue.TRACK,
     EventType.m400: Venue.TRACK,
+    EventType.m600: Venue.TRACK,
     EventType.m800: Venue.TRACK,
     EventType.m1500: Venue.TRACK,
     EventType.m5000: Venue.TRACK,
@@ -457,7 +463,9 @@ EventDuration: dict[EventType, int] = {
     EventType.m60: 5,
     EventType.m100: 5,
     EventType.m200: 5,
+    EventType.m300: 5,
     EventType.m400: 5,
+    EventType.m600: 5,
     EventType.m800: 5,
     EventType.m1500: 10,
     EventType.m5000: 15,
