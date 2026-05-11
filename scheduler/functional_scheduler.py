@@ -1164,8 +1164,7 @@ def spread_events_post_process(
     for eid in sorted(youngest_ids, key=lambda e: event_starts.get(e, 0), reverse=True):
         if eid not in event_starts:
             continue
-        # Skip field events: goldens show 10yo throws/jumps run AFTER older
-        # categories at the same venue, so pulling them to slot 0 is wrong.
+        # Skip field events: handled by dedicated pull-field pass below.
         if problem.events[eid].event_type not in TRACK_DISTANCE_ORDER:
             continue
         current_start = event_starts[eid]
@@ -1185,11 +1184,9 @@ def spread_events_post_process(
             for v in venue_events:
                 venue_events[v].sort(key=lambda e: event_starts[e])
 
-    # Pull older field events to earliest feasible slot. Goldens consistently
-    # show field events running OLDEST categories first at each venue. We can
-    # only do this when slot 0 is actually free at the venue — swapping with
-    # a younger event already at slot 0 would push the younger event's field
-    # slot past their track event in a way that breaks the recovery gap.
+    # Pull field events forward in their current order. The solver already places
+    # them where venue/athlete-conflict constraints allow; this pass just compacts
+    # them into earlier free slots without changing the relative ordering.
     def _field_age(eid: str) -> int:
         eg = problem.events[eid]
         return max((get_category_age_order(e.age_category) for e in eg.events), default=0)
