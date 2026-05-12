@@ -17,6 +17,7 @@ import z3  # type: ignore
 from . import models as _models
 from .models import (
     Athlete,
+    Category,
     EventGroup,
     EventType,
     EventVenueMapping,
@@ -1220,6 +1221,40 @@ def spread_events_post_process(
                 break
         if best_start != current_start:
             print(f"   ⬆️  Pulled field {eid} from slot {current_start} to {best_start}")
+            event_starts[eid] = best_start
+            for v in venue_events:
+                venue_events[v].sort(key=lambda e: event_starts[e])
+
+    # Push senior-only events (all athletes 18+) toward the LATEST feasible slot.
+    # Goldens consistently schedule senior events late (after-work arrivals);
+    # without this pass, the solver places them early to minimize total duration,
+    # which doesn't reflect real meet scheduling practice.
+    SENIOR_CATEGORIES = {Category.j18_19, Category.g18_19, Category.ks, Category.ms}
+
+    def _is_senior_only(eid: str) -> bool:
+        eg = problem.events[eid]
+        return bool(eg.events) and all(
+            e.age_category in SENIOR_CATEGORIES for e in eg.events
+        )
+
+    senior_ids_post = [eid for eid in event_starts if _is_senior_only(eid)]
+    # Process in reverse current order so later events get pushed first
+    senior_ids_post.sort(key=lambda e: event_starts[e], reverse=True)
+    for eid in senior_ids_post:
+        current_start = event_starts[eid]
+        duration = problem.event_duration_slots[eid]
+        max_start = max_slots - duration
+        best_start = current_start
+        for candidate in range(max_start, current_start, -1):
+            if (
+                not has_conflict(eid, candidate)
+                and not has_venue_conflict(eid, candidate)
+                and not violates_track_precedence(eid, candidate)
+            ):
+                best_start = candidate
+                break
+        if best_start != current_start:
+            print(f"   ⬇️  Pushed senior {eid} from slot {current_start} to {best_start}")
             event_starts[eid] = best_start
             for v in venue_events:
                 venue_events[v].sort(key=lambda e: event_starts[e])
