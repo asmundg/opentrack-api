@@ -1240,12 +1240,16 @@ def spread_events_post_process(
     senior_ids_post = [eid for eid in event_starts if _is_senior_only(eid)]
     # Process in reverse current order so later events get pushed first
     senior_ids_post.sort(key=lambda e: event_starts[e], reverse=True)
+    half_slot = max_slots // 2
     for eid in senior_ids_post:
         current_start = event_starts[eid]
+        if current_start >= half_slot:
+            continue
         duration = problem.event_duration_slots[eid]
         max_start = max_slots - duration
         best_start = current_start
-        for candidate in range(max_start, current_start, -1):
+        # Try slots from half_slot upward — prefer the earliest second-half slot.
+        for candidate in range(half_slot, max_start + 1):
             if (
                 not has_conflict(eid, candidate)
                 and not has_venue_conflict(eid, candidate)
