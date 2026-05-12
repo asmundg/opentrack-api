@@ -447,10 +447,20 @@ def add_track_precedence_constraints(
         categories = "/".join(e.age_category.value for e in group.events)
         print(f"    {i+1}. {group.id} - {group.event_type.value} ({categories}) [age={min_age}]")
 
-    # Add strict precedence: each group must start before the next one
+    # Add strict precedence: each group must start before the next one,
+    # but ONLY when they belong to different (distance, hurdles) blocks.
+    # Within a block (same distance + same hurdles type), age order is not
+    # enforced — goldens routinely interleave age categories within a block
+    # based on athlete availability.
     for i in range(len(sorted_groups) - 1):
         earlier_group = sorted_groups[i]
         later_group = sorted_groups[i + 1]
+
+        earlier_key = _get_event_group_sort_key(earlier_group)[:2]
+        later_key = _get_event_group_sort_key(later_group)[:2]
+        if earlier_key == later_key:
+            # Same distance/hurdles block — no enforced order between age groups.
+            continue
 
         earlier_id = earlier_group.id
         later_id = later_group.id
