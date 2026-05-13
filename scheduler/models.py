@@ -12,6 +12,7 @@ class Venue(Enum):
     JUMPING_PIT = "jumping_pit"
     HIGH_JUMP_AREA = "high_jump_area"
     HIGH_JUMP_AREA_2 = "high_jump_area_2"  # Secondary area for young athletes
+    POLE_VAULT_AREA = "pole_vault_area"  # Outdoor PV has its own runway/pit
     JAVELIN_AREA = "javelin_area"
 
 

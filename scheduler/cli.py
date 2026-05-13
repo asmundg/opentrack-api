@@ -72,7 +72,7 @@ def schedule(
             "--secondary-venues",
             help="Comma-separated event types for secondary venues (e.g. 'hj,sp'), or empty to disable",
         ),
-    ] = "",
+    ] = "hj,sp",
     max_track_duration: Annotated[
         int | None,
         typer.Option("--max-track-duration", help="Maximum track duration in minutes (track ends earlier than field)"),
