@@ -67,12 +67,13 @@ def schedule(
         typer.Option("--quiet", "-q", help="Suppress detailed output"),
     ] = False,
     secondary_venues: Annotated[
-        str,
+        str | None,
         typer.Option(
             "--secondary-venues",
-            help="Comma-separated event types for secondary venues (e.g. 'hj,sp'), or empty to disable",
+            help="Comma-separated event types for secondary venues (e.g. 'hj,sp'). "
+                 "Use 'none' to disable. If not specified, uses arena's default.",
         ),
-    ] = "hj,sp",
+    ] = None,
     max_track_duration: Annotated[
         int | None,
         typer.Option("--max-track-duration", help="Maximum track duration in minutes (track ends earlier than field)"),
@@ -101,8 +102,11 @@ def schedule(
         raise typer.Exit(1)
     models.ARENA = models.ARENAS[arena]
 
-    # Configure secondary venues
-    if secondary_venues:
+    # Configure secondary venues. None = use arena default; "none"/"" = disabled.
+    if secondary_venues is None:
+        active = {EventType[name] for name in models.ARENA.default_secondary_venues}
+        models.ACTIVE_SECONDARY_VENUES = active
+    elif secondary_venues and secondary_venues.lower() != "none":
         active = set()
         for name in secondary_venues.split(","):
             name = name.strip()
@@ -328,6 +332,9 @@ def schedule_from_events(
         typer.echo(f"Unknown arena: '{arena}'. Available: {', '.join(models.ARENAS)}", err=True)
         raise typer.Exit(1)
     models.ARENA = models.ARENAS[arena]
+    models.ACTIVE_SECONDARY_VENUES = {
+        EventType[name] for name in models.ARENA.default_secondary_venues
+    }
 
     # Inject date into output filename
     if date:

@@ -244,6 +244,13 @@ class ArenaConfig:
     # Re-rig gap (minutes) between sprint (straight) and round track events.
     # 0 = no re-rig needed (e.g., permanent oval track).
     sprint_to_round_gap_minutes: int = 0
+    # Event types that have a secondary venue available at this arena.
+    # Tromsøhallen has two SP circles and two HJ areas; outdoor arenas
+    # typically don't.
+    default_secondary_venues: frozenset[str] = frozenset()
+    # If True, pole vault has its own runway/pit and can run in parallel
+    # with high jump. False = PV shares the high jump area.
+    pv_separate_from_hj: bool = False
 
 
 ARENA_GENERIC = ArenaConfig(
@@ -267,11 +274,22 @@ ARENA_TROMSOHALLEN = ArenaConfig(
     hurdle_lane_limits={13: 7},
     unavailable_hurdle_lanes=frozenset({4}),
     sprint_to_round_gap_minutes=15,
+    default_secondary_venues=frozenset({"hj", "sp"}),
+    pv_separate_from_hj=False,
+)
+
+ARENA_VALHALL = ArenaConfig(
+    name="valhall",
+    total_lanes=8,
+    hurdle_markers={},
+    hurdle_lane_limits={},
+    pv_separate_from_hj=True,
 )
 
 ARENAS: dict[str, ArenaConfig] = {
     "generic": ARENA_GENERIC,
     "tromsohallen": ARENA_TROMSOHALLEN,
+    "valhall": ARENA_VALHALL,
 }
 
 # Module-level active config, set by CLI (same pattern as ACTIVE_SECONDARY_VENUES)
@@ -398,12 +416,15 @@ ACTIVE_SECONDARY_VENUES: set[EventType] = set()
 def get_venue_for_event(
     event_type: EventType, category: Category | None = None
 ) -> Venue | None:
-    """Get the venue for an event, considering secondary venue assignments.
+    """Get the venue for an event, considering secondary venue assignments
+    and arena-specific overrides.
 
-    If category is provided and a secondary venue is configured for that
-    event type and category, returns the secondary venue. Otherwise returns
-    the primary venue from EventVenueMapping.
+    If the active arena marks PV as separate from HJ, pole vault returns
+    POLE_VAULT_AREA so it can run in parallel with high jump.
     """
+    if event_type == EventType.pv and ARENA.pv_separate_from_hj:
+        return Venue.POLE_VAULT_AREA
+
     primary_venue = EventVenueMapping.get(event_type)
 
     if category is None or event_type not in ACTIVE_SECONDARY_VENUES:
