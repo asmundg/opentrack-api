@@ -24,6 +24,56 @@ app = typer.Typer(
 )
 
 
+def _parse_shared_venue_groups(shared: list[str]) -> list[frozenset[EventType]]:
+    """Parse repeated --shared values into a list of EventType groups.
+
+    Each value is a comma-separated list of EventType enum names (e.g. "jt,dt,ht").
+    Validates that every name resolves, that each group has at least 2 members,
+    and that no event type appears in more than one group.
+    """
+    groups: list[frozenset[EventType]] = []
+    seen: dict[EventType, str] = {}
+    for raw in shared:
+        names = [n.strip() for n in raw.split(",") if n.strip()]
+        if len(names) < 2:
+            typer.echo(
+                f"--shared group needs at least two event types: '{raw}'", err=True
+            )
+            raise typer.Exit(1)
+        types: list[EventType] = []
+        for name in names:
+            try:
+                et = EventType[name]
+            except KeyError:
+                valid = ", ".join(e.name for e in EventType)
+                typer.echo(
+                    f"Unknown event type '{name}' in --shared. Valid: {valid}",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            if et in seen:
+                typer.echo(
+                    f"Event type '{name}' appears in multiple --shared groups "
+                    f"(also in '{seen[et]}')",
+                    err=True,
+                )
+                raise typer.Exit(1)
+            seen[et] = raw
+            types.append(et)
+        groups.append(frozenset(types))
+    return groups
+
+
+def _echo_shared_groups(quiet: bool) -> None:
+    if quiet or not models.SHARED_VENUE_GROUPS:
+        return
+    descriptions = [
+        ",".join(sorted(et.name for et in group))
+        for group in models.SHARED_VENUE_GROUPS
+    ]
+    typer.echo(f"Shared venue groups: {'; '.join(descriptions)}")
+
+
 @app.command("schedule")
 def schedule(
     input_file: Annotated[
@@ -94,6 +144,25 @@ def schedule(
         str | None,
         typer.Option("--date", help="Only schedule events on this date (DD.MM.YYYY format, matching the XLSX Dato column)"),
     ] = None,
+    shared: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--shared",
+            help="Comma-separated event types that share a venue/officials and cannot "
+                 "run in parallel (e.g. 'jt,dt,ht'). Repeat for multiple groups: "
+                 "--shared jt,dt,ht --shared hj,lj. Overrides secondary-venue parallelism "
+                 "for the affected event types.",
+        ),
+    ] = None,
+    sticky: Annotated[
+        bool,
+        typer.Option(
+            "--sticky/--no-sticky",
+            help="Group events of the same type at one venue into a contiguous block "
+                 "(no DT-HT-DT interleaving). Track is exempt. Default off; hard "
+                 "constraint that may make tight schedules infeasible.",
+        ),
+    ] = False,
 ) -> None:
     """Generate a track meet schedule from an Isonen XLSX file."""
     # Configure arena
@@ -101,6 +170,12 @@ def schedule(
         typer.echo(f"Unknown arena: '{arena}'. Available: {', '.join(models.ARENAS)}", err=True)
         raise typer.Exit(1)
     models.ARENA = models.ARENAS[arena]
+
+    # Configure shared-venue groups (always reset, even when no flag given)
+    models.SHARED_VENUE_GROUPS = _parse_shared_venue_groups(shared or [])
+
+    # Configure venue stickiness (always reset)
+    models.STICKY_VENUES = sticky
 
     # Configure secondary venues. None = use arena default; "none"/"" = disabled.
     if secondary_venues is None:
@@ -135,6 +210,9 @@ def schedule(
             typer.echo(f"Secondary venues: {names}")
         else:
             typer.echo("Secondary venues: disabled")
+        _echo_shared_groups(quiet)
+        if models.STICKY_VENUES:
+            typer.echo("Sticky venues: ON (event types form contiguous blocks per venue)")
         typer.echo(f"Parsing {input_file}...")
 
     events, athletes = parse_isonen_xlsx(str(input_file), filter_date=date)
@@ -288,9 +366,14 @@ def schedule_from_events(
         ),
     ],
     output: Annotated[
-        Path,
-        typer.Option("--output", "-o", help="Output HTML file path"),
-    ] = Path("schedule.html"),
+        Path | None,
+        typer.Option(
+            "--output", "-o",
+            help="Output HTML file path. Defaults to the events CSV name with "
+                 "the '_events.csv' suffix replaced by '.html' (e.g. "
+                 "'schedule_2026-05-20_events.csv' -> 'schedule_2026-05-20.html').",
+        ),
+    ] = None,
     title: Annotated[
         str,
         typer.Option("--title", help="Title for the HTML schedule"),
@@ -315,6 +398,23 @@ def schedule_from_events(
         str | None,
         typer.Option("--date", help="Only include events on this date (DD.MM.YYYY format)"),
     ] = None,
+    shared: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--shared",
+            help="Comma-separated event types that share a venue/officials and cannot "
+                 "run in parallel (e.g. 'jt,dt,ht'). Repeat for multiple groups. "
+                 "Must match what was used for the original schedule.",
+        ),
+    ] = None,
+    sticky: Annotated[
+        bool,
+        typer.Option(
+            "--sticky/--no-sticky",
+            help="Validate that event types form contiguous blocks per venue. "
+                 "Pass the same value used for the original schedule.",
+        ),
+    ] = False,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -335,6 +435,18 @@ def schedule_from_events(
     models.ACTIVE_SECONDARY_VENUES = {
         EventType[name] for name in models.ARENA.default_secondary_venues
     }
+    models.SHARED_VENUE_GROUPS = _parse_shared_venue_groups(shared or [])
+    models.STICKY_VENUES = sticky
+    _echo_shared_groups(quiet)
+    if not quiet and models.STICKY_VENUES:
+        typer.echo("Sticky venues: ON")
+
+    # Derive default output from the events CSV (which encodes the date).
+    if output is None:
+        stem = events_csv.stem
+        if stem.endswith("_events"):
+            stem = stem[: -len("_events")]
+        output = events_csv.parent / f"{stem}.html"
 
     # Inject date into output filename
     if date:

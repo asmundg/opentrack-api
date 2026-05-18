@@ -9,11 +9,14 @@ event overview CSVs after manual adjustments.
 from collections import defaultdict
 
 from .dtos import EventScheduleRow
+from . import models as _models
 from .models import (
     EventGroup,
     Athlete,
-    Venue,
     Category,
+    EventType,
+    Venue,
+    get_scheduling_venue_keys,
     get_track_event_order,
     get_category_age_order,
     TRACK_DISTANCE_ORDER,
@@ -79,6 +82,11 @@ def validate_event_schedule(
     # Include FIFA events - they still occupy physical space
     _validate_venue_conflicts(events)
 
+    # Validate venue stickiness (no interleaving of event types at one venue)
+    # Only when the sticky-venues option was active when producing the schedule.
+    if _models.STICKY_VENUES:
+        _validate_venue_stickiness(events)
+
     # Validate athlete conflicts (athletes can't compete in overlapping events)
     # Only check regular events - FIFA events have no athletes
     _validate_athlete_conflicts(event_groups, athletes, event_schedule_map)
@@ -92,20 +100,26 @@ def validate_event_schedule(
 def _validate_venue_conflicts(
     events: list[EventScheduleRow],
 ) -> None:
-    """Validate that no two events use the same venue at overlapping times."""
+    """Validate that no two events use the same venue at overlapping times.
 
-    # Group events by venue and check for time overlaps
-    # Use event_group_id as identifier (works for both regular and FIFA events)
-    venue_events: dict[Venue, list[tuple[EventScheduleRow, str]]] = defaultdict(list)
+    Honors shared-venue groups (set via CLI): event types that share officials
+    or equipment fold onto a single conflict key so they cannot overlap even if
+    their physical venues differ.
+    """
+
+    # Group events by scheduling venue key and check for time overlaps.
+    # Use event_group_id as identifier (works for both regular and FIFA events).
+    # Each event participates in every key it belongs to: its natural venue
+    # AND any shared-group keys.
+    venue_events: dict[str, list[tuple[EventScheduleRow, str]]] = defaultdict(list)
 
     for event_schedule in events:
-        # For FIFA events, use the event_group_id directly as the label
-        # For regular events, use the event group id
         event_id = event_schedule.event_group_id
-        venue_events[event_schedule.venue].append((event_schedule, event_id))
+        for key in get_scheduling_venue_keys(event_schedule.event_type, event_schedule.venue):
+            venue_events[key].append((event_schedule, event_id))
 
     # Check each venue for overlapping events
-    for venue, venue_event_list in venue_events.items():
+    for venue_key, venue_event_list in venue_events.items():
         # Sort by start time
         venue_event_list.sort(key=lambda x: x[0].start_time)
 
@@ -116,11 +130,55 @@ def _validate_venue_conflicts(
 
             # Events overlap if next starts before current ends
             if next_event.start_time < current_event.end_time:
+                # Render a human-friendly venue label
+                if venue_key.startswith("shared:"):
+                    label = f"shared group ({venue_key[len('shared:'):]})"
+                else:
+                    label = venue_key
                 raise ConstraintViolation(
-                    f"Venue conflict at {venue.value}: "
+                    f"Venue conflict at {label}: "
                     f"{current_id} ({current_event.start_time}-{current_event.end_time}) "
                     f"overlaps with {next_id} ({next_event.start_time}-{next_event.end_time})"
                 )
+
+
+def _validate_venue_stickiness(
+    events: list[EventScheduleRow],
+) -> None:
+    """Validate that event types at each non-track venue form contiguous blocks.
+
+    Walks every non-track scheduling venue key in start-time order and ensures
+    no event type reappears after a different type has occurred (i.e. no
+    DT-HT-DT interleaving). Track is exempt because it has its own precedence
+    rules.
+    """
+    venue_events: dict[str, list[EventScheduleRow]] = defaultdict(list)
+    for row in events:
+        for key in get_scheduling_venue_keys(row.event_type, row.venue):
+            if key == Venue.TRACK.value:
+                continue
+            venue_events[key].append(row)
+
+    for venue_key, rows in venue_events.items():
+        rows_sorted = sorted(rows, key=lambda r: r.start_time)
+        seen: dict[EventType, int] = {}
+        for idx, row in enumerate(rows_sorted):
+            if row.event_type in seen and seen[row.event_type] != idx - 1:
+                # Find the offending interleaver between the two same-type rows
+                prev_idx = seen[row.event_type]
+                offender = rows_sorted[prev_idx + 1]
+                if venue_key.startswith("shared:"):
+                    label = f"shared group ({venue_key[len('shared:'):]})"
+                else:
+                    label = venue_key
+                raise ConstraintViolation(
+                    f"Venue stickiness violated at {label}: "
+                    f"{row.event_type.value} appears at {rows_sorted[prev_idx].start_time} "
+                    f"and again at {row.start_time}, with "
+                    f"{offender.event_type.value} ({offender.event_group_id}) "
+                    f"at {offender.start_time} in between"
+                )
+            seen[row.event_type] = idx
 
 
 def _validate_athlete_conflicts(

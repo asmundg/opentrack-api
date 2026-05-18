@@ -25,6 +25,7 @@ from .models import (
     SPRINT_EVENTS,
     Venue,
     get_venue_for_event,
+    get_scheduling_venue_keys,
     is_young_category,
     is_youngest_category,
     get_category_age_order,
@@ -552,23 +553,24 @@ def add_athlete_conflict_constraints(
 def add_venue_conflict_constraints(
     solver: z3.Solver, problem: SchedulingProblem, variables: SchedulingVariables
 ) -> int:
-    """Ensure only one event per venue per slot."""
-    # Group events by venue
-    venue_events: dict[Venue, list[str]] = {}
+    """Ensure only one event per venue per slot.
+
+    Each event participates in every conflict bucket it belongs to (natural
+    venue plus any shared-group keys). Without this an event in a shared group
+    would skip its natural-venue conflict.
+    """
+    venue_events: dict[str, list[str]] = {}
     for event_group in problem.events.values():
-        # For EventGroup, use category from first event (all events in group share age tier)
         first_event = event_group.events[0] if event_group.events else None
         category = first_event.age_category if first_event else None
         venue = get_venue_for_event(event_group.event_type, category)
-        if venue is not None:
-            if venue not in venue_events:
-                venue_events[venue] = []
-            venue_events[venue].append(event_group.id)
+        for key in get_scheduling_venue_keys(event_group.event_type, venue):
+            venue_events.setdefault(key, []).append(event_group.id)
 
     constraint_count = 0
 
     # For each venue, ensure at most one event active per slot
-    for venue, event_ids in sorted(venue_events.items(), key=lambda x: x[0].value):  # Sort for determinism
+    for venue_key, event_ids in sorted(venue_events.items()):  # Sort for determinism
         event_ids_sorted = sorted(event_ids)  # Sort for determinism
         if (
             len(event_ids_sorted) > 1
@@ -580,6 +582,79 @@ def add_venue_conflict_constraints(
                 ]
                 solver.add(z3.PbLe([(var, 1) for var in venue_vars_active_in_slot], 1))
                 constraint_count += 1
+
+    return constraint_count
+
+
+def add_venue_stickiness_constraints(
+    solver: z3.Solver, problem: SchedulingProblem, variables: SchedulingVariables
+) -> int:
+    """Force events of the same type at one venue to form a contiguous block.
+
+    For each non-track scheduling venue key (natural venue or shared-venue group),
+    impose a total order on event types: for any two types T1 and T2 with events
+    at the same venue, either all T1 events precede all T2 events, or vice versa.
+    This prevents impractical interleaving like DT-HT-DT at the throwing circle.
+
+    Each event applies stickiness at every key it belongs to (natural + shared).
+    Track is excluded because it has its own precedence/spacing constraints.
+    """
+    venue_to_types: dict[str, dict[EventType, list[str]]] = {}
+    for event_group in problem.events.values():
+        first_event = event_group.events[0] if event_group.events else None
+        category = first_event.age_category if first_event else None
+        venue = get_venue_for_event(event_group.event_type, category)
+        for key in get_scheduling_venue_keys(event_group.event_type, venue):
+            if key == Venue.TRACK.value:
+                continue
+            venue_to_types.setdefault(key, {}).setdefault(
+                event_group.event_type, []
+            ).append(event_group.id)
+
+    if not venue_to_types:
+        return 0
+
+    # Precompute start_slot int expression for each event used in stickiness.
+    needed_event_ids: set[str] = set()
+    for types_at_venue in venue_to_types.values():
+        if len(types_at_venue) < 2:
+            continue
+        for ids in types_at_venue.values():
+            needed_event_ids.update(ids)
+    start_int: dict[str, Any] = {
+        eid: z3.Sum(
+            [
+                z3.If(variables.event_start_slot_vars[eid][slot], slot, 0)
+                for slot in range(problem.config.max_time_slots)
+            ]
+        )
+        for eid in needed_event_ids
+    }
+
+    constraint_count = 0
+    for venue_key in sorted(venue_to_types):
+        types_at_venue = venue_to_types[venue_key]
+        if len(types_at_venue) < 2:
+            continue
+        type_list = sorted(types_at_venue.keys(), key=lambda t: t.name)
+        safe_key = "".join(c if c.isalnum() else "_" for c in venue_key)
+        for i, t1 in enumerate(type_list):
+            for t2 in type_list[i + 1 :]:
+                events_t1 = sorted(types_at_venue[t1])
+                events_t2 = sorted(types_at_venue[t2])
+                # No interleaving possible if only two events total
+                if len(events_t1) + len(events_t2) < 3:
+                    continue
+                ordering = z3.Bool(
+                    f"sticky_{safe_key}_{t1.name}_before_{t2.name}"
+                )
+                for a in events_t1:
+                    for b in events_t2:
+                        solver.add(z3.Implies(ordering, start_int[a] < start_int[b]))
+                        solver.add(
+                            z3.Implies(z3.Not(ordering), start_int[b] < start_int[a])
+                        )
+                        constraint_count += 2
 
     return constraint_count
 
@@ -1049,18 +1124,22 @@ def spread_events_post_process(
     if not event_starts:
         return solution
 
-    # Group by venue, sorted by start slot
+    # Build venue → events index: each event participates in every conflict
+    # bucket it belongs to (natural venue plus any shared-group key).
     venue_events: dict[str, list[str]] = {}
     for eid in event_starts:
         eg = problem.events[eid]
         first = eg.events[0] if eg.events else None
         cat = first.age_category if first else None
         venue = get_venue_for_event(eg.event_type, cat)
-        if venue is not None:
-            venue_events.setdefault(venue.value, []).append(eid)
+        for key in get_scheduling_venue_keys(eg.event_type, venue):
+            venue_events.setdefault(key, []).append(eid)
 
-    for v in venue_events:
-        venue_events[v].sort(key=lambda eid: event_starts[eid])
+    def resort_venue_events() -> None:
+        for v in venue_events:
+            venue_events[v].sort(key=lambda eid: event_starts[eid])
+
+    resort_venue_events()
 
     # Identify 15+ groups
     senior_ids = {
@@ -1114,23 +1193,55 @@ def spread_events_post_process(
         return False
 
     def has_venue_conflict(eid: str, new_start: int) -> bool:
-        """Check if moving eid to new_start would overlap another event at the same venue."""
+        """Check if moving eid to new_start would overlap another event at any of its venues."""
         eg = problem.events[eid]
         first = eg.events[0] if eg.events else None
         cat = first.age_category if first else None
         venue = get_venue_for_event(eg.event_type, cat)
-        if venue is None:
+        keys = get_scheduling_venue_keys(eg.event_type, venue)
+        if not keys:
             return False
-        venue_name = venue.value
         dur = problem.event_duration_slots[eid]
         new_end = new_start + dur - 1
-        for other_eid in venue_events.get(venue_name, []):
-            if other_eid == eid:
+        seen_others: set[str] = set()
+        for key in keys:
+            for other_eid in venue_events.get(key, []):
+                if other_eid == eid or other_eid in seen_others:
+                    continue
+                seen_others.add(other_eid)
+                o_start = event_starts[other_eid]
+                o_end = o_start + problem.event_duration_slots[other_eid] - 1
+                if new_end >= o_start and new_start <= o_end:
+                    return True
+        return False
+
+    def would_break_stickiness(eid: str, new_start: int) -> bool:
+        """Check if moving eid would interleave event types at any of its venues.
+
+        With stickiness, every event type at a non-track scheduling venue key
+        must form a contiguous block in time. Track is exempt -- it has its own
+        precedence rules. Returns False when STICKY_VENUES is off.
+        """
+        if not _models.STICKY_VENUES:
+            return False
+        eg = problem.events[eid]
+        first = eg.events[0] if eg.events else None
+        cat = first.age_category if first else None
+        venue = get_venue_for_event(eg.event_type, cat)
+        keys = get_scheduling_venue_keys(eg.event_type, venue)
+        for venue_key in keys:
+            if venue_key == Venue.TRACK.value:
                 continue
-            o_start = event_starts[other_eid]
-            o_end = o_start + problem.event_duration_slots[other_eid] - 1
-            if new_end >= o_start and new_start <= o_end:
-                return True
+            items: list[tuple[int, EventType]] = []
+            for other_eid in venue_events.get(venue_key, []):
+                start = new_start if other_eid == eid else event_starts[other_eid]
+                items.append((start, problem.events[other_eid].event_type))
+            items.sort(key=lambda x: x[0])
+            seen: dict[EventType, int] = {}
+            for idx, (_, t) in enumerate(items):
+                if t in seen and seen[t] != idx - 1:
+                    return True
+                seen[t] = idx
         return False
 
     def has_overlap(eid: str, new_start: int) -> bool:
@@ -1185,15 +1296,14 @@ def spread_events_post_process(
                 not has_overlap(eid, candidate)
                 and not has_venue_conflict(eid, candidate)
                 and not violates_track_precedence(eid, candidate)
+                and not would_break_stickiness(eid, candidate)
             ):
                 best_start = candidate
                 break
         if best_start != current_start:
             print(f"   ⬆️  Pulled {eid} from slot {current_start} to {best_start}")
             event_starts[eid] = best_start
-            # Re-sort venue lists since positions changed
-            for v in venue_events:
-                venue_events[v].sort(key=lambda e: event_starts[e])
+            resort_venue_events()
 
     # Pull field events forward in their current order. The solver already places
     # them where venue/athlete-conflict constraints allow; this pass just compacts
@@ -1216,14 +1326,14 @@ def spread_events_post_process(
             if (
                 not has_conflict(eid, candidate)
                 and not has_venue_conflict(eid, candidate)
+                and not would_break_stickiness(eid, candidate)
             ):
                 best_start = candidate
                 break
         if best_start != current_start:
             print(f"   ⬆️  Pulled field {eid} from slot {current_start} to {best_start}")
             event_starts[eid] = best_start
-            for v in venue_events:
-                venue_events[v].sort(key=lambda e: event_starts[e])
+            resort_venue_events()
 
     # Push senior-only events (all athletes 18+) toward the LATEST feasible slot.
     # Goldens consistently schedule senior events late (after-work arrivals);
@@ -1254,14 +1364,14 @@ def spread_events_post_process(
                 not has_conflict(eid, candidate)
                 and not has_venue_conflict(eid, candidate)
                 and not violates_track_precedence(eid, candidate)
+                and not would_break_stickiness(eid, candidate)
             ):
                 best_start = candidate
                 break
         if best_start != current_start:
             print(f"   ⬇️  Pushed senior {eid} from slot {current_start} to {best_start}")
             event_starts[eid] = best_start
-            for v in venue_events:
-                venue_events[v].sort(key=lambda e: event_starts[e])
+            resort_venue_events()
 
     # Iteratively insert 1-slot gaps at the tightest positions
     for _ in range(max_slots):
@@ -1294,6 +1404,7 @@ def spread_events_post_process(
 
                 if score > best_score:
                     # Check if shifting eids[i:] by 1 is feasible
+                    shifted_set = set(eids[i:])
                     feasible = True
                     for j in range(i, len(eids)):
                         eid_j = eids[j]
@@ -1311,6 +1422,30 @@ def spread_events_post_process(
                             if new_finish > finish_limits[eid_j]:
                                 feasible = False
                                 break
+                        # Venue conflicts at OTHER buckets: with shared keys an
+                        # event lives at multiple venues. Shifted events get
+                        # +1, the rest stay put.
+                        eg_j = problem.events[eid_j]
+                        first_j = eg_j.events[0] if eg_j.events else None
+                        cat_j = first_j.age_category if first_j else None
+                        venue_j = get_venue_for_event(eg_j.event_type, cat_j)
+                        new_end = new_start + dur_j - 1
+                        bad = False
+                        for key in get_scheduling_venue_keys(eg_j.event_type, venue_j):
+                            for other_eid in venue_events.get(key, []):
+                                if other_eid == eid_j:
+                                    continue
+                                shift = 1 if other_eid in shifted_set else 0
+                                o_start = event_starts[other_eid] + shift
+                                o_end = o_start + problem.event_duration_slots[other_eid] - 1
+                                if new_end >= o_start and new_start <= o_end:
+                                    bad = True
+                                    break
+                            if bad:
+                                break
+                        if bad:
+                            feasible = False
+                            break
 
                     if feasible:
                         best_venue = venue_name
@@ -1324,6 +1459,8 @@ def spread_events_post_process(
         eids = venue_events[best_venue]
         for j in range(best_pos, len(eids)):
             event_starts[eids[j]] += 1
+        # Shifted events may also appear in other venue lists; re-sort all.
+        resort_venue_events()
 
     # Rebuild schedule in the same dict format as extract_solution
     new_schedule: dict[int, list[dict[str, Any]]] = {}
@@ -1809,6 +1946,13 @@ def add_all_constraints(
     if verbose:
         print("Adding venue conflicts...")
     add_venue_conflict_constraints(solver, problem, variables)
+
+    if _models.STICKY_VENUES:
+        if verbose:
+            print("Adding venue stickiness constraints...")
+        added = add_venue_stickiness_constraints(solver, problem, variables)
+        if verbose:
+            print(f"  Total venue stickiness constraints added: {added}")
 
     # Add age-based spacing constraints (10 year olds first - highest priority)
     if youngest_finish_slot is not None:

@@ -11,6 +11,21 @@ Only one event can use a venue at any given time slot.
 - Track events share the track
 - Field events use dedicated areas (shot put circle, jumping pit, etc.)
 - Secondary venues (e.g., shot put circle 2) can run in parallel with primary venues
+- **Shared venue groups** (CLI `--shared`): event types that share officials or
+  equipment can be folded onto a shared conflict bucket via the CLI. For example,
+  `--shared jt,dt,ht` makes javelin, discus, and hammer mutually exclusive even
+  though they live in different physical venues. The flag can be repeated for
+  several groups (e.g., also `--shared hj,lj`). The shared bucket is *additive*:
+  events stay in their natural-venue bucket too, so `--shared hj,lj` does not
+  let Lengde overlap with Tresteg at the jumping pit. Secondary venues still
+  apply within their own bucket.
+- **Venue stickiness** (CLI `--sticky`): when enabled, events of the same type
+  at the same scheduling venue key must run as a contiguous block. This forbids
+  patterns like DT-HT-DT at the throwing circle and respects shared groups
+  (e.g., with `--shared jt,dt,ht --sticky`, the throws form three back-to-back
+  type blocks across the throwing circle and javelin area). Track is exempt
+  because its precedence rules already determine event order. Stickiness is a
+  hard constraint and may make tight schedules infeasible.
 
 ### 2. Athlete Conflicts
 An athlete cannot compete in two events simultaneously. If an athlete is registered for multiple events, those events must not overlap.

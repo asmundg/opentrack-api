@@ -412,6 +412,19 @@ SecondaryVenueConfig: dict[EventType, tuple[Venue, frozenset[Category]]] = {
 # Which secondary venues are currently active (set by CLI)
 ACTIVE_SECONDARY_VENUES: set[EventType] = set()
 
+# Groups of event types that share a venue/officials and cannot run in parallel.
+# Set by CLI via --shared. Each group is a frozenset of EventType. The scheduler
+# folds every member onto a synthetic shared key in ADDITION to its natural
+# venue, so shared events still conflict at their physical venue too. Display
+# and grouping code keep using the natural venue.
+SHARED_VENUE_GROUPS: list[frozenset[EventType]] = []
+
+# When True, the scheduler forbids interleaving different event types at the
+# same scheduling venue key (e.g., DT-HT-DT at the throwing circle is rejected;
+# events of one type must run as a contiguous block). Track is never sticky --
+# it has its own precedence rules. Set by CLI via --sticky.
+STICKY_VENUES: bool = False
+
 
 def get_venue_for_event(
     event_type: EventType, category: Category | None = None
@@ -437,6 +450,29 @@ def get_venue_for_event(
             return secondary_venue
 
     return primary_venue
+
+
+def get_scheduling_venue_keys(
+    event_type: EventType, venue: Venue | None
+) -> set[str]:
+    """Return the conflict-bucket keys that this event participates in.
+
+    Every event lives at its natural venue (e.g., jumping_pit). Events in a
+    declared shared-venue group ALSO live at a synthetic shared key
+    (e.g., "shared:hj,lj"). The scheduler treats each key as an independent
+    "at most one active per slot" bucket, so a Lengde event with --shared lj,hj
+    still conflicts with a Tresteg event at the jumping pit AND with a Høyde
+    event at the shared-officials bucket.
+
+    Returns an empty set for events with no venue (which never conflict).
+    """
+    keys: set[str] = set()
+    if venue is not None:
+        keys.add(venue.value)
+    for group in SHARED_VENUE_GROUPS:
+        if event_type in group:
+            keys.add("shared:" + ",".join(sorted(et.name for et in group)))
+    return keys
 
 
 @dataclass
