@@ -13,6 +13,7 @@ def parse_event_type(ovelse: str) -> EventType:
     mapping = {
         "60 meter": EventType.m60,
         "100 meter": EventType.m100,
+        "150 meter": EventType.m150,
         "200 meter": EventType.m200,
         "300 meter": EventType.m300,
         "400 meter": EventType.m400,
@@ -90,6 +91,7 @@ def _calculate_event_priority(event_type: EventType, category: Category) -> int:
     track_events = {
         EventType.m60,
         EventType.m100,
+        EventType.m150,
         EventType.m200,
         EventType.m300,
         EventType.m400,
@@ -119,6 +121,7 @@ def _calculate_personnel_required(event_type: EventType) -> int:
     track_events = {
         EventType.m60,
         EventType.m100,
+        EventType.m150,
         EventType.m200,
         EventType.m300,
         EventType.m400,
@@ -265,8 +268,10 @@ def parse_isonen_xlsx(
             event_type = parse_event_type(event_name)
             category = parse_category(category_name)
         except ValueError as e:
-            print(f"Warning: Skipping row due to parsing error: {e}")
-            continue
+            raise ValueError(
+                f"Failed to parse row (Øvelse={event_name!r}, Klasse={category_name!r}, "
+                f"Dato={date_str!r}): {e}"
+            ) from e
 
         # Create unique event ID
         event_id = f"{event_type.value}_{category.value}"

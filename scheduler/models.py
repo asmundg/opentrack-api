@@ -19,6 +19,7 @@ class Venue(Enum):
 class EventType(Enum):
     m60 = "60m"
     m100 = "100m"
+    m150 = "150m"
     m200 = "200m"
     m300 = "300m"
     m400 = "400m"
@@ -143,6 +144,7 @@ TRACK_DISTANCE_ORDER: list[EventType] = [
     EventType.m80_hurdles,  # 80m hurdles after 60m block
     EventType.m100,
     EventType.m100_hurdles,
+    EventType.m150,  # 150m to goal, between 100m straight and 200m bend starts
     EventType.m200,  # 200m to goal
     EventType.m200_hurdles,  # 200m to goal, hurdles
     EventType.m600,  # 600m = 400+200, starts at 200m-to-goal
@@ -163,6 +165,7 @@ SPRINT_EVENTS: frozenset[EventType] = frozenset({
 })
 
 ROUND_EVENTS: frozenset[EventType] = frozenset({
+    EventType.m150,
     EventType.m200, EventType.m200_hurdles, EventType.m300, EventType.m400,
     EventType.m600, EventType.m800, EventType.m1500, EventType.m3000, EventType.m5000,
 })
@@ -374,6 +377,7 @@ EventVenueMapping: dict[EventType, Venue] = {
     # Track events - all use the same track
     EventType.m60: Venue.TRACK,
     EventType.m100: Venue.TRACK,
+    EventType.m150: Venue.TRACK,
     EventType.m200: Venue.TRACK,
     EventType.m300: Venue.TRACK,
     EventType.m400: Venue.TRACK,
@@ -527,6 +531,7 @@ EventDuration: dict[EventType, int] = {
     # Track events take time x heats (max 8 per heat)
     EventType.m60: 5,
     EventType.m100: 5,
+    EventType.m150: 5,
     EventType.m200: 5,
     EventType.m300: 5,
     EventType.m400: 5,
