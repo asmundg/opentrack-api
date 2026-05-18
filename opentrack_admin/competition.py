@@ -9,7 +9,7 @@ from typing import Literal
 
 from openpyxl import load_workbook
 
-from .browser import OpenTrackSession
+from .browser import OpenTrackSession, screenshot_on_error
 
 logger = logging.getLogger(__name__)
 
@@ -117,11 +117,16 @@ class CompetitionCreator:
     def create_competition(self, details: CompetitionDetails) -> str:
         """Create a new competition and return its URL.
 
+        Idempotent: if a competition with the given slug already exists at the
+        expected URL, skips the create form and resumes configuration. All
+        configuration steps are individually idempotent (re-running them on a
+        fully configured competition is a no-op).
+
         Args:
             details: Competition configuration
 
         Returns:
-            URL of the created competition
+            URL of the created/resumed competition
         """
         logger.info("Starting competition creation: %s", details.name)
 
@@ -130,9 +135,17 @@ class CompetitionCreator:
             logger.info("Not logged in, logging in...")
             self.session.login()
 
-        # Step 1: Navigate and create basic competition (includes initial entry setup)
-        logger.info("Step 1/5: Creating basic competition...")
-        self._create_basic_competition(details)
+        # Step 1: Either create the basic competition or resume an existing one
+        if self._find_existing_competition(details):
+            logger.info(
+                "Step 1/5: Competition '%s' already exists, resuming configuration",
+                details.slug,
+            )
+            self._navigate_to_manage_page()
+            self._enable_entries()
+        else:
+            logger.info("Step 1/5: Creating basic competition...")
+            self._create_basic_competition(details)
 
         # Step 2: Configure advanced settings (hide from public)
         logger.info("Step 2/5: Configuring advanced settings...")
@@ -156,6 +169,121 @@ class CompetitionCreator:
         logger.info("Competition created successfully: %s", self.page.url)
         return self.page.url
 
+    def _expected_public_url(self, details: CompetitionDetails) -> str:
+        """Construct the expected public competition URL from slug + year.
+
+        Norway-specific: assumes the /x/<year>/NOR/<slug>/ path layout.
+        """
+        base = self.session.config.base_url.rstrip("/")
+        year = details.start_date.year
+        return f"{base}/x/{year}/NOR/{details.slug}/"
+
+    def _find_existing_competition(self, details: CompetitionDetails) -> bool:
+        """Check if a competition with this slug already exists.
+
+        Navigates to the expected public URL and looks for the admin
+        " Manage" link as proof we're on a real comp page (and logged in).
+        Returns True if found (page is left on the public URL).
+        """
+        page = self.page
+        public_url = self._expected_public_url(details)
+
+        logger.debug("Checking for existing competition at: %s", public_url)
+        try:
+            response = page.goto(
+                public_url, wait_until="domcontentloaded", timeout=30_000
+            )
+        except Exception as e:
+            logger.debug("Navigation to %s failed: %s", public_url, e)
+            return False
+
+        if response is None or response.status >= 400:
+            status = response.status if response else "?"
+            logger.debug("HTTP %s at %s, treating as new competition", status, public_url)
+            return False
+
+        # Verify we landed on the expected URL (no redirect to a different comp / home)
+        if not page.url.rstrip("/").startswith(public_url.rstrip("/")):
+            logger.debug(
+                "URL after navigation (%s) does not match expected (%s), treating as new",
+                page.url,
+                public_url,
+            )
+            return False
+
+        manage_link = page.get_by_role("link", name=" Manage")
+        try:
+            manage_link.wait_for(state="visible", timeout=5_000)
+        except Exception:
+            logger.debug("No Manage link at %s, treating as new competition", public_url)
+            return False
+
+        logger.info("Found existing competition at %s", public_url)
+        return True
+
+    def _navigate_to_manage_page(self) -> None:
+        """From the public competition page, navigate to the Manage page.
+
+        The Manage page is where the settings form (Hide from public, Display,
+        Scoring tabs, etc.) and the 'Manage entries' link live. Verifies we
+        landed on a page with the expected settings form.
+        """
+        page = self.page
+        page.get_by_role("link", name=" Manage").click()
+        page.wait_for_load_state("networkidle")
+        # Assert we're on the settings form (has the advanced submit button)
+        page.locator('button[name="adv_submit"]').wait_for(
+            state="visible", timeout=30_000
+        )
+
+    @screenshot_on_error
+    def _enable_entries(self) -> None:
+        """Enable entries for the competition. Idempotent.
+
+        Captures the current manage page URL up-front. Clicks 'Manage entries';
+        if the 'I confirm' dialog appears, accepts it (entries get enabled).
+        If not (entries already enabled), navigates back to the captured URL
+        so subsequent configuration runs on the right page.
+        """
+        page = self.page
+        manage_url = page.url
+
+        manage_entries = page.get_by_role("link", name="Manage entries")
+        try:
+            manage_entries.wait_for(state="visible", timeout=5_000)
+        except Exception:
+            logger.info(
+                "'Manage entries' link not present on %s, assuming entries already enabled",
+                manage_url,
+            )
+            return
+
+        logger.debug("Clicking 'Manage entries'")
+        manage_entries.click()
+        page.wait_for_load_state("networkidle")
+
+        confirm = page.get_by_text("I confirm that I have read")
+        try:
+            confirm.wait_for(state="visible", timeout=5_000)
+        except Exception:
+            logger.info(
+                "Entries already enabled (no confirmation dialog), returning to %s",
+                manage_url,
+            )
+            page.goto(manage_url)
+            page.wait_for_load_state("networkidle")
+            page.locator('button[name="adv_submit"]').wait_for(
+                state="visible", timeout=30_000
+            )
+            return
+
+        logger.debug("Confirming entry enablement")
+        confirm.click()
+        page.get_by_role("button", name="Go").click()
+        page.wait_for_load_state("networkidle")
+        logger.info("Entries enabled")
+
+    @screenshot_on_error
     def _create_basic_competition(self, details: CompetitionDetails) -> None:
         """Navigate to competition creation and fill basic info."""
         page = self.page
@@ -210,17 +338,21 @@ class CompetitionCreator:
         highlighted_option.wait_for(state="visible")
         highlighted_option.click()
 
-        # Create the competition
+        # Create the competition. OpenTrack's submit handler may do an AJAX
+        # round-trip rather than a classic form POST/redirect, so don't let
+        # Playwright block on navigation detection — wait for the post-create
+        # page element (the "Manage entries" link) explicitly instead.
         logger.debug("Submitting competition creation form")
-        page.get_by_role("button", name="Create").nth(1).click()
-        page.wait_for_load_state("networkidle")
+        page.get_by_role("button", name="Create").nth(1).click(no_wait_after=True)
 
-        # Immediately enable entries after creation
-        logger.debug("Enabling entries")
-        page.get_by_role("link", name="Manage entries").click()
-        page.get_by_text("I confirm that I have read").click()
-        page.get_by_role("button", name="Go").click()
-        page.wait_for_load_state("networkidle")
+        # Wait for the post-create manage page
+        logger.debug("Waiting for post-create page")
+        page.get_by_role("link", name="Manage entries").wait_for(
+            state="visible", timeout=120_000
+        )
+
+        # Enable entries (delegates to the idempotent helper)
+        self._enable_entries()
         logger.debug("Basic competition created and entries enabled")
 
     def _configure_advanced_settings(self) -> None:
@@ -283,9 +415,19 @@ class CompetitionCreator:
         """Configure scoring settings like combined events tables."""
         page = self.page
 
-        # Navigate to Events and scoring via World Athletics link
+        # Navigate to Events and scoring. The top-nav link text reflects the
+        # currently-configured scoring system: "World Athletics" by default,
+        # "Tyrving" once set. Try both to stay idempotent on re-runs.
         logger.debug("Navigating to Events and scoring")
-        page.locator("a").filter(has_text="World Athletics").click()
+        scoring_nav = None
+        for label in ("World Athletics", "Tyrving"):
+            candidate = page.locator("a").filter(has_text=label)
+            if candidate.count() > 0:
+                scoring_nav = candidate.first
+                break
+        if scoring_nav is None:
+            raise RuntimeError("Could not find scoring system navigation link")
+        scoring_nav.click()
         page.get_by_role("link", name="Events and scoring").click()
 
         # Go to Scoring -> Combined Events tab
