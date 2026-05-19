@@ -288,8 +288,11 @@ class CompetitionCreator:
         """Navigate to competition creation and fill basic info."""
         page = self.page
 
-        # Navigate to competition creation
+        # Navigate to competition creation. We may be on a 404 page (from the
+        # existence check) so go home first; the "Competitions" link lives in
+        # the logged-in homepage nav.
         logger.debug("Navigating to competition creation form")
+        self.session.goto_home()
         page.get_by_role("link", name="Competitions").click()
         page.get_by_role("button", name="New Competition ").click()
 
@@ -365,7 +368,7 @@ class CompetitionCreator:
             hide_checkbox.check()
 
         logger.debug("Saving advanced settings")
-        page.locator('button[name="adv_submit"]').click()
+        page.locator('button[name="adv_submit"]').click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
 
     def _configure_display_settings(self, details: CompetitionDetails) -> None:
@@ -400,7 +403,7 @@ class CompetitionCreator:
 
         # Save display settings
         logger.debug("Saving display settings")
-        page.get_by_role("button", name="Save").nth(1).click()
+        page.get_by_role("button", name="Save").nth(1).click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
 
         # Individual points setting (separate save button)
@@ -408,7 +411,7 @@ class CompetitionCreator:
         points_checkbox = page.get_by_role("checkbox", name="Show individual points?")
         if not points_checkbox.is_checked():
             points_checkbox.check()
-        page.get_by_role("button", name="Save").nth(3).click()
+        page.get_by_role("button", name="Save").nth(3).click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
 
     def _configure_scoring(self, details: CompetitionDetails) -> None:
@@ -444,7 +447,7 @@ class CompetitionCreator:
             page.get_by_label("Combined Events tables:").select_option(table_value)
 
         logger.debug("Saving scoring settings")
-        page.get_by_role("button", name="Save").click()
+        page.get_by_role("button", name="Save").click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
 
     def import_athletes(self, xlsx_path: Path) -> None:
@@ -520,7 +523,7 @@ class CompetitionCreator:
             results_from_photofinish.check()
 
         logger.debug("Saving photofinish settings")
-        page.get_by_role("button", name="Save").click()
+        page.get_by_role("button", name="Save").click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
 
     def _wait_for_background_task(self, step_name: str) -> None:
