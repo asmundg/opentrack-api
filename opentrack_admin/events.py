@@ -855,14 +855,20 @@ class EventScheduler:
             updated += 1
             logger.debug(f"Filled PB/SB for: {name}")
 
-        # Save and wait for confirmation
+        # Save and wait for confirmation. OpenTrack returns either
+        # "Performances have been saved successfully" (changes saved) or
+        # "No changed performances were submitted" (idempotent re-save).
+        # Both indicate the request was processed cleanly.
         page.wait_for_timeout(1000)  # Wait for form to be ready
         save_btn = page.locator("button[name='performances_submit']").last
         logger.info(f"Clicking save button via JavaScript")
         save_btn.evaluate("el => el.click()")
-        page.get_by_text("Performances have been saved successfully").wait_for(
-            state="visible", timeout=10000
-        )
+        page.get_by_text(
+            re.compile(
+                r"(Performances have been saved successfully|"
+                r"No changed performances were submitted)"
+            )
+        ).wait_for(state="visible", timeout=10000)
 
         logger.info(f"Updated PB/SB for {updated}/{row_count} competitors")
         return updated
