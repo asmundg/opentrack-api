@@ -1,17 +1,122 @@
 """Browser management for OpenTrack automation."""
 
+import logging
+import time
 from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import Callable, Generator, ParamSpec, TypeVar
+from typing import Any, Callable, Generator, ParamSpec, TypeVar
 
-from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+from playwright.sync_api import Browser, BrowserContext, Page, Response, sync_playwright
 from playwright_stealth import Stealth
 
 from .config import OpenTrackConfig
 
+logger = logging.getLogger(__name__)
+
 _stealth = Stealth()
+
+# Upstream / Cloudflare error statuses we transparently retry on.
+_RETRYABLE_STATUSES = {502, 503, 504}
+_MAX_UPSTREAM_RETRIES = 4
+_UPSTREAM_RETRY_WAIT = 5.0
+
+
+def _is_upstream_error_page(page: Page, response: Response | None) -> bool:
+    """Return True if the most recent navigation landed on a 5xx / Cloudflare
+    error page. Falls back to inspecting the page title when the response
+    object isn't available (e.g., after click-driven navigation)."""
+    if response is not None and response.status in _RETRYABLE_STATUSES:
+        return True
+    try:
+        title = (page.title() or "").lower()
+    except Exception:
+        return False
+    return (
+        "bad gateway" in title
+        or "gateway time-out" in title
+        or "gateway timeout" in title
+    )
+
+
+def _install_upstream_retry(page: Page) -> None:
+    """Make all navigations resilient to Cloudflare / upstream 5xx errors.
+
+    Two complementary mechanisms:
+
+    1. Wrap `page.goto` (and `page.reload`) so direct navigations retry
+       after a short wait when the response status is 5xx.
+
+    2. Listen for main-frame document responses; when one comes back 5xx
+       (e.g. from a `link.click()` that triggered navigation), schedule a
+       reload via in-page `setTimeout`. Subsequent waits naturally tolerate
+       the reload because their selectors are still pending.
+
+    The real browser navigation is preserved end-to-end so Cloudflare's bot
+    detection sees a normal session.
+    """
+    # --- 1. retry page.goto / page.reload directly ---------------------
+    original_goto = page.goto
+    original_reload = page.reload
+
+    @wraps(original_goto)
+    def goto_with_retry(url: str, **kwargs: Any) -> Response | None:
+        last_response: Response | None = None
+        for attempt in range(1, _MAX_UPSTREAM_RETRIES + 1):
+            last_response = original_goto(url, **kwargs)
+            if not _is_upstream_error_page(page, last_response):
+                return last_response
+            status = last_response.status if last_response else "(no response)"
+            logger.warning(
+                "Upstream %s at %s (attempt %d/%d), retrying after %.1fs",
+                status, url, attempt, _MAX_UPSTREAM_RETRIES, _UPSTREAM_RETRY_WAIT,
+            )
+            time.sleep(_UPSTREAM_RETRY_WAIT)
+        return last_response
+
+    @wraps(original_reload)
+    def reload_with_retry(**kwargs: Any) -> Response | None:
+        last_response: Response | None = None
+        for attempt in range(1, _MAX_UPSTREAM_RETRIES + 1):
+            last_response = original_reload(**kwargs)
+            if not _is_upstream_error_page(page, last_response):
+                return last_response
+            status = last_response.status if last_response else "(no response)"
+            logger.warning(
+                "Upstream %s on reload of %s (attempt %d/%d), retrying after %.1fs",
+                status, page.url, attempt, _MAX_UPSTREAM_RETRIES, _UPSTREAM_RETRY_WAIT,
+            )
+            time.sleep(_UPSTREAM_RETRY_WAIT)
+        return last_response
+
+    page.goto = goto_with_retry  # type: ignore[assignment]
+    page.reload = reload_with_retry  # type: ignore[assignment]
+
+    # --- 2. auto-reload when a click triggers navigation to a 5xx page --
+    def on_response(response: Response) -> None:
+        try:
+            if response.frame != page.main_frame:
+                return
+            if response.request.resource_type != "document":
+                return
+            if response.status not in _RETRYABLE_STATUSES:
+                return
+        except Exception:
+            return
+        logger.warning(
+            "Upstream %s on click-driven navigation to %s, scheduling reload in %.1fs",
+            response.status, response.url, _UPSTREAM_RETRY_WAIT,
+        )
+        # Fire-and-forget in-page reload; subsequent waits keep polling.
+        try:
+            page.evaluate(
+                f"setTimeout(() => location.reload(), {int(_UPSTREAM_RETRY_WAIT * 1000)})"
+            )
+        except Exception as e:
+            logger.debug("Could not schedule in-page reload: %s", e)
+
+    page.on("response", on_response)
 
 # Directory for error screenshots
 SCREENSHOT_DIR = Path("screenshots")
@@ -108,6 +213,10 @@ class OpenTrackSession:
         )
         self._page = self._context.new_page()
         _stealth.apply_stealth_sync(self._page)
+        # Transparent retry on Cloudflare/upstream 5xx errors for all
+        # page.goto() calls — keeps the real browser navigation intact
+        # (avoids triggering Cloudflare bot detection).
+        _install_upstream_retry(self._page)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -141,7 +250,7 @@ class OpenTrackSession:
 
         # Navigate to home and click login
         self.page.goto(self.config.base_url)
-        self.page.get_by_role("link", name="Login / SignUp").click()
+        self.page.get_by_role("link", name="Login / Sign Up").click()
         
         # Fill login form
         self.page.get_by_role("textbox", name="Email:").click()
