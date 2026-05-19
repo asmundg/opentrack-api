@@ -93,30 +93,6 @@ def _install_upstream_retry(page: Page) -> None:
     page.goto = goto_with_retry  # type: ignore[assignment]
     page.reload = reload_with_retry  # type: ignore[assignment]
 
-    # --- 2. auto-reload when a click triggers navigation to a 5xx page --
-    def on_response(response: Response) -> None:
-        try:
-            if response.frame != page.main_frame:
-                return
-            if response.request.resource_type != "document":
-                return
-            if response.status not in _RETRYABLE_STATUSES:
-                return
-        except Exception:
-            return
-        logger.warning(
-            "Upstream %s on click-driven navigation to %s, scheduling reload in %.1fs",
-            response.status, response.url, _UPSTREAM_RETRY_WAIT,
-        )
-        # Fire-and-forget in-page reload; subsequent waits keep polling.
-        try:
-            page.evaluate(
-                f"setTimeout(() => location.reload(), {int(_UPSTREAM_RETRY_WAIT * 1000)})"
-            )
-        except Exception as e:
-            logger.debug("Could not schedule in-page reload: %s", e)
-
-    page.on("response", on_response)
 
 # Directory for error screenshots
 SCREENSHOT_DIR = Path("screenshots")
@@ -144,24 +120,47 @@ def save_screenshot(page: Page, name: str) -> Path:
 
 
 def screenshot_on_error(func: Callable[P, T]) -> Callable[P, T]:
-    """Decorator that takes a screenshot when an exception occurs.
-    
+    """Decorator that captures a screenshot when an exception occurs, and
+    transparently recovers from Cloudflare upstream 5xx errors.
+
+    If the wrapped method raises and the page is currently showing a
+    Cloudflare bad-gateway / gateway-timeout page, reload (which has its
+    own retry-on-5xx loop) and re-invoke the method once. Only screenshots
+    + re-raises if the second attempt still fails (or the page wasn't on a
+    5xx page to begin with).
+
     Expects the first argument (self) to have a `page` attribute.
     """
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         try:
             return func(*args, **kwargs)
-        except Exception as e:
-            # Try to get page from self (first arg)
-            if args and hasattr(args[0], "page"):
-                page = args[0].page
+        except Exception as first_exc:
+            page = args[0].page if args and hasattr(args[0], "page") else None
+
+            if page is not None and _is_upstream_error_page(page, None):
+                logger.warning(
+                    "Cloudflare upstream error during %s, reloading and retrying once",
+                    func.__name__,
+                )
+                try:
+                    page.reload(wait_until="load")
+                except Exception:
+                    logger.exception("Reload while recovering from upstream error failed")
+                else:
+                    if not _is_upstream_error_page(page, None):
+                        try:
+                            return func(*args, **kwargs)
+                        except Exception as retry_exc:
+                            first_exc = retry_exc
+
+            if page is not None:
                 try:
                     save_screenshot(page, f"error_{func.__name__}")
                     print(f"URL: {page.url}")
                 except Exception:
                     pass
-            raise
+            raise first_exc
     return wrapper
 
 
