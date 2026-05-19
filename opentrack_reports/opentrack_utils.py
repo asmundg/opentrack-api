@@ -101,6 +101,7 @@ def clean_event_name(event_name: str) -> str:
 TRACK_EVENT_CODES = [
     "60",
     "100",
+    "150",
     "200",
     "300",
     "400",
