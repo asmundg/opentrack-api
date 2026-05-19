@@ -312,49 +312,47 @@ def get_event_name(code: str) -> str:
 
 # Map any known category alias to its canonical OpenTrack short code.
 # Covers Isonen XLSX values ("Gutter 14"), scheduler enum values
-# ("Kvinner Senior", "J-Rekrutt"), and lowercase variants. Already-canonical
-# codes ("G14", "KS", ...) pass through via the .get() fallback in
-# normalize_category().
+# ("Kvinner Senior", "J-Rekrutt"), and lowercase / casing variants. Lookup
+# is case-insensitive — see normalize_category(). Already-canonical codes
+# ("G14", "KS", ...) pass through via the .get() fallback.
 _CATEGORY_ALIASES: dict[str, str] = {
     # Boys — Isonen names
-    "Gutter 6-8 Rekrutt": "G10",
-    "Gutter 9": "G10",
-    "Gutter 10": "G10",
-    "Gutter 11": "G11",
-    "Gutter 12": "G12",
-    "Gutter 13": "G13",
-    "Gutter 14": "G14",
-    "Gutter 15": "G15",
-    "Gutter 16": "G16",
-    "Gutter 17": "G17",
-    "Gutter 18-19": "G18-19",
+    "gutter 6-8 rekrutt": "G10",
+    "gutter 9": "G10",
+    "gutter 10": "G10",
+    "gutter 11": "G11",
+    "gutter 12": "G12",
+    "gutter 13": "G13",
+    "gutter 14": "G14",
+    "gutter 15": "G15",
+    "gutter 16": "G16",
+    "gutter 17": "G17",
+    "gutter 18-19": "G18-19",
     # Girls — Isonen names
-    "Jenter 6-8 Rekrutt": "J10",
-    "Jenter 9": "J10",
-    "Jenter 10": "J10",
-    "Jenter 11": "J11",
-    "Jenter 12": "J12",
-    "Jenter 13": "J13",
-    "Jenter 14": "J14",
-    "Jenter 15": "J15",
-    "Jenter 16": "J16",
-    "Jenter 17": "J17",
-    "Jenter 18-19": "J18-19",
+    "jenter 6-8 rekrutt": "J10",
+    "jenter 9": "J10",
+    "jenter 10": "J10",
+    "jenter 11": "J11",
+    "jenter 12": "J12",
+    "jenter 13": "J13",
+    "jenter 14": "J14",
+    "jenter 15": "J15",
+    "jenter 16": "J16",
+    "jenter 17": "J17",
+    "jenter 18-19": "J18-19",
     # Seniors — both Isonen and scheduler use these long names
-    "Kvinner Senior": "KS",
-    "Menn Senior": "MS",
+    "kvinner senior": "KS",
+    "menn senior": "MS",
     # Scheduler enum shortcuts
-    "G-Rekrutt": "G10",
-    "J-Rekrutt": "J10",
-    "G-rekrutt": "G10",
-    "J-rekrutt": "J10",
+    "g-rekrutt": "G10",
+    "j-rekrutt": "J10",
 }
 
 
 def normalize_category(category: str) -> str:
     """Map any known category alias to its canonical OpenTrack short code.
 
-    Recognizes:
+    Recognizes (case-insensitively):
       - Isonen XLSX values: "Gutter 14" -> "G14", "Kvinner Senior" -> "KS"
       - Scheduler enum values: "J-Rekrutt" -> "J10", "Menn Senior" -> "MS"
       - Already-canonical codes ("G14", "J18-19", "KS", "MS") pass through.
@@ -365,7 +363,7 @@ def normalize_category(category: str) -> str:
     returned unchanged so callers like the OpenTrack search can fail fast
     with a clear "no match" error.
     """
-    return _CATEGORY_ALIASES.get(category, category)
+    return _CATEGORY_ALIASES.get(category.lower(), category)
 
 
 def get_category_age(category: str) -> int | None:
