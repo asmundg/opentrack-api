@@ -9,6 +9,7 @@ from datetime import time
 from io import StringIO
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urljoin
 
 from pblookup.events import standardize_event_name as pblookup_standardize_event
 
@@ -186,35 +187,47 @@ def get_implement_weight(event_code: str, category: str) -> str | None:
 
     Args:
         event_code: Event code (SP, DT, HT, JT)
-        category: Category like "G10", "J15", "M", "W"
+        category: Category like "G10", "J15", "Menn Senior", "Kvinner Senior"
 
     Returns:
-        Weight string (e.g., "2", "0,75", "400g") or None if not a throwing event
+        Weight string (e.g., "2", "0,75", "400g"), or None if event_code is
+        not a throwing event, or None if this (event, age) combination is
+        intentionally not offered (e.g., DT/JT/HT for rekrutt/10).
+
+    Raises:
+        ValueError: If the category is not recognized at all (would otherwise
+            silently produce wrong or missing weights).
     """
     if event_code not in THROWING_EVENTS:
         return None
 
     # Determine gender
     normalized = normalize_category(category)
-    if normalized.startswith("G") or normalized in ("M", "U20", "U23"):
+    if normalized.startswith("G") or normalized in ("M", "MS", "U20", "U23"):
         gender = "G"
-    elif normalized.startswith("J") or normalized in ("W", "K"):
+    elif normalized.startswith("J") or normalized in ("W", "K", "KS"):
         gender = "J"
     else:
-        return None
+        raise ValueError(
+            f"Unknown category {category!r} (normalized={normalized!r}): "
+            "cannot determine gender for implement weight lookup"
+        )
 
     # Determine age
     age = get_category_age(category)
     if age is None:
         # Senior/U categories
-        if normalized in ("M", "W", "K"):
+        if normalized in ("M", "MS", "W", "K", "KS"):
             age = 99
-        elif normalized in ("U20",):
+        elif normalized == "U20":
             age = 20
-        elif normalized in ("U23",):
+        elif normalized == "U23":
             age = 23
         else:
-            age = 99
+            raise ValueError(
+                f"Unknown category {category!r} (normalized={normalized!r}): "
+                "cannot determine age for implement weight lookup"
+            )
 
     # Look up weight
     event_weights = IMPLEMENT_WEIGHTS.get(event_code, {})
@@ -300,11 +313,21 @@ def get_event_name(code: str) -> str:
 def normalize_category(category: str) -> str:
     """Normalize category name for OpenTrack search.
 
-    Converts 'G-rekrutt' -> 'G10', 'J-rekrutt' -> 'J10', etc.
+    Maps long Norwegian names emitted by the scheduler to OpenTrack's
+    canonical short codes:
+      - 'G-Rekrutt' / 'G-rekrutt' -> 'G10'
+      - 'J-Rekrutt' / 'J-rekrutt' -> 'J10'
+      - 'Kvinner Senior'          -> 'KS'
+      - 'Menn Senior'             -> 'MS'
+    Categories already in canonical form (e.g. 'G15', 'J18-19') pass
+    through unchanged.
     """
-    if category.endswith("-rekrutt"):
-        # G-rekrutt -> G10, J-rekrutt -> J10
-        prefix = category.replace("-rekrutt", "")
+    if category == "Kvinner Senior":
+        return "KS"
+    if category == "Menn Senior":
+        return "MS"
+    if category.lower().endswith("-rekrutt"):
+        prefix = category[: -len("-rekrutt")]
         return f"{prefix}10"
     return category
 
@@ -376,7 +399,7 @@ class EventSchedule:
         EventSchedule("M", "SP", time(11, 0))        # Men Kule at 11:00
     """
 
-    category: str  # e.g., "G10", "J15", "M", "W", "G-rekrutt"
+    category: str  # e.g., "G10", "J15", "M", "W", "G-Rekrutt"
     event: str  # e.g., "60m", "HJ", "SP", "LJ"
     start_time: time
 
@@ -569,8 +592,13 @@ class EventScheduler:
     def set_implement_weight(self, weight: str, num_competitors: int = 20) -> None:
         """Set the implement weight for all competitors in a throwing event.
 
-        Navigates to the attempts/heights editor and fills in the weight for all rows.
-        Uses Handsontable grid - finds Weight column by header, then fills each row.
+        Navigates to the per-pool attempts/heights editor and fills in the weight
+        for every athlete row. Uses the Handsontable Weight column.
+
+        Assumes we're on the event detail page. Pool seeding must have been done
+        first (athletes need QPs and to be assigned to pools); otherwise the
+        edit table will be empty. Run `opentrack admin update-pbs` before
+        scheduling throwing events on a fresh import.
 
         Args:
             weight: The weight string (e.g., "2", "0,75", "400g")
@@ -580,62 +608,78 @@ class EventScheduler:
 
         logger.info(f"Setting implement weight: {weight}")
 
-        # Click View to see competitors, then Edit to edit weights
-        page.get_by_role("link", name="View").click()
-        page.wait_for_load_state("networkidle")
-        # Edit button has complex structure, use the URL pattern
-        page.locator("a[href*='/edit/']").filter(has_text="Edit").click()
-        page.wait_for_load_state("networkidle")
+        # After set_event_attempts we're on /manage/events/{code}/, which has
+        # no per-pool Edit link. Navigate to the event detail view first to
+        # find the pool-specific edit URL.
+        view_link = page.get_by_role("link", name=re.compile(r"^VIEW$", re.IGNORECASE))
+        view_href = view_link.first.get_attribute("href")
+        if not view_href:
+            raise RuntimeError("Could not find VIEW link on Manage event page")
+        page.goto(urljoin(page.url, view_href), wait_until="load")
 
-        # Find the Weight column header and click it to select the column
+        # The per-pool Edit link is rendered inside a responsive button group
+        # (collapse_right) that is hidden on narrow viewports, so clicking it
+        # times out. Read its href and navigate directly instead.
+        edit_link = page.locator("a[href*='/edit/']").first
+        edit_href = edit_link.get_attribute("href")
+        if not edit_href:
+            raise RuntimeError("Could not find per-pool Edit link on event page")
+        edit_url = urljoin(page.url, edit_href)
+        logger.info(f"Navigating to weight editor: {edit_url}")
+        page.goto(edit_url, wait_until="load")
+
+        # Wait for Handsontable to render before reading rows.
+        page.locator("#attempts_ht .ht_master table.htCore").wait_for(state="visible")
+
+        # Find the Weight column header to locate the column's X position.
         table = page.locator("#attempts_ht .ht_master table.htCore")
-
-        # Find Weight header - click on first row's Weight cell to start
         weight_header = table.locator("thead th").filter(has_text="Weight")
         if weight_header.count() == 0:
             raise RuntimeError("Could not find 'Weight' column in table")
 
-        # Get the bounding box of the Weight header to find the column position
         weight_header_box = weight_header.bounding_box()
         if not weight_header_box:
             raise RuntimeError("Could not get Weight column position")
-
-        # X position is the center of the Weight column
         weight_x = weight_header_box["x"] + weight_header_box["width"] / 2
 
-        # Get all data rows
+        # Count rows that actually have an athlete (non-empty first cell).
+        # Fresh imports produce an empty placeholder row when no athletes have
+        # been seeded into a pool yet.
         rows = table.locator("tbody tr")
         row_count = rows.count()
-        logger.info(f"Found {row_count} rows in table")
-
-        for i in range(min(row_count, num_competitors)):
-            row = rows.nth(i)
-            # Check if this row has data (first cell has content)
-            first_cell = row.locator("td").first
-            if not first_cell.text_content():
-                logger.info(f"Row {i + 1} is empty, stopping")
+        populated = 0
+        for i in range(row_count):
+            first_cell = rows.nth(i).locator("td").first
+            if (first_cell.text_content() or "").strip():
+                populated += 1
+            else:
                 break
 
-            # Get the row's Y position
-            row_box = row.bounding_box()
+        if populated == 0:
+            raise RuntimeError(
+                "Pool is empty (no athletes seeded). Run 'opentrack admin "
+                "update-pbs' to populate seeding performances before scheduling "
+                "throwing events."
+            )
+
+        logger.info(f"Filling weight for {populated} athlete row(s)")
+
+        for i in range(min(populated, num_competitors)):
+            row_box = rows.nth(i).bounding_box()
             if not row_box:
                 continue
-
             row_y = row_box["y"] + row_box["height"] / 2
 
-            # Click at the Weight column position for this row
             page.mouse.click(weight_x, row_y)
             page.wait_for_timeout(100)
-
-            # Type the weight (will replace cell content when cell is active)
             page.keyboard.type(weight)
             page.keyboard.press("Enter")
-
             logger.debug(f"Set weight for row {i + 1}")
 
-        # Save
-        page.get_by_role("button", name="Save").first.click()
-        page.wait_for_load_state("networkidle")
+        # The Save button POSTs the form and reloads the edit page (no
+        # in-page banner like the event-detail form). Wait for navigation.
+        with page.expect_navigation(wait_until="load"):
+            page.get_by_role("button", name="Save").first.click()
         logger.info("Implement weights saved")
 
     @screenshot_on_error
