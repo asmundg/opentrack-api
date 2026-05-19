@@ -310,26 +310,62 @@ def get_event_name(code: str) -> str:
     )
 
 
-def normalize_category(category: str) -> str:
-    """Normalize category name for OpenTrack search.
+# Map any known category alias to its canonical OpenTrack short code.
+# Covers Isonen XLSX values ("Gutter 14"), scheduler enum values
+# ("Kvinner Senior", "J-Rekrutt"), and lowercase variants. Already-canonical
+# codes ("G14", "KS", ...) pass through via the .get() fallback in
+# normalize_category().
+_CATEGORY_ALIASES: dict[str, str] = {
+    # Boys — Isonen names
+    "Gutter 6-8 Rekrutt": "G10",
+    "Gutter 9": "G10",
+    "Gutter 10": "G10",
+    "Gutter 11": "G11",
+    "Gutter 12": "G12",
+    "Gutter 13": "G13",
+    "Gutter 14": "G14",
+    "Gutter 15": "G15",
+    "Gutter 16": "G16",
+    "Gutter 17": "G17",
+    "Gutter 18-19": "G18-19",
+    # Girls — Isonen names
+    "Jenter 6-8 Rekrutt": "J10",
+    "Jenter 9": "J10",
+    "Jenter 10": "J10",
+    "Jenter 11": "J11",
+    "Jenter 12": "J12",
+    "Jenter 13": "J13",
+    "Jenter 14": "J14",
+    "Jenter 15": "J15",
+    "Jenter 16": "J16",
+    "Jenter 17": "J17",
+    "Jenter 18-19": "J18-19",
+    # Seniors — both Isonen and scheduler use these long names
+    "Kvinner Senior": "KS",
+    "Menn Senior": "MS",
+    # Scheduler enum shortcuts
+    "G-Rekrutt": "G10",
+    "J-Rekrutt": "J10",
+    "G-rekrutt": "G10",
+    "J-rekrutt": "J10",
+}
 
-    Maps long Norwegian names emitted by the scheduler to OpenTrack's
-    canonical short codes:
-      - 'G-Rekrutt' / 'G-rekrutt' -> 'G10'
-      - 'J-Rekrutt' / 'J-rekrutt' -> 'J10'
-      - 'Kvinner Senior'          -> 'KS'
-      - 'Menn Senior'             -> 'MS'
-    Categories already in canonical form (e.g. 'G15', 'J18-19') pass
-    through unchanged.
+
+def normalize_category(category: str) -> str:
+    """Map any known category alias to its canonical OpenTrack short code.
+
+    Recognizes:
+      - Isonen XLSX values: "Gutter 14" -> "G14", "Kvinner Senior" -> "KS"
+      - Scheduler enum values: "J-Rekrutt" -> "J10", "Menn Senior" -> "MS"
+      - Already-canonical codes ("G14", "J18-19", "KS", "MS") pass through.
+
+    This is the single normalization mechanism used by both the schedule
+    parser (Isonen XLSX/CSV → EventSchedule) and the OpenTrack search code
+    (EventSchedule → search query). Anything not in _CATEGORY_ALIASES is
+    returned unchanged so callers like the OpenTrack search can fail fast
+    with a clear "no match" error.
     """
-    if category == "Kvinner Senior":
-        return "KS"
-    if category == "Menn Senior":
-        return "MS"
-    if category.lower().endswith("-rekrutt"):
-        prefix = category[: -len("-rekrutt")]
-        return f"{prefix}10"
-    return category
+    return _CATEGORY_ALIASES.get(category, category)
 
 
 def get_category_age(category: str) -> int | None:
@@ -1061,7 +1097,7 @@ def parse_schedule_csv(content: str) -> list[EventSchedule]:
 
     for row in reader:
         try:
-            category = _normalize_isonen_category(row["Klasse"].strip())
+            category = normalize_category(row["Klasse"].strip())
             event = _normalize_isonen_event(row["Øvelse"].strip())
             start_time = parse_time(row["Kl."])
 
@@ -1106,7 +1142,7 @@ def parse_schedule_xlsx(xlsx_path: Path) -> list[EventSchedule]:
     for row in rows_iter:
         values = {h: (str(c.value).strip() if c.value is not None else "") for h, c in zip(headers, row)}
         try:
-            category = _normalize_isonen_category(values["Klasse"])
+            category = normalize_category(values["Klasse"])
             event = _normalize_isonen_event(values["Øvelse"])
             start_time = parse_time(values["Kl."]) if values.get("Kl.") else time(0, 0)
 
@@ -1154,48 +1190,6 @@ ISONEN_EVENT_CODES: dict[str, str] = {
     "Slegge": "HT",
     "Liten ball": "BT",  # Ball throw for young athletes
 }
-
-# Mapping from Isonen category names to normalized categories
-ISONEN_CATEGORY_MAP: dict[str, str] = {
-    # Boys
-    "Gutter 6-8 Rekrutt": "G10",
-    "Gutter 9": "G10",
-    "Gutter 10": "G10",
-    "Gutter 11": "G11",
-    "Gutter 12": "G12",
-    "Gutter 13": "G13",
-    "Gutter 14": "G14",
-    "Gutter 15": "G15",
-    "Gutter 16": "G16",
-    "Gutter 17": "G17",
-    "Gutter 18-19": "G18-19",
-    # Girls
-    "Jenter 6-8 Rekrutt": "J10",
-    "Jenter 9": "J10",
-    "Jenter 10": "J10",
-    "Jenter 11": "J11",
-    "Jenter 12": "J12",
-    "Jenter 13": "J13",
-    "Jenter 14": "J14",
-    "Jenter 15": "J15",
-    "Jenter 16": "J16",
-    "Jenter 17": "J17",
-    "Jenter 18-19": "J18-19",
-    # Seniors
-    "Kvinner Senior": "W",
-    "Menn Senior": "M",
-}
-
-
-def _normalize_isonen_category(category: str) -> str:
-    """Convert Isonen category name to event code format.
-
-    E.g., "Gutter 14" -> "G14", "Jenter 6-8 Rekrutt" -> "G10"
-    """
-    if category in ISONEN_CATEGORY_MAP:
-        return ISONEN_CATEGORY_MAP[category]
-    # Fallback: try to extract from pattern
-    return category
 
 
 def _normalize_isonen_event(event: str) -> str:
