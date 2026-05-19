@@ -460,33 +460,39 @@ class CompetitionCreator:
         upload_path = _normalize_xlsx(xlsx_path)
         logger.info("Normalized XLSX written to: %s", upload_path)
 
-        # Navigate to the custom import page
+        # Navigate to the custom import page (transparent upstream retry
+        # via context route middleware).
         competition_url = page.url.rstrip("/")
         custom_url = f"{competition_url}/manage/custom/"
         logger.info("Navigating to custom import: %s", custom_url)
         page.goto(custom_url)
-        page.wait_for_load_state("networkidle")
 
         # Step 1: Upload the XLSX file
         logger.info("Uploading file: %s", upload_path.name)
         page.locator("input[name=fileinput]").set_input_files(str(upload_path))
         page.locator("button[name=upload]").click()
-        page.wait_for_load_state("networkidle")
         self._wait_for_background_task("upload")
+
+        # The post-upload DOM still shows the Process button, but its handler
+        # is not wired up until the page is reloaded with a fresh GET.
+        # page.reload() would resubmit the upload POST and 500, so navigate.
+        logger.debug("Refreshing custom import page to enable Process step")
+        page.goto(custom_url)
 
         # Step 2: Process - create competitor/event records
         # Accept the "Are you sure?" confirmation dialog
         logger.info("Processing athletes...")
         page.once("dialog", lambda dialog: dialog.accept())
         page.locator("button[name=process]").click(timeout=240_000)
-        page.wait_for_load_state("networkidle")
         self._wait_for_background_task("process")
         logger.info("Athletes imported successfully")
 
     def prepare_athletes(self) -> None:
-        """Number competitors after import."""
+        """Number competitors and seed start lists after import."""
         logger.info("Numbering competitors...")
         self._number_competitors()
+        logger.info("Seeding start lists...")
+        self._apply_random_seeding()
         logger.info("Athletes prepared successfully")
 
     def _configure_photofinish(self) -> None:
@@ -555,21 +561,29 @@ class CompetitionCreator:
         logger.debug("Bib numbers assigned")
 
     def _apply_random_seeding(self) -> None:
-        """Apply random seeding to all start lists."""
+        """Fetch all start lists (track + field) with random athlete order.
+
+        The seeding page exposes two dropdowns: "Fetch all start lists"
+        (track) and "Fetch all field start lists". Each dropdown contains
+        Random order / Sorted by bib / Sorted by category submit buttons.
+        We trigger the random-order option for both.
+        """
         page = self.page
 
-        # Navigate to seeding
-        logger.debug("Navigating to seeding")
-        page.get_by_role("button", name="Manage competitors ").click()
-        page.get_by_role("link", name="Seeding").click()
+        logger.debug("Navigating to seeding page")
+        seeding_url = page.url.rstrip("/").rsplit("/manage/", 1)[0] + "/manage/seeding/"
+        page.goto(seeding_url)
 
-        # Fetch all start lists first
-        logger.debug("Fetching all start lists")
-        page.get_by_text("Fetch all start lists Fetch").click()
-        page.wait_for_load_state("networkidle")
-
-        # Apply random order
-        logger.debug("Applying random order")
-        page.get_by_role("button", name="Random order").click()
-        page.wait_for_load_state("networkidle")
-        logger.debug("Random seeding applied")
+        # Each Random order button is a form submit button. Submit both
+        # forms (track + field) by dispatching a click directly — the
+        # buttons live inside hidden dropdown-menus so a regular .click()
+        # fails the visibility check.
+        for button_name, label in (
+            ("fetch_all_start_lists_random", "track"),
+            ("fetch_all_field_start_lists_random", "field"),
+        ):
+            logger.debug("Submitting random seeding for %s start lists", label)
+            page.locator(f"button[name={button_name}]").dispatch_event("click")
+            page.wait_for_load_state("load")
+            self._wait_for_background_task(f"seed {label}")
+            logger.debug("Random seeding applied (%s)", label)

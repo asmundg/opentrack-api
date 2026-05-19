@@ -158,13 +158,11 @@ def import_athletes(
     print()
 
     with OpenTrackSession(config) as session:
-        session.page.goto(competition_url)
-        session.page.wait_for_load_state("networkidle")
-
+        session.goto_home()
         if not session.is_logged_in():
             session.login()
-            session.page.goto(competition_url)
-            session.page.wait_for_load_state("networkidle")
+
+        session.page.goto(competition_url)
 
         creator = CompetitionCreator(session)
 
@@ -222,16 +220,12 @@ def schedule(
         print(f"📍 Using checkpoint: {checkpoint_name}")
     
     with OpenTrackSession(config) as session:
-        # Navigate to competition
-        session.page.goto(competition_url)
-        session.page.wait_for_load_state("networkidle")
-        
-        # Ensure logged in
+        session.goto_home()
         if not session.is_logged_in():
             session.login()
-            session.page.goto(competition_url)
-            session.page.wait_for_load_state("networkidle")
-        
+
+        session.page.goto(competition_url)
+
         scheduler = EventScheduler(session)
         
         try:
@@ -312,16 +306,12 @@ def update_pbs(
             print(f"   Skipping {skip_count} already-completed events")
     
     with OpenTrackSession(config) as session:
-        # Navigate to competition
-        session.page.goto(competition_url)
-        session.page.wait_for_load_state("networkidle")
-        
-        # Ensure logged in
+        session.goto_home()
         if not session.is_logged_in():
             session.login()
-            session.page.goto(competition_url)
-            session.page.wait_for_load_state("networkidle")
-        
+
+        session.page.goto(competition_url)
+
         scheduler = EventScheduler(session)
         scheduler.navigate_to_events_table()
         
