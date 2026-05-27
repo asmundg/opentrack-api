@@ -31,20 +31,22 @@ class Result:
     def get_result_as_float(self) -> Optional[float]:
         """
         Get the result as a float value.
-        
+
         Handles Norwegian locale (comma as decimal separator) and various formats:
         - "4,23" -> 4.23 (field events)
         - "10.54" -> 10.54 (time events)
         - "1:23.45" or "1:23,45" -> 83.45 (time events with minutes)
-        
+        - "2,08,98" -> 128.98 (Norwegian M,SS,cc time format)
+        - "1,15,30,45" -> 4530.45 (Norwegian H,MM,SS,cc time format)
+
         Returns None if the result cannot be parsed.
         """
         if not self.result:
             return None
-            
+
         try:
             result_str = self.result.strip()
-            
+
             # Handle time format with minutes (e.g., "1:23.45" or "1:23,45")
             if ':' in result_str:
                 parts = result_str.split(':')
@@ -58,10 +60,26 @@ class Result:
                     minutes = float(parts[1])
                     seconds = float(parts[2].replace(',', '.'))
                     return hours * 3600 + minutes * 60 + seconds
-            
+
+            # Norwegian time format uses comma both as decimal separator AND as
+            # field separator: "M,SS,cc" or "H,MM,SS,cc". Three or four parts
+            # means a structured time; two parts is a plain decimal value.
+            comma_parts = result_str.split(',')
+            if len(comma_parts) == 3:
+                minutes = int(comma_parts[0])
+                seconds = int(comma_parts[1])
+                centiseconds = int(comma_parts[2])
+                return minutes * 60 + seconds + centiseconds / 100
+            if len(comma_parts) == 4:
+                hours = int(comma_parts[0])
+                minutes = int(comma_parts[1])
+                seconds = int(comma_parts[2])
+                centiseconds = int(comma_parts[3])
+                return hours * 3600 + minutes * 60 + seconds + centiseconds / 100
+
             # Handle regular decimal (comma or dot)
             return float(result_str.replace(',', '.'))
-            
+
         except (ValueError, AttributeError):
             return None
 
