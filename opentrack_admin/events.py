@@ -39,6 +39,7 @@ EVENT_NAMES = {
     "DT": "Diskos",
     "JT": "Spyd",
     "HT": "Slegge",
+    "BT": "Liten ball",
     # Sprints
     "60m": "60 meter",
     "100m": "100 meter",
@@ -52,8 +53,10 @@ EVENT_NAMES = {
     "5000m": "5000 meter",
     # Hurdles
     "60H": "60 meter hekk",
+    "80H": "80 meter hekk",
     "100H": "100 meter hekk",
     "110H": "110 meter hekk",
+    "200H": "200 meter hekk",
     "400H": "400 meter hekk",
     # Relays
     "4x100m": "4x100 meter",
@@ -78,7 +81,7 @@ IMPLEMENT_WEIGHTS = {
             17: "5",
             18: "6",
             19: "6",
-            20: "6",
+            20: "7,26",
             23: "7,26",
             99: "7,26",
         },
@@ -105,7 +108,9 @@ IMPLEMENT_WEIGHTS = {
             15: "1",
             16: "1,5",
             17: "1,5",
-            20: "1,75",
+            18: "1,75",
+            19: "1,75",
+            20: "2",
             23: "2",
             99: "2",
         },
@@ -161,6 +166,8 @@ IMPLEMENT_WEIGHTS = {
             15: "0,6",
             16: "0,7",
             17: "0,7",
+            18: "0,8",
+            19: "0,8",
             20: "0,8",
             23: "0,8",
             99: "0,8",
@@ -238,6 +245,11 @@ def get_implement_weight(event_code: str, category: str) -> str | None:
     # Find the appropriate age bracket
     if age in gender_weights:
         return gender_weights[age]
+
+    # 18-19 athletes fall back to U20 weight when not explicitly listed
+    # (e.g., DT/JT only list age 20 for the 18-20 bracket)
+    if age in (18, 19) and 20 in gender_weights:
+        return gender_weights[20]
 
     # Age not valid for this event (e.g., DT/JT/HT not offered for rekrutt/10)
     return None
@@ -369,13 +381,14 @@ def normalize_category(category: str) -> str:
 
 
 def get_category_age(category: str) -> int | None:
-    """Extract age from category like 'G10', 'J15', etc.
+    """Extract age from category like 'G10', 'J15', 'G18-19', etc.
 
     Returns None for senior categories like 'M', 'W', 'U20', 'U23'.
+    For ranges like 'G18-19', returns the lower bound (18).
     """
     normalized = normalize_category(category)
-    # Match G/J followed by age number
-    match = re.match(r"^[GJ](\d+)$", normalized)
+    # Match G/J followed by age number, optionally with a range like "18-19"
+    match = re.match(r"^[GJ](\d+)(?:-\d+)?$", normalized)
     if match:
         return int(match.group(1))
     # Senior/U categories treated as 15+
@@ -1189,6 +1202,7 @@ ISONEN_EVENT_CODES: dict[str, str] = {
     "Lengde": "LJ",
     "Lengde uten tilløp": "SLJ",
     "Tresteg": "TJ",
+    "Stav": "PV",
     "Stavsprang": "PV",
     "Kule": "SP",
     "Diskos": "DT",
@@ -1225,6 +1239,7 @@ _EVENT_NAME_TO_CODE.update({
     "60m hekk": "60H",
     "80m hekk": "80H",
     "100m hekk": "100H",
+    "200m hekk": "200H",
 })
 
 
