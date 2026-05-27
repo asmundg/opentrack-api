@@ -278,15 +278,20 @@ class MinfriidrettsScraper:
             club = None
             date = None
             venue = None
-            
-            # Parse additional cells for context
+
+            # For wind-affected events, wind is embedded in the result cell as
+            # "VALUE(±W,W)" — split it out so get_result_as_float() can parse it.
+            wind_match = re.match(r'^(.+?)\(([+\-]?[\d,.]+)\)\s*$', result_cell)
+            if wind_match:
+                result_cell = wind_match.group(1).strip()
+                wind = wind_match.group(2)
+
+            # Parse additional cells for context (cells[2..] are position, club, date, venue)
             for i, cell in enumerate(cells[2:], 2):
                 cell_text = cell.get_text().strip()
                 
                 # Try to identify what this cell contains
-                if re.match(r'[+\-]?\d+[,.]?\d*', cell_text) and i == 2:
-                    wind = cell_text
-                elif re.match(r'\d+(-h\d+)?', cell_text):
+                if re.match(r'\d+(-h\d+)?$', cell_text):
                     position = cell_text
                 elif re.search(r'\d{2}\.\d{2}\.\d{2,4}', cell_text):
                     date_match = re.search(r'(\d{2}\.\d{2}\.\d{2,4})', cell_text)
