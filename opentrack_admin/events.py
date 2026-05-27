@@ -930,11 +930,11 @@ class EventScheduler:
                 )
 
                 if result:
-                    # Get PB as float (handles Norwegian locale comma decimal)
-                    pb_value = result.get_result_as_float()
+                    # Format for opentrack input (Norwegian comma -> dot/colon)
+                    pb_value = result.get_result_formatted()
                     if pb_value is not None:
                         pb_lookup[name] = {
-                            "pb": pb_value,  # Float value (e.g., 10.54, 6.32)
+                            "pb": pb_value,  # e.g., "10.54", "6:00.80", "6.32"
                             "sb": "",  # SB would require looking at current season results
                         }
                         logger.info(f"Found PB for {name}: {pb_value}")

@@ -83,6 +83,25 @@ class Result:
         except (ValueError, AttributeError):
             return None
 
+    def get_result_formatted(self) -> Optional[str]:
+        """
+        Get the result as a string formatted for opentrack input.
+
+        Converts Norwegian comma format to dot/colon format:
+        - "30,05" -> "30.05" (sprints, field events)
+        - "2,08,98" -> "2:08.98" (middle-distance: M:SS.cc)
+        - "1,15,30,45" -> "1:15:30.45" (long-distance: H:MM:SS.cc)
+
+        Returns None if the result cannot be parsed (validated via
+        get_result_as_float so callers get a single None signal).
+        """
+        if self.get_result_as_float() is None:
+            return None
+        parts = self.result.strip().split(',')
+        if len(parts) == 1:
+            return parts[0]
+        return ':'.join(parts[:-1]) + '.' + parts[-1]
+
 
 @dataclass
 class Athlete:
