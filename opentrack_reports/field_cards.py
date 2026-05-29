@@ -494,8 +494,9 @@ def create_field_cards(
             )
 
         if len(all_competitors) == 0:
-            print(f"  No competitors in group {group_key}, skipping")
-            continue
+            print(
+                f"  No competitors in group {group_key}, emitting header-only page"
+            )
 
         # Create group header using event names in the same order as competitors
         if (
@@ -578,6 +579,12 @@ def create_field_cards(
             )
 
         elements.append(Spacer(1, 0.3 * cm))
+
+        # Empty event: header has been emitted so refs can see something is
+        # scheduled at this time; skip the table layout and move on.
+        if not all_competitors:
+            elements.append(PageBreak())
+            continue
 
         # Don't sort competitors by bib - preserve the order from results
         # all_competitors.sort(key=lambda x: int(x['bib']))  # Removed - preserve original order

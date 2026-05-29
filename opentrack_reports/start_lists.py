@@ -454,6 +454,15 @@ def create_start_lists(
 
             sorted_heats = sorted(event_data["heats"].items(), key=get_heat_sort_key)
 
+            # If the event has no entries at all, every heat is empty. Emit
+            # just the event-name header so the page still tells refs that
+            # something is scheduled at this time (instead of a blank page
+            # with only the start time line).
+            if not any(competitors for _, competitors in sorted_heats):
+                elements.append(Paragraph(event_name, category_style))
+                elements.append(Spacer(1, 0.4 * cm))
+                continue
+
             # Debug: Show heat ordering for merged events
             if (
                 len(

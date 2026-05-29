@@ -11,7 +11,7 @@ import typer
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig
-from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_xlsx, parse_event_schedule_csv, Checkpoint
+from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_file, parse_schedule_xlsx, parse_event_schedule_csv, Checkpoint
 from pblookup import PBLookupService
 
 # Create the typer app for admin commands
@@ -363,6 +363,143 @@ def update_pbs(
         print()
         print(f"✅ Updated PBs for {total_updated} total competitors")
         
+        if errors:
+            print()
+            print(f"⚠️  {len(errors)} events had errors:")
+            for event, error in errors:
+                print(f"   - {event}: {error}")
+            raise typer.Exit(1)
+
+
+@app.command("set-implements")
+def set_implements(
+    competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
+    file: Annotated[Path, typer.Argument(help="Schedule file: schedule_events.csv (event overview), Isonen-format schedule.csv, or Isonen-format .xlsx")],
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
+    no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
+) -> None:
+    """Set implement weights for throwing events (SP, DT, JT, HT).
+
+    Pool seeding must already be done (run `update-pbs` first), otherwise
+    the per-pool weight editor will be empty and the command will fail.
+    """
+    setup_logging(verbose=verbose)
+    logger = logging.getLogger(__name__)
+
+    config = OpenTrackConfig.from_env()
+
+    if not config.username or not config.password:
+        print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
+        raise typer.Exit(1)
+
+    if not file.exists():
+        print(f"❌ Schedule file not found: {file}")
+        raise typer.Exit(1)
+
+    schedules = parse_schedule_file(file)
+
+    if not schedules:
+        print("❌ No valid events found in schedule file.")
+        raise typer.Exit(1)
+
+    # Build worklist: skip FIFA (unknown to OpenTrack) and anything that
+    # isn't a throw with a known implement weight. FIFA must be filtered
+    # before reading implement_weight, which raises on unknown categories.
+    # Throwing events without a weight in our table (masters, rekrutt/10
+    # DT/JT/HT) are surfaced separately so the user can handle them manually.
+    worklist: list[tuple[EventSchedule, str]] = []
+    skipped_no_weight: list[EventSchedule] = []
+    for sched in schedules:
+        if sched.category.upper() == "FIFA":
+            continue
+        if not sched.is_throwing_event:
+            continue
+        weight = sched.implement_weight
+        if weight is None:
+            skipped_no_weight.append(sched)
+            continue
+        worklist.append((sched, weight))
+
+    if skipped_no_weight:
+        print(f"⚠️  Skipping {len(skipped_no_weight)} throwing event(s) with no weight in table (set manually):")
+        for sched in skipped_no_weight:
+            print(f"   {sched.search_term}")
+        print()
+
+    if not worklist:
+        print("❌ No throwing events with implement weights found in schedule.")
+        raise typer.Exit(1)
+
+    print(f"⚖️  Setting implement weights for {len(worklist)} event(s):")
+    for sched, weight in worklist:
+        print(f"   {sched.search_term} → {weight}")
+    print()
+
+    # Use a separate checkpoint name to avoid colliding with schedule/PB
+    # checkpoints. Include the weight in each key so a corrected weight
+    # forces a re-run without needing --no-checkpoint.
+    checkpoint_name = None
+    if not no_checkpoint:
+        slug = competition_url.rstrip("/").split("/")[-1]
+        checkpoint_name = f"{slug}-implements"
+        print(f"📍 Using checkpoint: {checkpoint_name}")
+
+    checkpoint = Checkpoint(checkpoint_name) if checkpoint_name else None
+
+    def ckpt_key(sched: EventSchedule, weight: str) -> str:
+        return f"{sched.search_term}|weight={weight}"
+
+    if checkpoint:
+        skip_count = sum(1 for sched, weight in worklist if checkpoint.is_done(ckpt_key(sched, weight)))
+        if skip_count > 0:
+            print(f"   Skipping {skip_count} already-completed events")
+
+    with OpenTrackSession(config) as session:
+        session.goto_home()
+        if not session.is_logged_in():
+            session.login()
+
+        session.page.goto(competition_url)
+
+        scheduler = EventScheduler(session)
+        scheduler.navigate_to_events_table()
+
+        processed = 0
+        errors: list[tuple[str, str]] = []
+
+        for i, (sched, weight) in enumerate(worklist, 1):
+            key = ckpt_key(sched, weight)
+            if checkpoint and checkpoint.is_done(key):
+                print(f"⏭️  Skipping {i}/{len(worklist)}: {sched.search_term} (already done)")
+                continue
+
+            print(f"⚖️  Processing {i}/{len(worklist)}: {sched.search_term} → {weight}")
+
+            try:
+                scheduler.find_and_click_event(sched)
+                scheduler.set_implement_weight(weight)
+                processed += 1
+
+                if checkpoint:
+                    checkpoint.mark_done(key)
+
+                scheduler.navigate_to_events_table()
+
+            except Exception as e:
+                logger.error(f"Error processing {sched.search_term}: {e}")
+                errors.append((sched.search_term, str(e)))
+                # Hard reset on failure: the weight editor leaves the page
+                # in an unknown state (dirty Handsontable, partial save).
+                # Re-anchor on the competition URL before retrying nav.
+                try:
+                    session.page.goto(competition_url, wait_until="load")
+                    scheduler.navigate_to_events_table()
+                except Exception:
+                    pass
+
+        print()
+        print(f"✅ Set implement weights for {processed} event(s)")
+
         if errors:
             print()
             print(f"⚠️  {len(errors)} events had errors:")

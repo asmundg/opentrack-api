@@ -68,6 +68,7 @@ EVENT_NAMES = {
 # Gender: "G" for boys/men, "J" for girls/women
 # Age groups: 10 (rekrutt/6-10), 11, 12, 13, 14, 15, 16, 17, 20 (U20), 23 (U23), 99 (Senior)
 # Note: DT, JT, HT start at age 11 (not offered for rekrutt/10)
+# Masters weights are in MASTERS_IMPLEMENT_WEIGHTS — different bracketing.
 IMPLEMENT_WEIGHTS = {
     "SP": {  # Kule (Shot Put)
         "G": {
@@ -191,6 +192,65 @@ IMPLEMENT_WEIGHTS = {
 THROWING_EVENTS = {"SP", "DT", "HT", "JT"}
 
 
+# Masters implement weights, keyed by event and gender. Each value is a list
+# of (bracket_start_age, weight) sorted ascending; the matching bracket is
+# the highest start_age <= athlete_age. Gender "G" = Menn, "J" = Kvinner.
+#
+# Slegge values omit the wire-length component (e.g. official "7,26/121,5"
+# stored as just "7,26") since OpenTrack only takes weight.
+# Spyd values are kg with Norwegian comma-decimal (OpenTrack rejects "Ng").
+# Vektkast is not modelled — not a standard event in our meet flows.
+MASTERS_IMPLEMENT_WEIGHTS: dict[str, dict[str, list[tuple[int, str]]]] = {
+    "SP": {
+        "G": [(35, "7,26"), (50, "6"), (60, "5"), (70, "4"), (80, "3")],
+        "J": [(35, "4"), (50, "3"), (60, "3"), (75, "2")],
+    },
+    "DT": {
+        "G": [(35, "2"), (50, "1,5"), (60, "1"), (70, "1"), (80, "1")],
+        "J": [(35, "1"), (50, "1"), (60, "1"), (75, "0,75")],
+    },
+    "HT": {
+        "G": [(35, "7,26"), (50, "6"), (60, "5"), (70, "4"), (80, "3")],
+        "J": [(35, "4"), (50, "3"), (60, "3"), (75, "2")],
+    },
+    "JT": {
+        "G": [(35, "0,8"), (50, "0,7"), (60, "0,6"), (70, "0,5"), (80, "0,4")],
+        "J": [(35, "0,6"), (50, "0,5"), (60, "0,5"), (75, "0,4")],
+    },
+}
+
+
+# Matches the canonical masters short form: "MV45-49", "KV75-79", "MV80",
+# etc. Used by both _get_masters_implement_weight and get_implement_weight's
+# dispatch (callers should pass normalized categories — normalize_category
+# converts long form like "Menn masters 60-64" to "MV60-64").
+_MASTERS_CATEGORY_RE = re.compile(r"^([MK])V(\d+)(?:-\d+)?$")
+
+
+def _get_masters_implement_weight(event_code: str, category: str) -> str | None:
+    """Look up a masters implement weight by gender + lower-bound age.
+
+    Returns None if the category doesn't match the masters pattern, the
+    event isn't a throw, or the athlete's age is below the lowest defined
+    bracket (35).
+    """
+    m = _MASTERS_CATEGORY_RE.match(normalize_category(category))
+    if not m:
+        return None
+
+    gender = "G" if m.group(1) == "M" else "J"
+    age = int(m.group(2))
+
+    brackets = MASTERS_IMPLEMENT_WEIGHTS.get(event_code, {}).get(gender, [])
+    weight: str | None = None
+    for bracket_start, w in brackets:
+        if age >= bracket_start:
+            weight = w
+        else:
+            break
+    return weight
+
+
 def get_implement_weight(event_code: str, category: str) -> str | None:
     """Get the implement weight for a throwing event and category.
 
@@ -209,6 +269,12 @@ def get_implement_weight(event_code: str, category: str) -> str | None:
     """
     if event_code not in THROWING_EVENTS:
         return None
+
+    # Masters categories have their own age-bracketed weight schedule.
+    # Detect via normalize_category (handles both raw "Menn masters 60-64"
+    # and already-normalized "MV60-64").
+    if _MASTERS_CATEGORY_RE.match(normalize_category(category)):
+        return _get_masters_implement_weight(event_code, category)
 
     # Determine gender
     normalized = normalize_category(category)
@@ -363,13 +429,23 @@ _CATEGORY_ALIASES: dict[str, str] = {
 }
 
 
+# Matches Isonen long-form masters categories like "Menn masters 60-64",
+# normalized to canonical "MV60-64" / "KV60-64" by normalize_category().
+_MASTERS_LONGFORM_RE = re.compile(
+    r"^(menn|kvinner)\s+masters\s+(\d+(?:-\d+)?)$",
+    re.IGNORECASE,
+)
+
+
 def normalize_category(category: str) -> str:
     """Map any known category alias to its canonical OpenTrack short code.
 
     Recognizes (case-insensitively):
       - Isonen XLSX values: "Gutter 14" -> "G14", "Kvinner Senior" -> "KS"
       - Scheduler enum values: "J-Rekrutt" -> "J10", "Menn Senior" -> "MS"
-      - Already-canonical codes ("G14", "J18-19", "KS", "MS") pass through.
+      - Masters long form: "Menn masters 60-64" -> "MV60-64",
+        "Kvinner masters 75-79" -> "KV75-79"
+      - Already-canonical codes ("G14", "J18-19", "KS", "MS", "MV60-64") pass through.
 
     This is the single normalization mechanism used by both the schedule
     parser (Isonen XLSX/CSV → EventSchedule) and the OpenTrack search code
@@ -377,6 +453,10 @@ def normalize_category(category: str) -> str:
     returned unchanged so callers like the OpenTrack search can fail fast
     with a clear "no match" error.
     """
+    m = _MASTERS_LONGFORM_RE.match(category.strip())
+    if m:
+        prefix = "MV" if m.group(1).lower() == "menn" else "KV"
+        return f"{prefix}{m.group(2)}"
     return _CATEGORY_ALIASES.get(category.lower(), category)
 
 
@@ -638,11 +718,11 @@ class EventScheduler:
         logger.info("Attempts saved")
 
     @screenshot_on_error
-    def set_implement_weight(self, weight: str, num_competitors: int = 20) -> None:
+    def set_implement_weight(self, weight: str) -> None:
         """Set the implement weight for all competitors in a throwing event.
 
         Navigates to the per-pool attempts/heights editor and fills in the weight
-        for every athlete row. Uses the Handsontable Weight column.
+        for every populated athlete row. Uses the Handsontable Weight column.
 
         Assumes we're on the event detail page. Pool seeding must have been done
         first (athletes need QPs and to be assigned to pools); otherwise the
@@ -651,7 +731,6 @@ class EventScheduler:
 
         Args:
             weight: The weight string (e.g., "2", "0,75", "400g")
-            num_competitors: Max number of competitor rows to fill (default 20)
         """
         page = self.page
 
@@ -713,7 +792,7 @@ class EventScheduler:
 
         logger.info(f"Filling weight for {populated} athlete row(s)")
 
-        for i in range(min(populated, num_competitors)):
+        for i in range(populated):
             row_box = rows.nth(i).bounding_box()
             if not row_box:
                 continue
@@ -1096,6 +1175,25 @@ def parse_time(time_str: str) -> time:
     return time(hour, minute)
 
 
+def parse_schedule_file(path: Path) -> list[EventSchedule]:
+    """Parse a schedule file, auto-detecting the format.
+
+    Supports:
+    - .xlsx → Isonen-format spreadsheet (via parse_schedule_xlsx)
+    - .csv with "event_type" header → scheduler event-overview CSV
+      (via parse_event_schedule_csv)
+    - other .csv → Isonen-format participant CSV (via parse_schedule_csv)
+    """
+    if path.suffix.lower() == ".xlsx":
+        return parse_schedule_xlsx(path)
+
+    # CSV: peek at the first line to distinguish event-overview from Isonen.
+    header = path.read_text().split("\n", 1)[0]
+    if "event_type" in header:
+        return parse_event_schedule_csv(path)
+    return parse_schedule_csv(path.read_text())
+
+
 def parse_schedule_csv(content: str) -> list[EventSchedule]:
     """Parse an Isonen-format schedule CSV file.
 
@@ -1249,9 +1347,12 @@ def parse_event_schedule_csv(path: Path) -> list[EventSchedule]:
     Each row has combined categories (e.g., "G14,J14") which are split
     into individual EventSchedule entries sharing the same start time.
 
+    Duplicate (category, event) pairs are silently dropped (first occurrence wins).
+
     Expected columns: event_type, categories, start_time
     """
     schedules: list[EventSchedule] = []
+    seen: set[tuple[str, str]] = set()
 
     with path.open(encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -1263,6 +1364,10 @@ def parse_event_schedule_csv(path: Path) -> list[EventSchedule]:
 
             for cat in row["categories"].split(","):
                 cat = cat.strip()
+                key = (cat, event_code)
+                if key in seen:
+                    continue
+                seen.add(key)
                 schedules.append(EventSchedule(
                     category=cat,
                     event=event_code,

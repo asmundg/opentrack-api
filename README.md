@@ -83,6 +83,15 @@ opentrack admin schedule <opentrack-url> schedule.csv
 opentrack admin update-pbs <opentrack-url> schedule.csv
 ```
 
+```bash
+opentrack admin set-implements <opentrack-url> schedule.csv
+```
+
+`set-implements` updates the per-pool implement weight for every throwing
+event (SP, DT, JT, HT) in the schedule. Run `update-pbs` first so athletes
+are seeded into pools; otherwise the weight editor is empty and the command
+will fail.
+
 ### Reports
 
 ```bash
