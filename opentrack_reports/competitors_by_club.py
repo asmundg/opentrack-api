@@ -17,9 +17,14 @@ from .opentrack_utils import (
 def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Parse OpenTrack JSON and create a list of competitors by club with their events."""
 
-    # First pass: collect all unique team names for each teamId to handle unicode duplicates
+    # First pass: collect all unique team names for each teamId to handle unicode
+    # duplicates. Skip rows missing either field — OpenTrack sometimes omits
+    # teamName even when teamId is set (recoverable here via the teamId map),
+    # and unaffiliated competitors may have neither.
     team_names_by_id = {}
     for competitor in data["competitors"]:
+        if "teamId" not in competitor or "teamName" not in competitor:
+            continue
         team_id = competitor["teamId"]
         team_name = competitor["teamName"]
 
@@ -44,6 +49,7 @@ def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
 
     # Build a dictionary of competitors by bib number
     competitors = {}
+    missing_club: list[str] = []
 
     for competitor in data["competitors"]:
         # Require fields instead of using .get() with fallbacks
@@ -51,9 +57,15 @@ def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
         last_name = competitor["lastName"]
         name = f"{first_name} {last_name}".strip()
 
-        # Get preferred club name using teamId
-        team_id = competitor["teamId"]
-        club = preferred_team_names[team_id]
+        # Resolve club via teamId → preferred name. If neither field is
+        # present anywhere for this team, fall back to empty string and
+        # record the name so the operator gets a warning.
+        team_id = competitor.get("teamId")
+        if team_id and team_id in preferred_team_names:
+            club = preferred_team_names[team_id]
+        else:
+            club = ""
+            missing_club.append(name)
         category = competitor["category"]
 
         # Extract PB and SB per event from eventsEntered
@@ -109,6 +121,14 @@ def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
     result = []
     for club in sorted(club_competitors.keys()):
         result.extend(club_competitors[club])
+
+    if missing_club:
+        print(
+            f"⚠️  {len(missing_club)} competitor(s) have no club registered in OpenTrack "
+            f"(club will be blank in reports):"
+        )
+        for name in missing_club:
+            print(f"   - {name}")
 
     return result
 
