@@ -43,6 +43,7 @@ def parse_opentrack_json(
 
     # Build a dictionary of competitors by bib number
     bib_dict = {}
+    missing_club: list[str] = []
 
     for competitor in data['competitors']:
         # Require fields instead of using .get() with fallbacks
@@ -50,8 +51,14 @@ def parse_opentrack_json(
         last_name = competitor['lastName']
         name = f"{first_name} {last_name}".strip()
 
-        # Get club information from teamName field
-        club = competitor['teamName']
+        # Club may be missing for unaffiliated competitors (e.g. youth
+        # registrations). Track and warn so the operator can fix it in
+        # OpenTrack if desired, but don't crash the CSV generation.
+        if 'teamName' in competitor:
+            club = competitor['teamName']
+        else:
+            club = ''
+            missing_club.append(name)
         category = competitor['category']
 
         # Derive exact age class from birth year when available
@@ -129,6 +136,14 @@ def parse_opentrack_json(
 
     if backfilled > 0:
         print(f"Backfilled {backfilled} missing Tyrving point(s) using local calculator.")
+
+    if missing_club:
+        print(
+            f"⚠️  {len(missing_club)} competitor(s) have no club registered in OpenTrack "
+            f"(Klubb will be blank in the CSV):"
+        )
+        for name in missing_club:
+            print(f"   - {name}")
 
     return results
 
