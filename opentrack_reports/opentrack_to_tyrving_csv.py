@@ -29,12 +29,16 @@ def load_birth_years(xlsx_path: str) -> dict[str, int]:
 def parse_opentrack_json(
     data: dict[str, Any],
     birth_years: dict[str, int] | None = None,
+    day: int | None = None,
 ) -> list[dict[str, Any]]:
     """Parse OpenTrack JSON and extract required fields.
 
     When OpenTrack returns 0 points (e.g. for 18/19 age groups),
     computes points locally using the Tyrving coefficient table.
     Uses exact age class from birth_years when available.
+
+    If ``day`` is given, only events whose ``day`` field matches are
+    included (1-indexed, matching OpenTrack's own numbering).
     """
     results = []
 
@@ -85,6 +89,10 @@ def parse_opentrack_json(
     backfilled = 0
 
     for event in events:
+        # Filter by day if specified (matches start-lists / field-cards behaviour)
+        if day is not None and event["day"] != day:
+            continue
+
         # Require fields
         event_name = event['name']
 

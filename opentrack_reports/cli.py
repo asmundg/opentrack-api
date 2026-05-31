@@ -254,6 +254,10 @@ def tyrving_csv(
             help="Participant xlsx with birth dates for exact age class lookup",
         ),
     ] = None,
+    filter_date: Annotated[
+        Optional[str],
+        typer.Option("--date", "-d", help="Filter events by date (YYYY-MM-DD)"),
+    ] = None,
     refresh_coefficients: Annotated[
         bool,
         typer.Option(
@@ -266,6 +270,8 @@ def tyrving_csv(
 
     Automatically backfills missing points (e.g. for 18/19 age groups)
     using the official Tyrving coefficient table.
+
+    Use --date to restrict output to a single day of a multi-day meet.
     """
     from .opentrack_to_tyrving_csv import (
         load_birth_years,
@@ -285,9 +291,18 @@ def tyrving_csv(
         meeting_name = get_meeting_name(json_data)
         safe_meeting_name = create_safe_filename(meeting_name)
 
-        output_file = output or f"tyrvingpoeng_{safe_meeting_name}.csv"
+        day = None
+        day_suffix = ""
+        if filter_date is not None:
+            parsed_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
+            day = _date_to_day_number(json_data, parsed_date)
+            day_suffix = f"_day{day}"
 
-        parsed_data = parse_opentrack_json(json_data, birth_years=birth_years)
+        output_file = output or f"tyrvingpoeng_{safe_meeting_name}{day_suffix}.csv"
+
+        parsed_data = parse_opentrack_json(
+            json_data, birth_years=birth_years, day=day
+        )
         parsed_data.sort(key=lambda r: int(r['Tyrvingpoeng']), reverse=True)
         save_to_csv(parsed_data, output_file)
 
