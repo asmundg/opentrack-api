@@ -1,11 +1,12 @@
 """Parser for Isonen XLSX exports to convert registration data to events and athletes."""
 
+import re
 from datetime import datetime
 from typing import Any
 
 from openpyxl import load_workbook
 
-from .models import Athlete, Category, Event, EventType
+from .models import Athlete, Category, Event, EventType, MASTERS_CATEGORIES
 
 
 def parse_event_type(ovelse: str) -> EventType:
@@ -79,10 +80,32 @@ def parse_category(klasse: str) -> Category:
         "Kvinner senior": Category.ks,  # Handle both variations
     }
 
-    if klasse not in mapping:
-        raise ValueError(f"Unknown category: {klasse}")
+    if klasse in mapping:
+        return mapping[klasse]
 
-    return mapping[klasse]
+    masters_match = _MASTERS_LONGFORM_RE.match(klasse)
+    if masters_match:
+        prefix = "mv" if masters_match.group(1).lower() == "menn" else "kv"
+        lo, hi = masters_match.group(2), masters_match.group(3)
+        enum_name = f"{prefix}{lo}_{hi}"
+        try:
+            return Category[enum_name]
+        except KeyError as e:
+            raise ValueError(
+                f"Unsupported masters bracket: {klasse} "
+                f"(no Category enum member {enum_name!r})"
+            ) from e
+
+    raise ValueError(f"Unknown category: {klasse}")
+
+
+# Isonen long-form masters categories: "Menn masters 80-84", "Kvinner masters 75-79".
+# Mirrors opentrack_admin.events._MASTERS_LONGFORM_RE but captures the bracket
+# endpoints separately so we can build the matching Category enum name.
+_MASTERS_LONGFORM_RE = re.compile(
+    r"^(Menn|Kvinner)\s+masters\s+(\d+)-(\d+)$",
+    re.IGNORECASE,
+)
 
 
 def _calculate_event_priority(event_type: EventType, category: Category) -> int:
@@ -108,8 +131,8 @@ def _calculate_event_priority(event_type: EventType, category: Category) -> int:
 
     base_priority = 10 if event_type in track_events else 8
 
-    # Senior events get slightly higher priority
-    if category in {Category.ks, Category.ms}:
+    # Senior-tier events (incl. masters) get slightly higher priority
+    if category in {Category.ks, Category.ms} or category in MASTERS_CATEGORIES:
         base_priority += 2
 
     return base_priority

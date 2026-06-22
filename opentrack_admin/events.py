@@ -227,6 +227,21 @@ MASTERS_IMPLEMENT_WEIGHTS: dict[str, dict[str, list[tuple[int, str]]]] = {
 _MASTERS_CATEGORY_RE = re.compile(r"^([MK])V(\d+)(?:-\d+)?$")
 
 
+def fold_masters_to_senior(category: str) -> str:
+    """Map a masters category (MV*/KV*) to the matching senior (MS/KS).
+
+    OpenTrack imports masters athletes into the senior event pool rather
+    than creating separate MV*/KV* events, so any search against OpenTrack
+    must look up the corresponding senior event. Non-masters categories
+    pass through `normalize_category` unchanged.
+    """
+    normalized = normalize_category(category)
+    m = _MASTERS_CATEGORY_RE.match(normalized)
+    if not m:
+        return normalized
+    return "MS" if m.group(1) == "M" else "KS"
+
+
 def _get_masters_implement_weight(event_code: str, category: str) -> str | None:
     """Look up a masters implement weight by gender + lower-bound age.
 
@@ -539,8 +554,13 @@ class EventSchedule:
 
     @property
     def search_category(self) -> str:
-        """Get the normalized category for searching."""
-        return normalize_category(self.category)
+        """Get the category to use when searching for an OpenTrack event.
+
+        Masters (MV*/KV*) are folded to MS/KS because OpenTrack imports
+        masters athletes into the senior event pool. See
+        `fold_masters_to_senior`.
+        """
+        return fold_masters_to_senior(self.category)
 
     @property
     def search_term(self) -> str:
@@ -612,7 +632,14 @@ class EventScheduler:
         """
         page = self.page
 
-        logger.info(f"Searching for event: {schedule.search_term}")
+        if schedule.search_category != normalize_category(schedule.category):
+            logger.info(
+                "Searching for event: %s (folded from %s)",
+                schedule.search_term,
+                schedule.category,
+            )
+        else:
+            logger.info("Searching for event: %s", schedule.search_term)
 
         # Use the search box to filter
         search_box = page.get_by_role("textbox", name="Search")
@@ -718,23 +745,36 @@ class EventScheduler:
         logger.info("Attempts saved")
 
     @screenshot_on_error
-    def set_implement_weight(self, weight: str) -> None:
-        """Set the implement weight for all competitors in a throwing event.
+    def set_implement_weights(self, event_code: str) -> None:
+        """Set per-competitor implement weights for a throwing event.
 
-        Navigates to the per-pool attempts/heights editor and fills in the weight
-        for every populated athlete row. Uses the Handsontable Weight column.
+        Navigates to the per-pool attempts/heights editor, reads each
+        athlete row's category from the Handsontable data (the 'category'
+        column is hidden in the UI but present in the data model), and
+        types the resolved weight from `get_implement_weight(event_code,
+        row_category)` into the Weight column.
 
-        Assumes we're on the event detail page. Pool seeding must have been done
-        first (athletes need QPs and to be assigned to pools); otherwise the
-        edit table will be empty. Run `opentrack admin update-pbs` before
-        scheduling throwing events on a fresh import.
+        Per-row resolution is required because masters athletes (MV*/KV*)
+        are folded into senior pools (MS/KS) on OpenTrack, but they use
+        their own age-bracketed implement weights — not the senior weight.
+
+        Assumes we're on the event detail page. Pool seeding must have
+        been done first (athletes need QPs and to be assigned to pools);
+        otherwise the edit table will be empty. Run `opentrack admin
+        update-pbs` before scheduling throwing events on a fresh import.
 
         Args:
-            weight: The weight string (e.g., "2", "0,75", "400g")
+            event_code: OpenTrack event code (SP, DT, HT, JT)
+
+        Raises:
+            RuntimeError: If the pool is empty, the data table is
+                unreadable, or any row's category yields no weight for
+                this event (unknown category or category not offered for
+                this event).
         """
         page = self.page
 
-        logger.info(f"Setting implement weight: {weight}")
+        logger.info(f"Setting implement weights for event {event_code}")
 
         # After set_event_attempts we're on /manage/events/{code}/, which has
         # no per-pool Edit link. Navigate to the event detail view first to
@@ -759,6 +799,63 @@ class EventScheduler:
         # Wait for Handsontable to render before reading rows.
         page.locator("#attempts_ht .ht_master table.htCore").wait_for(state="visible")
 
+        # Read the underlying data array (includes hidden 'category' column).
+        rows_data = page.evaluate(
+            """() => {
+                const el = document.querySelector('#attempts_ht');
+                if (!el) return null;
+                let inst = null;
+                if (window.$ && $(el).handsontable) {
+                    try { inst = $(el).handsontable('getInstance'); } catch (e) {}
+                }
+                if (!inst && el.hotInstance) inst = el.hotInstance;
+                if (!inst && window.Handsontable && Handsontable.getInstance) {
+                    try { inst = Handsontable.getInstance(el); } catch (e) {}
+                }
+                if (!inst) return null;
+                return inst.getData();
+            }"""
+        )
+        if not rows_data:
+            raise RuntimeError("Could not read Handsontable data from weight editor")
+
+        populated = [r for r in rows_data if (r.get("bib") or "").strip()]
+        if not populated:
+            raise RuntimeError(
+                "Pool is empty (no athletes seeded). Run 'opentrack admin "
+                "update-pbs' to populate seeding performances before scheduling "
+                "throwing events."
+            )
+
+        # Resolve all weights up front so we fail fast on bad categories
+        # before mutating any cells.
+        per_row_weights: list[str] = []
+        for row in populated:
+            category = (row.get("category") or "").strip()
+            if not category:
+                raise RuntimeError(
+                    f"Athlete bib {row.get('bib')!r} "
+                    f"({row.get('first_name')} {row.get('last_name')}) "
+                    "has no category in pool data; cannot resolve implement weight."
+                )
+            try:
+                weight = get_implement_weight(event_code, category)
+            except ValueError as e:
+                raise RuntimeError(
+                    f"Cannot resolve implement weight for athlete bib "
+                    f"{row.get('bib')!r} ({row.get('first_name')} "
+                    f"{row.get('last_name')}, category {category!r}) "
+                    f"in event {event_code}: {e}"
+                ) from e
+            if weight is None:
+                raise RuntimeError(
+                    f"No implement weight defined for athlete bib "
+                    f"{row.get('bib')!r} ({row.get('first_name')} "
+                    f"{row.get('last_name')}, category {category!r}) "
+                    f"in event {event_code}."
+                )
+            per_row_weights.append(weight)
+
         # Find the Weight column header to locate the column's X position.
         table = page.locator("#attempts_ht .ht_master table.htCore")
         weight_header = table.locator("thead th").filter(has_text="Weight")
@@ -770,29 +867,16 @@ class EventScheduler:
             raise RuntimeError("Could not get Weight column position")
         weight_x = weight_header_box["x"] + weight_header_box["width"] / 2
 
-        # Count rows that actually have an athlete (non-empty first cell).
-        # Fresh imports produce an empty placeholder row when no athletes have
-        # been seeded into a pool yet.
         rows = table.locator("tbody tr")
-        row_count = rows.count()
-        populated = 0
-        for i in range(row_count):
-            first_cell = rows.nth(i).locator("td").first
-            if (first_cell.text_content() or "").strip():
-                populated += 1
-            else:
-                break
+        logger.info(
+            "Filling weights for %d athlete row(s): %s",
+            len(populated),
+            ", ".join(
+                f"{r.get('bib')}={w}" for r, w in zip(populated, per_row_weights)
+            ),
+        )
 
-        if populated == 0:
-            raise RuntimeError(
-                "Pool is empty (no athletes seeded). Run 'opentrack admin "
-                "update-pbs' to populate seeding performances before scheduling "
-                "throwing events."
-            )
-
-        logger.info(f"Filling weight for {populated} athlete row(s)")
-
-        for i in range(populated):
+        for i, weight in enumerate(per_row_weights):
             row_box = rows.nth(i).bounding_box()
             if not row_box:
                 continue
@@ -802,7 +886,7 @@ class EventScheduler:
             page.wait_for_timeout(100)
             page.keyboard.type(weight)
             page.keyboard.press("Enter")
-            logger.debug(f"Set weight for row {i + 1}")
+            logger.debug(f"Set weight for row {i + 1}: {weight}")
 
         # The Save button POSTs the form and reloads the edit page (no
         # in-page banner like the event-detail form). Wait for navigation.
@@ -1108,7 +1192,7 @@ class EventScheduler:
 
         # Set implement weights for throwing events
         if schedule.is_throwing_event and schedule.implement_weight:
-            self.set_implement_weight(schedule.implement_weight)
+            self.set_implement_weights(schedule.event)
 
         self.navigate_to_events_table()
         return True

@@ -403,10 +403,10 @@ def set_implements(
         raise typer.Exit(1)
 
     # Build worklist: skip FIFA (unknown to OpenTrack) and anything that
-    # isn't a throw with a known implement weight. FIFA must be filtered
-    # before reading implement_weight, which raises on unknown categories.
-    # Throwing events without a weight in our table (masters, rekrutt/10
-    # DT/JT/HT) are surfaced separately so the user can handle them manually.
+    # isn't a throw. The schedule's implement_weight is only used as a
+    # display hint and as a filter for events where no category in the
+    # schedule has a weight (e.g. rekrutt/G10 DT). Actual weights are
+    # resolved per-row from each athlete's category by set_implement_weights.
     worklist: list[tuple[EventSchedule, str]] = []
     skipped_no_weight: list[EventSchedule] = []
     for sched in schedules:
@@ -430,14 +430,13 @@ def set_implements(
         print("❌ No throwing events with implement weights found in schedule.")
         raise typer.Exit(1)
 
-    print(f"⚖️  Setting implement weights for {len(worklist)} event(s):")
+    print(f"⚖️  Setting implement weights for {len(worklist)} event(s) (per-athlete):")
     for sched, weight in worklist:
-        print(f"   {sched.search_term} → {weight}")
+        print(f"   {sched.search_term} (schedule category → {weight})")
     print()
 
     # Use a separate checkpoint name to avoid colliding with schedule/PB
-    # checkpoints. Include the weight in each key so a corrected weight
-    # forces a re-run without needing --no-checkpoint.
+    # checkpoints.
     checkpoint_name = None
     if not no_checkpoint:
         slug = competition_url.rstrip("/").split("/")[-1]
@@ -446,11 +445,11 @@ def set_implements(
 
     checkpoint = Checkpoint(checkpoint_name) if checkpoint_name else None
 
-    def ckpt_key(sched: EventSchedule, weight: str) -> str:
-        return f"{sched.search_term}|weight={weight}"
+    def ckpt_key(sched: EventSchedule) -> str:
+        return f"{sched.search_term}|event={sched.event}"
 
     if checkpoint:
-        skip_count = sum(1 for sched, weight in worklist if checkpoint.is_done(ckpt_key(sched, weight)))
+        skip_count = sum(1 for sched, _ in worklist if checkpoint.is_done(ckpt_key(sched)))
         if skip_count > 0:
             print(f"   Skipping {skip_count} already-completed events")
 
@@ -468,16 +467,16 @@ def set_implements(
         errors: list[tuple[str, str]] = []
 
         for i, (sched, weight) in enumerate(worklist, 1):
-            key = ckpt_key(sched, weight)
+            key = ckpt_key(sched)
             if checkpoint and checkpoint.is_done(key):
                 print(f"⏭️  Skipping {i}/{len(worklist)}: {sched.search_term} (already done)")
                 continue
 
-            print(f"⚖️  Processing {i}/{len(worklist)}: {sched.search_term} → {weight}")
+            print(f"⚖️  Processing {i}/{len(worklist)}: {sched.search_term} (per-athlete; schedule hint {weight})")
 
             try:
                 scheduler.find_and_click_event(sched)
-                scheduler.set_implement_weight(weight)
+                scheduler.set_implement_weights(sched.event)
                 processed += 1
 
                 if checkpoint:
