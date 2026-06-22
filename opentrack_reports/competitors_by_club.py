@@ -74,8 +74,8 @@ def parse_competitors_by_club(data: dict[str, Any]) -> list[dict[str, Any]]:
         for event_entry in competitor.get("eventsEntered", []):
             event_id = event_entry.get("eventId", "")
             if event_id:
-                pb_by_event[event_id] = event_entry.get("pb", "")
-                sb_by_event[event_id] = event_entry.get("sb", "")
+                pb_by_event[event_id] = event_entry.get("pb") or ""
+                sb_by_event[event_id] = event_entry.get("sb") or ""
 
         # Use sortBib as the key for the competitor dictionary if available
         if "sortBib" in competitor:
