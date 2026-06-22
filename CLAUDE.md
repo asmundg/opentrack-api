@@ -16,7 +16,7 @@ This document describes the code layout and basic principles of the track meet s
 
 ### 3. Separation of Concerns
 - **Parsing**: Converts external formats to internal models
-- **Scheduling**: Pure constraint solving logic
+- **Layout**: Merging and timing decided externally (by an agent/human) and expressed in the event CSV
 - **Export**: Converts internal models to external formats
 - **Validation**: Checks constraints without recomputation
 
@@ -25,63 +25,49 @@ This document describes the code layout and basic principles of the track meet s
 ```
 scheduler/
 ├── cli.py                      # Top-level CLI commands (MAIN ENTRY POINT)
-├── __main__.py                 # Event grouping logic
+├── __main__.py                 # Event grouping logic (group_events_by_type)
 ├── models.py                   # Internal data models (Event, EventGroup, Athlete)
 ├── types.py                    # Shared type definitions (SchedulingResult)
 ├── dtos.py                     # Pydantic DTOs for CSV I/O validation
 │
-├── isonen_parser.py           # Parse Isonen CSV → Events & Athletes
-├── functional_scheduler.py    # Core constraint solver (Z3)
+├── isonen_parser.py            # Parse Isonen XLSX → Events & Athletes (one per category)
 │
-├── html_schedule_generator.py # SchedulingResult → HTML
-├── csv_exporter.py            # SchedulingResult → Athlete CSV
-├── event_csv.py               # SchedulingResult ↔ Event Overview CSV
-├── schedule_builder.py        # Event Overview CSV → SchedulingResult
-├── constraint_validator.py    # Validate manual schedules
+├── event_csv.py                # Event Overview CSV ↔ slot assignments
+├── schedule_builder.py         # Event Overview CSV → SchedulingResult
+├── constraint_validator.py     # Validate a manual/agent layout against the atoms
+├── html_schedule_generator.py  # SchedulingResult → HTML grid
+├── hurdle_plan_generator.py    # SchedulingResult → hurdle setup plan HTML
 │
-└── CONSTRAINTS.md             # Documentation of scheduling constraints
+└── CONSTRAINTS.md              # Documentation of scheduling constraints
 ```
 
-## Workflow Options
+## Workflow
 
-### Option 1: Fully Automated
+Layout (which categories merge, and each group's time and venue) is a
+human/agent decision expressed in an event overview CSV. The CLI validates that
+CSV and renders the outputs. There is no automatic solver.
+
 ```
-Isonen CSV → schedule command → HTML + Athlete CSV + Event CSV
+Isonen XLSX + edited schedule_events.csv → from-events → HTML (+ hurdle plan)
 ```
 
 **Command:**
 ```bash
-scheduler schedule participants.csv -o schedule.html
+scheduler from-events participants.xlsx schedule_events.csv -o schedule.html \
+    --arena valhall --shared jt,dt,ht --shared hj,lj,tj
 ```
 
-**Outputs:**
-- `schedule.html` - Visual schedule grid (time × venue)
-- `schedule.csv` - Updated participant list with start times
-- `schedule_events.csv` - Event overview with start/end times
+`from-events`:
+1. Imports the event CSV (Pydantic-validated).
+2. Validates all hard constraints (`constraint_validator.py`) and stops at the
+   first violation with a specific message.
+3. Builds a `SchedulingResult` from the manual times and renders the HTML grid
+   and, when there are hurdle events, the hurdle setup plan.
 
-### Option 2: Manual Adjustment Workflow
-```
-1. Isonen CSV → schedule command → Event CSV
-2. Manually edit Event CSV (adjust event times)
-3. Event CSV → from-events command → HTML + Athlete CSV
-```
-
-**Commands:**
-```bash
-# Step 1: Generate initial schedule
-scheduler schedule participants.csv -o schedule.html
-
-# Step 2: Manually edit schedule_events.csv
-
-# Step 3: Regenerate outputs from manual schedule
-scheduler from-events participants.csv schedule_events.csv -o final_schedule.html
-```
-
-This workflow allows for:
-- Initial automated optimization
-- Manual adjustments for special circumstances
-- Validation that manual changes satisfy all constraints
-- Final output generation
+To produce and iterate on `schedule_events.csv`, use the `track-meet-layout`
+skill (`.claude/skills/`): it seeds a proposed merge/layout, detects mistakes in
+batch (`layout_report.py`), and re-validates each revision with `from-events`
+until every constraint passes.
 
 ## Data Flow
 
@@ -101,11 +87,12 @@ This workflow allows for:
     `scheduler/CONSTRAINTS.md` for the cross-tier merge rules
     (Masters↔15+, 11-14↔15-17).
 
-### Processing: Constraint Solving
-- Input: EventGroups + Athletes + Configuration
-- Solver: Z3 SAT solver with multi-phase optimization
-- Output: SchedulingResult (immutable, frozen dataclass)
-- Logic in: `functional_scheduler.py`
+### Processing: Layout & Validation
+- Input: an event overview CSV (merges + start/end times) + Athletes
+- `constraint_validator.py` checks coverage and all hard constraints against the
+  raw `(event_type, category)` atoms, without re-deriving any grouping.
+- `schedule_builder.py` turns the validated CSV into a `SchedulingResult`
+  (immutable, frozen dataclass defined in `types.py`).
 
 ### Output: Multiple Formats
 
@@ -114,10 +101,8 @@ This workflow allows for:
 - Rowspan for multi-slot events
 - Visual category grouping
 
-**Athlete CSV** (`csv_exporter.py`):
-- Updated Isonen CSV with computed start times
-- Preserves all original columns
-- Updates "Kl." and "Dato" fields
+**Hurdle plan** (`hurdle_plan_generator.py`):
+- Per-heat hurdle setup (distance, height, lane/gutter layout) for hurdle events
 
 **Event Overview CSV** (`event_csv.py`):
 - One row per event group
@@ -145,10 +130,10 @@ This workflow allows for:
 - Track event ordering (by distance, then hurdles, then age)
 - Event continuity (multi-slot events occupy consecutive slots)
 
-**Soft constraints** (optimization objectives):
-- Minimize total duration (Phase 1)
-- Young athletes finish early (Phase 2)
-- Maximize recovery gaps for older athletes (Phase 3)
+**Soft goals** (the layout aims for; enforced by judgment and the skill's report, not a solver):
+- Minimize total duration (compact makespan)
+- Young athletes finish early
+- Maximize recovery gaps for older athletes
 
 ## Validation Principles
 
@@ -175,8 +160,8 @@ This workflow allows for:
 3. Add to CLI command in `cli.py`
 
 ### Adding a New Constraint
-1. Implement constraint in `functional_scheduler.py`
-2. Add validation logic in `constraint_validator.py`
+1. Implement the check in `constraint_validator.py`
+2. Mirror it as a batch pre-check in the track-meet-layout skill's `layout_report.py` if useful
 3. Document in `CONSTRAINTS.md`
 
 ### Modifying Event Grouping Rules
@@ -190,11 +175,6 @@ This workflow allows for:
 - Default: Enabled
 - Effect: J/G10 athletes use separate shot put circle
 - Global setting: `models.USE_SECONDARY_VENUES`
-
-### Solver Timeouts
-- Default: 10 seconds per optimization phase
-- Configurable via: `--timeout` flag
-- Increase for larger meets or more complex constraints
 
 ### Slot Duration
 - Fixed: 5 minutes per slot
@@ -213,13 +193,12 @@ This workflow allows for:
   - Athlete conflicts (athlete in two places at once)
   - Track ordering violated (distance order or age order)
 
-### "No solution found"
-- Schedule is over-constrained
-- Try:
-  - Increase max duration
-  - Add more personnel
-  - Enable secondary venues
-  - Adjust track spacing constraints
+### "Constraint violation" won't clear
+- The layout is over-constrained or mis-merged. `from-events` reports one
+  violation at a time; the skill's `layout_report.py --xlsx` lists all athlete
+  conflicts, age-merge and spacing problems at once.
+- Try: re-split an oversized or illegal merge, move a row to a free slot, enable
+  secondary venues, or widen the track/field reconfiguration gaps.
 
 ### CSV Import Errors
 - Pydantic validation will show line number and specific error
@@ -231,7 +210,7 @@ This workflow allows for:
 ## Future Extensions
 
 The architecture supports:
-- Multiple scheduling algorithms (plug in alternative to Z3)
+- Alternative layout generators (e.g. an optimizer that emits the same event CSV)
 - Additional output formats (PDF, API, etc.)
 - Web UI (CLI logic remains unchanged)
 - Custom constraint plugins

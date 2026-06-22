@@ -7,7 +7,7 @@ from a SchedulingResult, providing a visual grid layout of the schedule.
 
 from typing import Any
 from .models import MASTERS_MEN, MASTERS_WOMEN, Venue, Category, EventGroup, get_venue_for_event
-from .functional_scheduler import SchedulingResult
+from .types import SchedulingResult
 
 
 def generate_html_schedule_table(

@@ -42,24 +42,29 @@ Track events follow a strict sequence based on starting position logistics:
 400m) runs right after the sprint/hurdle block instead of being forced last by
 its distance, so the youngest finish early. Sprints/hurdles still come first
 overall — they occupy the home straight that the round race must run through.
-See `_get_event_group_sort_key`.
+Distance order is enforced by `constraint_validator._validate_track_ordering`
+(using `get_track_event_order`), with the Rekrutt round-event exception allowed
+as a warning. Younger-first within a distance is a soft policy, not enforced.
 
 This ordering minimizes equipment moves and starting position changes.
 
 #### Spacing between consecutive track events
-Implemented in `_track_min_gap_slots` (shared by the spacing constraints and the
-Phase 4 pull-forward pass, so both agree how close two events may sit):
-- **Hurdle setup/teardown** (one side is hurdles, the other is not, or a hurdle
-  distance/position changes): **2 slots**. A 400m cannot start until the hurdles
-  are cleared from the straight.
-- **Pure start-position change** (different distance-to-goal block, no hurdles):
-  **1 slot** — just a starter move.
-- **Both groups young (≤12)**: **0 slots** — back-to-back is fine.
-- **Otherwise**: **1 slot** of prep time.
-- **Sprint→round re-rig**: arena-specific (`ArenaConfig.sprint_to_round_gap_minutes`).
+Spacing is a soft layout goal, checked by the track-meet-layout skill's
+`layout_report.py` (in minutes), not a hard `from-events` constraint. Compress
+the track timeline, but leave **>=5 min** between two consecutive heats when:
+- **The start position changes** (a different race distance): the starter team
+  must walk to the new start. A 400m also cannot start until the hurdles are
+  cleared from the straight.
+- **Hurdles are reconfigured** (both heats use hurdles, or a hurdle setup
+  changes): time to reset the hurdles.
 
-Start positions are grouped by distance-to-goal in `_START_POSITION_BLOCKS`
-(e.g. 200m/200mH/600m/5000m share one position, so no extra gap between them).
+Consecutive same-distance flat heats can run back-to-back. Races that share a
+start position (e.g. 200m/600m/5000m at the 200m-to-goal mark) need no extra gap.
+
+On the **field**, leave the same **>=5 min** when the event type changes at a
+venue or within a shared-personnel bucket (e.g. Spyd -> Slegge): implements and
+the runway/circle must be reset. Same-type groups run back-to-back. `layout_report.py`
+checks this when given the same `--shared` groups as `from-events`.
 
 ### 4. Hurdle Event Merging
 Hurdle categories may share a heat across different distances and heights, subject to
@@ -75,10 +80,11 @@ lane capacity:
   age boundary (an 11-14 and a 15+ category never share a heat), even when the lanes
   would fit. This can force single-person heats (e.g. one G14 and one J15 at 80m hurdles)
   that cannot be merged.
-- **Solver note**: the Z3 grouping path (`schedule` command, `--mix-hurdle-distances`)
-  still uses the older, more conservative `mixed_hurdle_lane_capacity` (2 gutter lanes
-  per distance boundary). It therefore splits mixed-distance pools into more heats than
-  strictly necessary, but its output still satisfies the validator above.
+- **Seed grouping note**: the proposal seed (`group_events_by_type`, used by the
+  skill's `dump_groups.py`) uses the older, more conservative
+  `mixed_hurdle_lane_capacity` (2 gutter lanes per distance boundary). It therefore
+  splits mixed-distance pools into more heats than strictly necessary, but its output
+  still satisfies the validator above, and the agent is free to re-merge.
 
 Hurdle specs (60m / 80m / 100m) are defined in `models.py:HURDLE_SPECS`. Boys 17+ run 110m hurdles, which has no event type and is therefore not modelled.
 

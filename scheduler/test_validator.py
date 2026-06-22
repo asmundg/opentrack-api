@@ -244,3 +244,17 @@ def test_hurdles_same_distance_different_height_passes():
     athletes = [Athlete("A", [g12]), Athlete("B", [j12])]
     rows = [_row("h", EventType.m60_hurdles, [Category.g12, Category.j12], "17:00", "17:05")]
     validate_event_schedule(rows, [g12, j12], athletes)  # no raise
+
+
+def test_rekrutt_round_out_of_order_passes():
+    # A Rekrutt (10yo) round race may run before shorter races so the youngest
+    # finish early; the validator warns instead of failing (CONSTRAINTS.md s3).
+    m400_g = _atom(EventType.m400, Category.g10)
+    m400_j = _atom(EventType.m400, Category.j10)
+    m60 = _atom(EventType.m60, Category.j15)
+    athletes = [Athlete("A", [m400_g]), Athlete("B", [m400_j]), Athlete("C", [m60])]
+    rows = [
+        _row("rek400", EventType.m400, [Category.g10, Category.j10], "17:00", "17:05"),
+        _row("r60", EventType.m60, [Category.j15], "17:10", "17:15"),
+    ]
+    validate_event_schedule(rows, [m400_g, m400_j, m60], athletes)
