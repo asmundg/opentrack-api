@@ -414,6 +414,7 @@ class CompetitionCreator:
         page.get_by_role("button", name="Save").nth(3).click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
 
+    @screenshot_on_error
     def _configure_scoring(self, details: CompetitionDetails) -> None:
         """Configure scoring settings like combined events tables."""
         page = self.page
@@ -421,7 +422,7 @@ class CompetitionCreator:
         # Navigate to Events and scoring. The top-nav link text reflects the
         # currently-configured scoring system: "World Athletics" by default,
         # "Tyrving" once set. Try both to stay idempotent on re-runs.
-        logger.debug("Navigating to Events and scoring")
+        logger.debug("Navigating to Events and scoring (url=%s)", page.url)
         scoring_nav = None
         for label in ("World Athletics", "Tyrving"):
             candidate = page.locator("a").filter(has_text=label)
@@ -429,6 +430,14 @@ class CompetitionCreator:
                 scoring_nav = candidate.first
                 break
         if scoring_nav is None:
+            nav_texts = page.locator("nav a, header a, .navbar a").all_inner_texts()
+            all_link_texts = page.locator("a").all_inner_texts()
+            logger.error(
+                "Scoring nav link not found on %s. nav/header anchors=%r ; all anchor texts=%r",
+                page.url,
+                [t.strip() for t in nav_texts if t.strip()],
+                [t.strip() for t in all_link_texts if t.strip()],
+            )
             raise RuntimeError("Could not find scoring system navigation link")
         scoring_nav.click()
         page.get_by_role("link", name="Events and scoring").click()
@@ -547,6 +556,7 @@ class CompetitionCreator:
         banner.wait_for(state="hidden", timeout=120_000)
         logger.info("%s background task complete", step_name)
 
+    @screenshot_on_error
     def _number_competitors(self) -> None:
         """Automatically assign bib numbers to all competitors."""
         page = self.page
@@ -561,8 +571,12 @@ class CompetitionCreator:
         logger.debug("Applying bib numbers")
         page.locator("button[name=apply_numbers]").click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
+        # Wait for the Vue/Pusher background-task banner, if any, to clear
+        # so the next navigation doesn't race with an in-flight task.
+        self._wait_for_background_task("number")
         logger.debug("Bib numbers assigned")
 
+    @screenshot_on_error
     def _apply_random_seeding(self) -> None:
         """Fetch all start lists (track + field) with random athlete order.
 
@@ -573,9 +587,14 @@ class CompetitionCreator:
         """
         page = self.page
 
-        logger.debug("Navigating to seeding page")
         seeding_url = page.url.rstrip("/").rsplit("/manage/", 1)[0] + "/manage/seeding/"
-        page.goto(seeding_url)
+        logger.debug(
+            "Navigating to seeding page %s (from %s)", seeding_url, page.url
+        )
+        # Use domcontentloaded rather than the default "load" — the seeding
+        # page may pull in sub-resources that race with prior in-flight
+        # activity and trigger ERR_ABORTED on the stricter "load" wait.
+        page.goto(seeding_url, wait_until="domcontentloaded")
 
         # Each Random order button is a form submit button. Submit both
         # forms (track + field) by dispatching a click directly — the
