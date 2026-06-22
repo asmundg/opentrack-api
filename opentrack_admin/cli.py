@@ -11,7 +11,7 @@ import typer
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig
-from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_file, parse_schedule_xlsx, parse_event_schedule_csv, Checkpoint
+from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_file, parse_event_schedule_csv, parse_event_merge_groups, Checkpoint
 from pblookup import PBLookupService
 
 # Create the typer app for admin commands
@@ -182,6 +182,7 @@ def schedule(
     day: Annotated[Optional[int], typer.Option("--day", help="Day number for multi-day meets (1-based)")] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
+    no_merge: Annotated[bool, typer.Option("--no-merge", help="Don't merge track events that share a start time; schedule them as separate heats")] = False,
 ) -> None:
     """Schedule events (set start times) for a competition."""
     setup_logging(verbose=verbose)
@@ -199,10 +200,17 @@ def schedule(
     
     # Detect format: event overview CSV has "event_type" header, Isonen has "Klasse"
     header = file.read_text().split("\n", 1)[0]
-    if "event_type" in header:
+    is_event_overview = "event_type" in header
+    if is_event_overview:
         schedules = parse_event_schedule_csv(file)
     else:
         schedules = parse_schedule_csv(file.read_text())
+
+    # Track events sharing a start time (a multi-category row in the event
+    # overview) run as one heat, expressed in OpenTrack by merging them.
+    merge_groups = (
+        parse_event_merge_groups(file) if is_event_overview and not no_merge else []
+    )
 
     if not schedules:
         print("❌ No valid events found in schedule file.")
@@ -212,7 +220,14 @@ def schedule(
     for s in schedules:
         print(f"   {s.category} {s.event} @ {s.start_time.strftime('%H:%M')}")
     print()
-    
+
+    if merge_groups:
+        print(f"🔀 {len(merge_groups)} track group(s) will be merged:")
+        for g in merge_groups:
+            members = " + ".join(s.search_term for s in g.members)
+            print(f"   {members} @ {g.primary.start_time.strftime('%H:%M')}")
+        print()
+
     # Extract checkpoint name from competition URL (use slug)
     # e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/ -> ser9-25
     checkpoint_name = competition_url.rstrip("/").split("/")[-1] if not no_checkpoint else None
@@ -232,6 +247,9 @@ def schedule(
             scheduler.schedule_events(schedules, checkpoint_name=checkpoint_name, day=day)
             print()
             print(f"✅ All {len(schedules)} events scheduled successfully!")
+            if merge_groups:
+                scheduler.merge_event_groups(merge_groups, checkpoint_name=checkpoint_name)
+                print(f"✅ Merged {len(merge_groups)} track group(s)!")
         except Exception as e:
             print()
             print(f"❌ Failed: {e}")
@@ -251,7 +269,10 @@ def update_pbs(
 ) -> None:
     """Update PB/SB values for competitors in events.
 
-    Provide an Isonen XLSX/CSV file, or use --event and --category for a single event.
+    By default this is competitor-driven: it reads every entered event straight
+    from OpenTrack (via the competitor pages) and sets PBs, so it works even when
+    track events have been merged/renamed. Use --event and --category to update a
+    single event instead. A schedule file is no longer required and is ignored.
     """
     setup_logging(verbose=verbose)
     logger = logging.getLogger(__name__)
@@ -262,62 +283,58 @@ def update_pbs(
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
         raise typer.Exit(1)
 
-    # Build schedule list from file or single event
-    if event and category:
-        # Single event mode
-        from datetime import time as dt_time
-        schedules = [EventSchedule(category=category, event=event, start_time=dt_time(0, 0))]
-        print(f"📊 Updating PBs for single event: {category} {event}")
-    elif file:
-        if not file.exists():
-            print(f"❌ Schedule file not found: {file}")
-            raise typer.Exit(1)
+    single_event_mode = bool(event and category)
 
-        if file.suffix.lower() == ".xlsx":
-            schedules = parse_schedule_xlsx(file)
-        else:
-            schedules = parse_schedule_csv(file.read_text())
-
-        if not schedules:
-            print("❌ No valid events found in file.")
-            raise typer.Exit(1)
-
-        print(f"📊 Updating PBs for {len(schedules)} events...")
-    else:
-        print("❌ Provide a CSV/XLSX file or use --event and --category")
-        raise typer.Exit(1)
-    if club:
-        print(f"   Default club: {club}")
-    print()
-    
-    # Extract checkpoint name from competition URL (use slug with -pbs suffix)
+    # Checkpoint name: slug with -pbs suffix.
     checkpoint_name = None
     if not no_checkpoint:
         slug = competition_url.rstrip("/").split("/")[-1]
         checkpoint_name = f"{slug}-pbs"
-        print(f"📍 Using checkpoint: {checkpoint_name}")
-    
     checkpoint = Checkpoint(checkpoint_name) if checkpoint_name else None
-    
-    # Count how many we'll skip
-    if checkpoint:
-        skip_count = sum(1 for s in schedules if checkpoint.is_done(s.search_term))
-        if skip_count > 0:
-            print(f"   Skipping {skip_count} already-completed events")
-    
+
+    if single_event_mode:
+        from datetime import time as dt_time
+        schedules = [EventSchedule(category=category, event=event, start_time=dt_time(0, 0))]
+        print(f"📊 Updating PBs for single event: {category} {event}")
+    else:
+        print("📊 Updating PBs for all entered events (competitor-driven)...")
+    if club:
+        print(f"   Default club: {club}")
+    if checkpoint_name:
+        print(f"📍 Using checkpoint: {checkpoint_name}")
+    print()
+
     with OpenTrackSession(config) as session:
         session.goto_home()
         if not session.is_logged_in():
             session.login()
 
         session.page.goto(competition_url)
-
         scheduler = EventScheduler(session)
+
+        if not single_event_mode:
+            # Competitor-driven: discover events from entries and set PBs.
+            total_updated, errors = scheduler.update_all_event_pbs(
+                competition_url=competition_url,
+                default_club=club,
+                debug=debug_pblookup,
+                checkpoint=checkpoint,
+            )
+            print()
+            print(f"✅ Updated PBs for {total_updated} total competitors")
+            if errors:
+                print()
+                print(f"⚠️  {len(errors)} events had errors:")
+                for code, error in errors:
+                    print(f"   - {code}: {error}")
+                raise typer.Exit(1)
+            return
+
+        # Single-event mode.
         scheduler.navigate_to_events_table()
-        
         total_updated = 0
         errors = []
-        
+
         for i, sched in enumerate(schedules, 1):
             # Skip FIFA category (not defined in OpenTrack)
             if sched.category.upper() == "FIFA":

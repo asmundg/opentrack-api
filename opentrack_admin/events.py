@@ -405,6 +405,41 @@ def get_event_name(code: str) -> str:
     )
 
 
+# Round/heat annotations OpenTrack appends to entry titles, e.g.
+# "G13 HøydePool 1 of 1" or "G/J 11-13 60 meter hekkRace 1 of 1".
+_EVENT_TITLE_SUFFIX_RE = re.compile(
+    r"\s*(Race|Pool|Heat|Final|Round|Group)\s*\d.*$"
+)
+
+# Known discipline names, longest first so "60 meter hekk" beats "60 meter"
+# and "Høyde uten tilløp" beats "Høyde" when matching a title suffix.
+_EVENT_NAMES_BY_LENGTH = sorted(set(EVENT_NAMES.values()), key=len, reverse=True)
+_EVENT_NAME_TO_CODE_EXACT = {v: k for k, v in EVENT_NAMES.items()}
+
+
+def event_code_from_event_title(title: str) -> str | None:
+    """Derive the discipline code from an OpenTrack event title.
+
+    Event titles combine a category prefix with the discipline name, e.g.
+    "G/J 11-13 60 meter hekk" or a merged "G 12-14 600 meter". A trailing round
+    annotation ("...Pool 1 of 1") is stripped first. The discipline is matched
+    as the title's suffix against the known event-name vocabulary (longest match
+    wins); generic distances fall back to a numeric pattern. Returns the code
+    (e.g. "60H", "600m", "HJ") or None when no discipline can be identified.
+    """
+    cleaned = _EVENT_TITLE_SUFFIX_RE.sub("", title).strip()
+    for name in _EVENT_NAMES_BY_LENGTH:
+        if cleaned.endswith(name):
+            return _EVENT_NAME_TO_CODE_EXACT[name]
+    m = re.search(r"(\d+) meter hekk$", cleaned)
+    if m:
+        return f"{m.group(1)}H"
+    m = re.search(r"(\d+) meter$", cleaned)
+    if m:
+        return f"{m.group(1)}m"
+    return None
+
+
 # Map any known category alias to its canonical OpenTrack short code.
 # Covers Isonen XLSX values ("Gutter 14"), scheduler enum values
 # ("Kvinner Senior", "J-Rekrutt"), and lowercase / casing variants. Lookup
@@ -493,6 +528,19 @@ def get_category_age(category: str) -> int | None:
 def is_field_event(event_code: str) -> bool:
     """Check if event code is a field event (jumps/throws)."""
     return event_code in {"HJ", "SHJ", "LJ", "SLJ", "TJ", "PV", "SP", "DT", "JT", "HT"}
+
+
+def is_track_event(event_code: str) -> bool:
+    """Check if an event code is a track (running) event.
+
+    Track events are sprints/distance ("60m".."5000m"), hurdles ("60H".."400H")
+    and relays ("4x100m"). Everything else (jumps, throws, and the "Liten ball"
+    ball-throw) is a field event. Defined positively so unknown codes are not
+    mistaken for track heats.
+    """
+    return bool(
+        re.match(r"^\d+(m|H)$", event_code) or re.match(r"^\d+x\d+m$", event_code)
+    )
 
 
 def is_horizontal_field_event(event_code: str) -> bool:
@@ -594,6 +642,62 @@ class EventSchedule:
     def implement_weight(self) -> str | None:
         """Get the implement weight for this throwing event, or None."""
         return get_implement_weight(self.event, self.category)
+
+
+@dataclass
+class EventMergeGroup:
+    """Track events of one discipline that share a heat and must be merged.
+
+    A schedule_events.csv row groups the categories that run together. For track
+    events that means a single heat, which in OpenTrack is expressed by merging
+    the per-category events into one. `primary` is the event kept in OpenTrack;
+    every event in `others` is merged into it.
+    """
+
+    primary: EventSchedule
+    others: list[EventSchedule]
+
+    @property
+    def members(self) -> list[EventSchedule]:
+        """All events in the group, primary first."""
+        return [self.primary, *self.others]
+
+    @property
+    def merged_name(self) -> str:
+        """Combined name for the merged event, e.g. "G/J 13-14 200 meter".
+
+        Format: ``<gender> [<age range>] <event name>``. Gender is G (boys),
+        J (girls) or G/J (both) for youth, or M/K for senior-only groups. The
+        age range spans the members' ages (a single number when they coincide);
+        senior members contribute no age. All members share one event code, so
+        the event name is taken from the primary.
+        """
+        normalized = [normalize_category(m.category) for m in self.members]
+        ages = sorted(
+            age
+            for age in (get_category_age(m.category) for m in self.members)
+            if age is not None
+        )
+        has_male = any(
+            n.startswith("G") or n == "MS" or n.startswith("MV") for n in normalized
+        )
+        has_female = any(
+            n.startswith("J") or n == "KS" or n.startswith("KV") for n in normalized
+        )
+        male_letter, female_letter = ("G", "J") if ages else ("M", "K")
+        if has_male and has_female:
+            gender = f"{male_letter}/{female_letter}"
+        elif has_female:
+            gender = female_letter
+        else:
+            gender = male_letter
+
+        event_name = get_event_name(self.primary.event)
+        if ages:
+            lo, hi = ages[0], ages[-1]
+            age_range = str(lo) if lo == hi else f"{lo}-{hi}"
+            return f"{gender} {age_range} {event_name}"
+        return f"{gender} {event_name}"
 
 
 class EventScheduler:
@@ -1086,10 +1190,13 @@ class EventScheduler:
             name = comp["name"]
             club = comp.get("club") or default_club
             birth_date = comp.get("birth_date", "")
+            # Per-athlete category wins (merged events mix categories); fall back
+            # to the event-wide category for the single-event flow.
+            comp_category = comp.get("category") or category
 
             try:
                 result = service.lookup_pb(
-                    name, club, birth_date, pblookup_event, category=category
+                    name, club, birth_date, pblookup_event, category=comp_category
                 )
 
                 if result:
@@ -1166,6 +1273,188 @@ class EventScheduler:
 
         # Fill in the PB values
         return self.fill_pb_sb_values(pb_lookup)
+
+    def gather_entered_event_codes(self, competition_url: str) -> list[str]:
+        """Collect every OpenTrack event code that has at least one entry.
+
+        Walks the public competitor list and each competitor's page, reading the
+        event codes from their entry links (e.g. ".../event/T2/1/1/" -> "T2").
+        This enumerates exactly the events that need PBs without depending on the
+        events table or on per-category event names (which change when events are
+        merged). Returns codes in first-seen order.
+        """
+        page = self.page
+        base = competition_url.rstrip("/")
+
+        page.goto(f"{base}/competitor/", wait_until="domcontentloaded")
+        page.wait_for_load_state("networkidle")
+        competitor_ids = page.evaluate(
+            """() => Array.from(new Set(
+                Array.from(document.querySelectorAll('a[href]'))
+                    .map(a => a.getAttribute('href'))
+                    .filter(h => /^\\.\\/\\d+\\/$/.test(h))
+                    .map(h => h.replace(/\\D/g, ''))
+            ))"""
+        )
+        logger.info("Found %d competitors", len(competitor_ids))
+
+        codes: list[str] = []
+        seen: set[str] = set()
+        for cid in competitor_ids:
+            page.goto(f"{base}/competitor/{cid}/", wait_until="domcontentloaded")
+            page.wait_for_load_state("networkidle")
+            entry_codes = page.evaluate(
+                """() => Array.from(document.querySelectorAll('a[href*="/event/"]'))
+                    .map(a => (a.getAttribute('href').match(/\\/event\\/([TF]\\d+)/) || [])[1])
+                    .filter(Boolean)"""
+            )
+            for code in entry_codes:
+                if code not in seen:
+                    seen.add(code)
+                    codes.append(code)
+
+        logger.info("Discovered %d entered events: %s", len(codes), codes)
+        return codes
+
+    @screenshot_on_error
+    def open_event_competitors_by_code(self, competition_url: str, code: str) -> str:
+        """Open an event's Competitors tab by its OpenTrack code.
+
+        Navigates straight to the manage event page (stable URL keyed by code,
+        unaffected by merges/renames), reads its canonical Name, then opens
+        View -> Competitors. Returns the event's Name (e.g. "G/J 11-13 60 meter
+        hekk") for discipline derivation.
+        """
+        page = self.page
+        base = competition_url.rstrip("/")
+        page.goto(f"{base}/manage/events/{code}/", wait_until="domcontentloaded")
+        page.wait_for_load_state("networkidle")
+        # Field-event pages also contain a merge form with its own #id_name, so
+        # scope to the detail form (the one with the Save/save_config button).
+        detail_form = page.locator("form").filter(
+            has=page.locator("button[name='save_config']")
+        )
+        name = detail_form.locator("#id_name").input_value()
+        self.navigate_to_competitors_tab()
+        return name
+
+    @screenshot_on_error
+    def read_event_pool(self) -> list[dict[str, str]]:
+        """Read the current event's competitor pool with per-athlete category.
+
+        Assumes we're on the Competitors tab. Returns dicts with keys name, club
+        and category. The category column is essential for merged events, whose
+        pool spans several age categories.
+        """
+        page = self.page
+        table = page.locator("table.performances_table")
+        if table.count() == 0:
+            logger.warning("No performances_table found")
+            return []
+
+        rows = page.evaluate(
+            """() => Array.from(document.querySelectorAll('table.performances_table tbody tr'))
+                .map(r => {
+                    const nameEl = r.querySelector('a.competitor-name');
+                    if (!nameEl) return null;
+                    const clubEl = r.querySelector('td.flg span');
+                    const tds = r.querySelectorAll('td');
+                    // Columns: bib, name, club(flg), category, ...
+                    const cat = tds[3] ? tds[3].textContent.trim() : '';
+                    return {
+                        name: nameEl.textContent.trim(),
+                        club: clubEl ? clubEl.textContent.trim() : '',
+                        category: cat,
+                    };
+                })
+                .filter(Boolean)"""
+        )
+        logger.info("Read %d athletes from event pool", len(rows))
+        return rows
+
+    def update_all_event_pbs(
+        self,
+        competition_url: str,
+        default_club: str = "",
+        debug: bool = False,
+        checkpoint: "Checkpoint | None" = None,
+    ) -> tuple[int, list[tuple[str, str]]]:
+        """Update PBs for every entered event, competitor-driven.
+
+        Discovers events from competitor entries, then for each event navigates
+        by code, derives the discipline from the event name, reads the pool with
+        per-athlete categories, looks up PBs (skipping athletes under 13), and
+        fills them. Robust to merged/renamed events because it never searches by
+        per-category name.
+
+        Returns (total_updated, errors) where errors is a list of
+        (event_code, message).
+        """
+        codes = self.gather_entered_event_codes(competition_url)
+
+        total_updated = 0
+        errors: list[tuple[str, str]] = []
+        for i, code in enumerate(codes, 1):
+            if checkpoint and checkpoint.is_done(code):
+                logger.info("Skipping %d/%d: %s (already done)", i, len(codes), code)
+                continue
+
+            logger.info("Processing %d/%d: event %s", i, len(codes), code)
+            try:
+                event_name = self.open_event_competitors_by_code(competition_url, code)
+                discipline = event_code_from_event_title(event_name)
+                if discipline is None:
+                    raise RuntimeError(
+                        f"Could not derive discipline from event name {event_name!r}"
+                    )
+                logger.info("  %s -> %s (%s)", code, event_name, discipline)
+
+                pool = self.read_event_pool()
+                if not pool:
+                    logger.warning("  No competitors in %s, skipping", code)
+                    if checkpoint:
+                        checkpoint.mark_done(code)
+                    continue
+
+                # Skip PB lookups for athletes under 13 (per-athlete, since merged
+                # pools mix ages).
+                eligible = []
+                for athlete in pool:
+                    age = get_category_age(athlete["category"])
+                    if age is not None and age < 13:
+                        logger.debug(
+                            "  Skipping %s (%s, age %d < 13)",
+                            athlete["name"],
+                            athlete["category"],
+                            age,
+                        )
+                        continue
+                    eligible.append(athlete)
+
+                if not eligible:
+                    logger.info("  All athletes under 13 in %s, nothing to look up", code)
+                    if checkpoint:
+                        checkpoint.mark_done(code)
+                    continue
+
+                pb_lookup = self.lookup_competitor_pbs(
+                    competitors=eligible,
+                    event=discipline,
+                    default_club=default_club,
+                    debug=debug,
+                )
+                if pb_lookup:
+                    total_updated += self.fill_pb_sb_values(pb_lookup)
+                else:
+                    logger.warning("  No PBs found for any competitor in %s", code)
+
+                if checkpoint:
+                    checkpoint.mark_done(code)
+            except Exception as e:
+                logger.error("Error processing %s: %s", code, e)
+                errors.append((code, str(e)))
+
+        return total_updated, errors
 
     def schedule_event(self, schedule: EventSchedule, day: int | None = None) -> bool:
         """Find an event, set its start time, and configure attempts/weights for field events.
@@ -1251,6 +1540,169 @@ class EventScheduler:
             f"Finished scheduling. Success: {sum(results.values())}/{len(results)}"
         )
         return results
+
+    @screenshot_on_error
+    def merge_event_group(self, group: EventMergeGroup) -> None:
+        """Merge a group's sibling track events into its primary event.
+
+        Opens the primary event's detail page and drives OpenTrack's merge form
+        (``#eventMergeForm``): it ticks the checkbox for each sibling (matched by
+        the Name column, which equals the event's ``search_term``) and submits,
+        accepting the irreversible-merge confirmation dialog.
+
+        OpenTrack performs the merge as a queued background task, so after
+        submitting we poll the candidate list until the merged siblings are gone.
+
+        Idempotent: siblings that are no longer offered as candidates are assumed
+        already merged (e.g. on a resumed run) and skipped; if nothing remains to
+        merge the call is a no-op. Assumes the primary still exists in OpenTrack.
+        """
+        page = self.page
+
+        logger.info(
+            "=== Merging into %s: %s ===",
+            group.primary.search_term,
+            [s.search_term for s in group.others],
+        )
+        self.find_and_click_event(group.primary)
+        detail_url = page.url
+
+        if page.locator("#eventMergeForm").count() == 0:
+            # OpenTrack only renders the merge form when same-discipline
+            # candidates exist; its absence means there is nothing left to merge
+            # into the primary (e.g. the group was already merged on a prior run).
+            logger.info(
+                "No merge form on %s; nothing left to merge",
+                group.primary.search_term,
+            )
+            return
+
+        candidates = self._merge_candidate_terms()
+        to_merge = [s for s in group.others if s.search_term in candidates]
+        for sib in group.others:
+            if sib.search_term not in candidates:
+                logger.info(
+                    "'%s' is not a merge candidate for '%s' (already merged?), "
+                    "skipping",
+                    sib.search_term,
+                    group.primary.search_term,
+                )
+
+        if not to_merge:
+            logger.info(
+                "Nothing to merge into %s; all siblings already merged",
+                group.primary.search_term,
+            )
+            return
+
+        for sib in to_merge:
+            checkbox = page.locator("#eventMergeForm tbody tr").filter(
+                has=page.get_by_role("cell", name=sib.search_term, exact=True)
+            ).locator("input[type='checkbox']")
+            if checkbox.count() != 1:
+                raise RuntimeError(
+                    f"Merge candidate '{sib.search_term}' is not unique on "
+                    f"'{group.primary.search_term}' page; found {checkbox.count()}."
+                )
+            checkbox.check()
+
+        # Apply the combined name (e.g. "G/J 13-14 200 meter") so the merged
+        # event reflects all its categories instead of keeping the primary's.
+        merged_name = group.merged_name
+        logger.info("Naming merged event: %s", merged_name)
+        page.locator("#eventMergeForm #id_name").fill(merged_name)
+
+        # The visible Submit button (#event-merge) is type=button; its JS shows a
+        # confirm() then clicks the hidden submit. Accept the dialog, then wait
+        # for the POST to reload the detail page.
+        page.once("dialog", lambda d: d.accept())
+        page.locator("#event-merge").click()
+        page.wait_for_load_state("networkidle")
+
+        # The merge is processed asynchronously as a queued background task; wait
+        # for it to finish (siblings drop off the candidate list).
+        self._wait_for_merge(detail_url, [s.search_term for s in to_merge])
+
+        logger.info(
+            "Merged %d event(s) into %s",
+            len(to_merge),
+            group.primary.search_term,
+        )
+
+    def _merge_candidate_terms(self) -> set[str]:
+        """Return the Name cells currently offered in the merge form."""
+        names = self.page.evaluate(
+            "() => Array.from(document.querySelectorAll("
+            "'#eventMergeForm tbody tr td:nth-child(6)')).map(td => td.textContent.trim())"
+        )
+        return set(names)
+
+    def _wait_for_merge(
+        self,
+        detail_url: str,
+        merged_terms: list[str],
+        attempts: int = 40,
+        interval_ms: int = 3000,
+    ) -> None:
+        """Poll the primary's merge form until ``merged_terms`` are gone.
+
+        OpenTrack queues the merge as a background task, so the siblings stay
+        listed as candidates for a few seconds after submit. Reloads the detail
+        page between checks. Raises if they are still present after the timeout.
+        """
+        page = self.page
+        remaining = [t for t in merged_terms if t in self._merge_candidate_terms()]
+        for attempt in range(1, attempts + 1):
+            if not remaining:
+                return
+            logger.debug(
+                "Waiting for merge background task (still listed: %s, %d/%d)",
+                remaining,
+                attempt,
+                attempts,
+            )
+            page.wait_for_timeout(interval_ms)
+            page.goto(detail_url, wait_until="domcontentloaded")
+            page.wait_for_load_state("networkidle")
+            remaining = [t for t in merged_terms if t in self._merge_candidate_terms()]
+        if remaining:
+            raise RuntimeError(
+                f"Merge at {detail_url} did not complete; still listed: {remaining}"
+            )
+
+    def merge_event_groups(
+        self,
+        groups: list[EventMergeGroup],
+        checkpoint_name: str | None = None,
+    ) -> None:
+        """Merge every track merge-group, with optional checkpoint resume.
+
+        Must run AFTER ``schedule_events`` so that all member events exist with
+        their start times. Checkpoint keys are namespaced (``merge:<term>``) so
+        the same file can be shared with the scheduling pass.
+        """
+        if not groups:
+            return
+
+        checkpoint = Checkpoint(checkpoint_name) if checkpoint_name else None
+        logger.info("Merging %d track event group(s)", len(groups))
+
+        for i, group in enumerate(groups, 1):
+            key = f"merge:{group.primary.search_term}"
+            if checkpoint and checkpoint.is_done(key):
+                logger.info(
+                    "Skipping merge %d/%d: %s (already done)", i, len(groups), key
+                )
+                continue
+
+            logger.info("Processing merge group %d/%d", i, len(groups))
+            self.navigate_to_events_table()
+            self.merge_event_group(group)
+
+            if checkpoint:
+                checkpoint.mark_done(key)
+
+        logger.info("Finished merging %d group(s)", len(groups))
 
 
 def parse_time(time_str: str) -> time:
@@ -1459,3 +1911,51 @@ def parse_event_schedule_csv(path: Path) -> list[EventSchedule]:
                 ))
 
     return schedules
+
+
+def parse_event_merge_groups(path: Path) -> list[EventMergeGroup]:
+    """Parse a schedule_events.csv into track-event merge groups.
+
+    Each CSV row groups the categories of one event type that run together. For
+    a TRACK event, several categories in a row means a shared heat, expressed in
+    OpenTrack by merging the per-category events into one. Non-track rows (jumps,
+    throws, ball-throw) are not merged here (they share a venue but run as
+    separate competitions).
+
+    Returns one EventMergeGroup per track row that resolves to at least two
+    distinct OpenTrack events (after masters-folding via ``search_term``). The
+    first category in the row is the primary; the rest are merged into it.
+
+    Expected columns: event_type, categories, start_time.
+    """
+    groups: list[EventMergeGroup] = []
+
+    with path.open(encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            event_name = row["event_type"].strip()
+            event_code = _EVENT_NAME_TO_CODE.get(event_name, event_name)
+            if not is_track_event(event_code):
+                continue
+
+            start = parse_time(row["start_time"])
+            members: list[EventSchedule] = []
+            seen_terms: set[str] = set()
+            for cat in row["categories"].split(","):
+                cat = cat.strip()
+                if not cat or cat.upper() == "FIFA":
+                    continue
+                sched = EventSchedule(category=cat, event=event_code, start_time=start)
+                # Distinct OpenTrack events only: categories that fold to the
+                # same search term (e.g. masters folded to senior) are one event.
+                if sched.search_term in seen_terms:
+                    continue
+                seen_terms.add(sched.search_term)
+                members.append(sched)
+
+            if len(members) >= 2:
+                groups.append(
+                    EventMergeGroup(primary=members[0], others=members[1:])
+                )
+
+    return groups

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urljoin
 
 from openpyxl import load_workbook
 
@@ -416,45 +417,38 @@ class CompetitionCreator:
 
     @screenshot_on_error
     def _configure_scoring(self, details: CompetitionDetails) -> None:
-        """Configure scoring settings like combined events tables."""
+        """Set the combined-events scoring table (Scoring -> Combined Events).
+
+        Navigates straight to the events/scoring page; hunting for the scoring
+        nav link is fragile because its label and presence depend on the current
+        manage sub-page, whereas the URL is deterministic.
+        """
         page = self.page
 
-        # Navigate to Events and scoring. The top-nav link text reflects the
-        # currently-configured scoring system: "World Athletics" by default,
-        # "Tyrving" once set. Try both to stay idempotent on re-runs.
-        logger.debug("Navigating to Events and scoring (url=%s)", page.url)
-        scoring_nav = None
-        for label in ("World Athletics", "Tyrving"):
-            candidate = page.locator("a").filter(has_text=label)
-            if candidate.count() > 0:
-                scoring_nav = candidate.first
-                break
-        if scoring_nav is None:
-            nav_texts = page.locator("nav a, header a, .navbar a").all_inner_texts()
-            all_link_texts = page.locator("a").all_inner_texts()
-            logger.error(
-                "Scoring nav link not found on %s. nav/header anchors=%r ; all anchor texts=%r",
-                page.url,
-                [t.strip() for t in nav_texts if t.strip()],
-                [t.strip() for t in all_link_texts if t.strip()],
-            )
-            raise RuntimeError("Could not find scoring system navigation link")
-        scoring_nav.click()
-        page.get_by_role("link", name="Events and scoring").click()
+        events_url = urljoin(self._expected_public_url(details), "manage/events/")
+        logger.debug("Navigating to events/scoring page: %s", events_url)
+        page.goto(events_url)
+        page.wait_for_load_state("networkidle")
 
-        # Go to Scoring -> Combined Events tab
-        logger.debug("Navigating to Combined Events tab")
+        # Scoring tab, then the Combined Events sub-tab. The sub-tab is an
+        # anchor targeting #ce; match on that (stable) rather than its role.
         page.get_by_role("tab", name="Scoring").click()
-        page.get_by_role("tab", name="Combined Events").click()
+        page.locator("a[href='#ce']").click()
 
-        # Select the combined events table
+        # Select the combined events table. Wait for the panel's select to
+        # become visible before interacting with it.
         if details.combined_events_table:
             table_value = COMBINED_EVENTS_TABLES.get(
                 details.combined_events_table, "WA"
             )
             logger.debug("Setting combined events table: %s", table_value)
-            page.get_by_label("Combined Events tables:").select_option(table_value)
+            table_select = page.get_by_label("Combined Events tables:")
+            table_select.wait_for(state="visible")
+            table_select.select_option(table_value)
 
+        # Only the active sub-tab's Save button is in the accessibility tree
+        # (inactive panels are display:none), so "Save" resolves to the
+        # combined-events Save here.
         logger.debug("Saving scoring settings")
         page.get_by_role("button", name="Save").click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
@@ -578,12 +572,13 @@ class CompetitionCreator:
 
     @screenshot_on_error
     def _apply_random_seeding(self) -> None:
-        """Fetch all start lists (track + field) with random athlete order.
+        """Fetch field-event start lists with random athlete order.
 
-        The seeding page exposes two dropdowns: "Fetch all start lists"
-        (track) and "Fetch all field start lists". Each dropdown contains
-        Random order / Sorted by bib / Sorted by category submit buttons.
-        We trigger the random-order option for both.
+        The seeding page exposes a "Fetch all field start lists" dropdown with
+        Random order / Sorted by bib / Sorted by category submit buttons. Only
+        field events are seeded: track heats are arranged in the schedule step
+        (categories sharing a heat are merged), so auto-seeding track start
+        lists is skipped.
         """
         page = self.page
 
@@ -596,16 +591,13 @@ class CompetitionCreator:
         # activity and trigger ERR_ABORTED on the stricter "load" wait.
         page.goto(seeding_url, wait_until="domcontentloaded")
 
-        # Each Random order button is a form submit button. Submit both
-        # forms (track + field) by dispatching a click directly — the
-        # buttons live inside hidden dropdown-menus so a regular .click()
-        # fails the visibility check.
-        for button_name, label in (
-            ("fetch_all_start_lists_random", "track"),
-            ("fetch_all_field_start_lists_random", "field"),
-        ):
-            logger.debug("Submitting random seeding for %s start lists", label)
-            page.locator(f"button[name={button_name}]").dispatch_event("click")
-            page.wait_for_load_state("load")
-            self._wait_for_background_task(f"seed {label}")
-            logger.debug("Random seeding applied (%s)", label)
+        # The Random order button is a form submit button living inside a
+        # hidden dropdown-menu, so dispatch the click directly — a regular
+        # .click() fails the visibility check.
+        logger.debug("Submitting random seeding for field start lists")
+        page.locator(
+            "button[name=fetch_all_field_start_lists_random]"
+        ).dispatch_event("click")
+        page.wait_for_load_state("load")
+        self._wait_for_background_task("seed field")
+        logger.debug("Random seeding applied (field)")

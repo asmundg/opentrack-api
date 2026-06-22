@@ -252,9 +252,9 @@ class OpenTrackSession:
         self.page.get_by_role("link", name="Login / Sign Up").click()
         
         # Fill login form
-        self.page.get_by_role("textbox", name="Email:").click()
-        self.page.get_by_role("textbox", name="Email:").fill(username)
-        self.page.get_by_role("textbox", name="Password:").fill(password)
+        self.page.get_by_role("textbox", name="Email").click()
+        self.page.get_by_role("textbox", name="Email").fill(username)
+        self.page.get_by_role("textbox", name="Password").fill(password)
         self.page.get_by_role("button", name="Log in").click()
         
         # Wait for navigation to complete
