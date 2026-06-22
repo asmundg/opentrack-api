@@ -6,7 +6,7 @@ from a SchedulingResult, providing a visual grid layout of the schedule.
 """
 
 from typing import Any
-from .models import Venue, Category, EventGroup, get_venue_for_event
+from .models import MASTERS_MEN, MASTERS_WOMEN, Venue, Category, EventGroup, get_venue_for_event
 from .functional_scheduler import SchedulingResult
 
 
@@ -199,6 +199,12 @@ def _get_category_color(category: Category | str) -> str:
         Category.j18_19: "#90EE90",   # Light green
         Category.ks: "#90EE90",       # Light green (women senior)
     }
+
+    # Masters share the senior-tier colors (olive for men, light green for women).
+    for cat in MASTERS_MEN:
+        category_colors[cat] = "#808000"
+    for cat in MASTERS_WOMEN:
+        category_colors[cat] = "#90EE90"
 
     # Special handling for string-based categories (Rekrutt = 10 year olds)
     special_categories: dict[str, str] = {
@@ -474,10 +480,10 @@ def _generate_html_content(
                 <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #DC143C; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J13/J14 &ndash; R&oslash;d
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #808000; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G15+ / Menn Senior &ndash; Oliven
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #808000; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> G15+ / Menn Senior / MV (masters) &ndash; Oliven
             </div>
             <div class="legend-item">
-                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #90EE90; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J15+ / Kvinner Senior &ndash; Lysegr&oslash;nn
+                <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: #90EE90; border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> J15+ / Kvinner Senior / KV (masters) &ndash; Lysegr&oslash;nn
             </div>
             <div class="legend-item">
                 <span class="legend-block" style="display: inline-block; width: 20px; height: 20px; background: linear-gradient(135deg, #87CEEB 0%, #FFB6C1 100%); border-radius: 3px; margin-right: 8px; border: 1px solid #ccc;"></span> Gradient = sammensl&aring;tte klasser
@@ -589,7 +595,7 @@ def _format_venue_name(venue: Venue) -> str:
         Venue.POLE_VAULT_AREA: "Stav",
         Venue.SHOT_PUT_CIRCLE: "Kule",
         Venue.SHOT_PUT_CIRCLE_2: "Kule 2",
-        Venue.THROWING_CIRCLE: "Kast",
+        Venue.THROWING_CIRCLE: "Slegge/Diskos",
         Venue.JAVELIN_AREA: "Spyd",
     }
     return venue_names.get(venue, venue.value.replace("_", " ").title())

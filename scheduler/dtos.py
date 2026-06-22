@@ -38,9 +38,11 @@ class EventScheduleRow(BaseModel):
     end_time: time = Field(
         description="Event end time (HH:MM format)"
     )
-    duration_minutes: int = Field(
-        description="Total duration in minutes",
-        ge=0
+    duration_minutes: int | None = Field(
+        default=None,
+        description="Reference only. Derived from end_time - start_time; the time "
+                    "window (start/end) is the authoritative occupancy.",
+        ge=0,
     )
 
     @field_validator('start_time', 'end_time', mode='before')
@@ -60,22 +62,19 @@ class EventScheduleRow(BaseModel):
 
     @model_validator(mode='after')
     def validate_time_range(self) -> Self:
-        """Ensure end_time is after start_time."""
+        """Ensure end_time is after start_time and derive duration from the window.
+
+        duration_minutes is reference-only: whatever the CSV says (or omits), the
+        authoritative occupancy is end_time - start_time, so we always recompute it.
+        """
         if self.end_time <= self.start_time:
             raise ValueError(
                 f"end_time ({self.end_time}) must be after start_time ({self.start_time})"
             )
 
-        # Calculate actual duration and check it matches
         start_dt = datetime.combine(datetime.today(), self.start_time)
         end_dt = datetime.combine(datetime.today(), self.end_time)
-        actual_minutes = int((end_dt - start_dt).total_seconds() / 60)
-
-        if actual_minutes != self.duration_minutes:
-            raise ValueError(
-                f"Duration mismatch: start/end times indicate {actual_minutes} minutes "
-                f"but duration_minutes is {self.duration_minutes}"
-            )
+        self.duration_minutes = int((end_dt - start_dt).total_seconds() / 60)
 
         return self
 
@@ -117,7 +116,11 @@ class EventScheduleRow(BaseModel):
             venue=venue,
             start_time=row['start_time'],
             end_time=row['end_time'],
-            duration_minutes=int(row['duration_minutes']),
+            duration_minutes=(
+                int(row['duration_minutes'])
+                if row.get('duration_minutes')
+                else None
+            ),
         )
 
 

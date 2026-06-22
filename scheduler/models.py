@@ -66,8 +66,90 @@ class Category(Enum):
     g18_19 = "G18-19"
     ks = "Kvinner Senior"
     ms = "Menn Senior"
+    # Masters (veteran) brackets, 5-year age bands. Canonical short forms
+    # match opentrack_admin.normalize_category() output ("MV30-34" / "KV30-34"
+    # etc.). MV = "Menn Veteran" (men masters), KV = "Kvinner Veteran".
+    mv30_34 = "MV30-34"
+    mv35_39 = "MV35-39"
+    mv40_44 = "MV40-44"
+    mv45_49 = "MV45-49"
+    mv50_54 = "MV50-54"
+    mv55_59 = "MV55-59"
+    mv60_64 = "MV60-64"
+    mv65_69 = "MV65-69"
+    mv70_74 = "MV70-74"
+    mv75_79 = "MV75-79"
+    mv80_84 = "MV80-84"
+    mv85_89 = "MV85-89"
+    mv90_94 = "MV90-94"
+    mv95_99 = "MV95-99"
+    kv30_34 = "KV30-34"
+    kv35_39 = "KV35-39"
+    kv40_44 = "KV40-44"
+    kv45_49 = "KV45-49"
+    kv50_54 = "KV50-54"
+    kv55_59 = "KV55-59"
+    kv60_64 = "KV60-64"
+    kv65_69 = "KV65-69"
+    kv70_74 = "KV70-74"
+    kv75_79 = "KV75-79"
+    kv80_84 = "KV80-84"
+    kv85_89 = "KV85-89"
+    kv90_94 = "KV90-94"
+    kv95_99 = "KV95-99"
     # Special category for non-athletic events (breaks, etc.) - shown in schedule but ignored for opentrack
     fifa = "FIFA"
+
+
+# Centralized masters category sets. Defined once so the scheduler, parser,
+# HTML generator, and tier configuration can all derive their masters
+# membership without each hard-coding the 28 enum members.
+MASTERS_MEN: frozenset[Category] = frozenset(
+    {
+        Category.mv30_34, Category.mv35_39, Category.mv40_44, Category.mv45_49,
+        Category.mv50_54, Category.mv55_59, Category.mv60_64, Category.mv65_69,
+        Category.mv70_74, Category.mv75_79, Category.mv80_84, Category.mv85_89,
+        Category.mv90_94, Category.mv95_99,
+    }
+)
+
+MASTERS_WOMEN: frozenset[Category] = frozenset(
+    {
+        Category.kv30_34, Category.kv35_39, Category.kv40_44, Category.kv45_49,
+        Category.kv50_54, Category.kv55_59, Category.kv60_64, Category.kv65_69,
+        Category.kv70_74, Category.kv75_79, Category.kv80_84, Category.kv85_89,
+        Category.kv90_94, Category.kv95_99,
+    }
+)
+
+MASTERS_CATEGORIES: frozenset[Category] = MASTERS_MEN | MASTERS_WOMEN
+
+
+# Senior tier: 18-19, regular seniors, and all masters brackets. Used by the
+# late-slot push and gender-detection helpers below.
+MALE_CATEGORIES: frozenset[Category] = frozenset(
+    {
+        Category.g10, Category.g11, Category.g12, Category.g13, Category.g14,
+        Category.g15, Category.g16, Category.g17, Category.g18_19, Category.ms,
+    }
+) | MASTERS_MEN
+
+FEMALE_CATEGORIES: frozenset[Category] = frozenset(
+    {
+        Category.j10, Category.j11, Category.j12, Category.j13, Category.j14,
+        Category.j15, Category.j16, Category.j17, Category.j18_19, Category.ks,
+    }
+) | MASTERS_WOMEN
+
+
+def is_male_category(category: Category) -> bool:
+    """Return True for any boys/men category (including MV* masters)."""
+    return category in MALE_CATEGORIES
+
+
+def is_female_category(category: Category) -> bool:
+    """Return True for any girls/women category (including KV* masters)."""
+    return category in FEMALE_CATEGORIES
 
 
 # Categories for 10 year olds - HIGHEST priority to finish early
@@ -123,6 +205,9 @@ CATEGORY_AGE_ORDER: dict[Category, int] = {
     Category.g18_19: 18,
     Category.ks: 99,
     Category.ms: 99,  # Seniors last
+    # Masters share the senior tier (run after youth). Per-bracket distinction
+    # is preserved through the enum identity, not the ordering value.
+    **{cat: 99 for cat in MASTERS_CATEGORIES},
 }
 
 
@@ -201,8 +286,10 @@ class HurdleSpec:
     height_cm: float
 
 
-# 60m hurdle specifications by (event_type, category).
+# Hurdle specifications by (event_type, category).
 # Source: Norwegian Athletics Federation hurdle setup tables.
+# Boys 17+ run 110m hurdles (not modelled — no m110_hurdles event type), so they
+# are intentionally absent from the 100m hurdle rows below.
 HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     # Boys (Gutter) - 60m hurdles
     (EventType.m60_hurdles, Category.g11): HurdleSpec(6, 11, 6.5, 68),
@@ -224,6 +311,18 @@ HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     (EventType.m60_hurdles, Category.j17): HurdleSpec(5, 13, 8.5, 76.2),
     (EventType.m60_hurdles, Category.j18_19): HurdleSpec(5, 13, 8.5, 84),
     (EventType.m60_hurdles, Category.ks): HurdleSpec(5, 13, 8.5, 84),
+    # Boys (Gutter) - 80m hurdles (only G14)
+    (EventType.m80_hurdles, Category.g14): HurdleSpec(8, 12, 8, 84),
+    # Girls (Jenter) - 80m hurdles (J15-16)
+    (EventType.m80_hurdles, Category.j15): HurdleSpec(8, 12, 8, 76.2),
+    (EventType.m80_hurdles, Category.j16): HurdleSpec(8, 12, 8, 76.2),
+    # Boys (Gutter) - 100m hurdles (G15-16; G17+ run 110m hurdles)
+    (EventType.m100_hurdles, Category.g15): HurdleSpec(10, 13, 8.5, 84),
+    (EventType.m100_hurdles, Category.g16): HurdleSpec(10, 13, 8.5, 91.4),
+    # Girls (Jenter) - 100m hurdles (J17+)
+    (EventType.m100_hurdles, Category.j17): HurdleSpec(10, 13, 8.5, 76.2),
+    (EventType.m100_hurdles, Category.j18_19): HurdleSpec(10, 13, 8.5, 84),
+    (EventType.m100_hurdles, Category.ks): HurdleSpec(10, 13, 8.5, 84),
 }
 
 
@@ -320,19 +419,24 @@ def effective_hurdle_lanes(categories: list[Category]) -> int:
 def hurdle_lane_capacity(event_type: EventType, categories: list[Category]) -> int:
     """Calculate lane capacity for a hurdle heat with the given categories.
 
-    Categories with different heights need a gutter (empty) lane between
-    height zones, reducing capacity from the effective lane count.
-    Returns effective_lanes - (num_distinct_heights - 1).
+    Each distinct hurdle setup — a unique (distance_between_m, height_cm) pair —
+    needs an empty gutter lane between it and the next, whether the difference is in
+    distance or height. Capacity is therefore:
+
+        effective_lanes - (num_distinct_setups - 1)
+
+    Categories sharing the exact same setup pack with no gutter between them. When all
+    categories share one distance this reduces to "one gutter per distinct height".
     """
     max_lanes = effective_hurdle_lanes(categories)
-    heights: set[float] = set()
+    setups: set[tuple[float, float]] = set()
     for cat in categories:
         spec = get_hurdle_spec(event_type, cat)
         if spec is not None:
-            heights.add(spec.height_cm)
-    if not heights:
+            setups.add((spec.distance_between_m, spec.height_cm))
+    if not setups:
         return max_lanes
-    return max_lanes - (len(heights) - 1)
+    return max_lanes - (len(setups) - 1)
 
 
 def mixed_hurdle_lane_capacity(
@@ -426,8 +530,8 @@ SHARED_VENUE_GROUPS: list[frozenset[EventType]] = []
 # When True, the scheduler forbids interleaving different event types at the
 # same scheduling venue key (e.g., DT-HT-DT at the throwing circle is rejected;
 # events of one type must run as a contiguous block). Track is never sticky --
-# it has its own precedence rules. Set by CLI via --sticky.
-STICKY_VENUES: bool = False
+# it has its own precedence rules. Toggle via CLI --sticky/--no-sticky.
+STICKY_VENUES: bool = True
 
 
 def get_venue_for_event(
@@ -576,6 +680,10 @@ EventCategoryDurationOverride: dict[tuple[EventType, Category], int] = {
     (EventType.dt, Category.j12): 4,
     (EventType.dt, Category.g11): 4,
     (EventType.dt, Category.g12): 4,
+    (EventType.jt, Category.j11): 4,
+    (EventType.jt, Category.j12): 4,
+    (EventType.jt, Category.g11): 4,
+    (EventType.jt, Category.g12): 4,
     (EventType.lj, Category.j10): 3,
     (EventType.lj, Category.j11): 4,
     (EventType.lj, Category.j12): 4,

@@ -24,8 +24,10 @@ from .models import (
     ROUND_EVENTS,
     SPRINT_EVENTS,
     Venue,
+    MASTERS_CATEGORIES,
     get_venue_for_event,
     get_scheduling_venue_keys,
+    is_male_category,
     is_young_category,
     is_youngest_category,
     get_category_age_order,
@@ -308,18 +310,28 @@ def add_basic_constraints(
         solver.add(variables.event_start_slot_vars[first_track_event][0])
 
 
-def _get_event_group_sort_key(group: EventGroup) -> tuple[int, int, int]:
-    """Get sort key for an event group: (distance_order, is_hurdles, min_age).
+def _get_event_group_sort_key(group: EventGroup) -> tuple[int, int, int, int]:
+    """Get sort key for an event group: (phase, distance_order, is_hurdles, min_age).
 
-    This ensures track events are ordered:
-    1. By distance (shortest first)
-    2. Non-hurdles before hurdles of same distance
-    3. By age within each (youngest first)
+    Track events are ordered:
+    1. Sprint/hurdle events first (they occupy the home straight that round
+       races must run through, so the straight has to clear before the oval).
+    2. Within the round block, Rekrutt (10-year-old) events run first, so the
+       youngest finish early instead of being forced last by distance (a lone
+       Rekrutt 400m would otherwise sort behind every longer race).
+    3. By distance (shortest first), then non-hurdles before hurdles, then by
+       age (youngest first).
     """
     distance_order = get_track_event_order(group.event_type)
     hurdles_order = 1 if is_hurdles_event(group.event_type) else 0
     min_age = min(get_category_age_order(e.age_category) for e in group.events)
-    return (distance_order, hurdles_order, min_age)
+    if group.event_type in SPRINT_EVENTS:
+        phase = 0
+    elif all(is_youngest_category(e.age_category) for e in group.events):
+        phase = 1  # Rekrutt round events: right after the sprint/hurdle block
+    else:
+        phase = 2
+    return (phase, distance_order, hurdles_order, min_age)
 
 
 def _sort_track_groups_for_spacing(
@@ -377,11 +389,8 @@ def _sort_track_groups_for_spacing(
             return 3
 
     def is_boys_group(group: EventGroup) -> bool:
-        # Check if all events are boys/men categories
-        return all(
-            e.age_category.value.startswith("G") or e.age_category.value.startswith("Menn")
-            for e in group.events
-        )
+        # Check if all events are boys/men categories (incl. MV* masters)
+        return all(is_male_category(e.age_category) for e in group.events)
 
     # Process consecutive pairs and swap if beneficial
     result = sorted_groups.copy()
@@ -393,12 +402,12 @@ def _sort_track_groups_for_spacing(
         key1 = _get_event_group_sort_key(g1)
         key2 = _get_event_group_sort_key(g2)
 
-        dist1, hurdles1, age1 = key1
-        dist2, hurdles2, age2 = key2
+        dist1, hurdles1, age1 = key1[1], key1[2], key1[3]
+        dist2, hurdles2, age2 = key2[1], key2[2], key2[3]
 
         tier1 = get_age_tier(age1)
         tier2 = get_age_tier(age2)
-        same_block = (dist1 == dist2 and hurdles1 == hurdles2 and tier1 == tier2)
+        same_block = (key1[0] == key2[0] and dist1 == dist2 and hurdles1 == hurdles2 and tier1 == tier2)
         different_gender = is_boys_group(g1) != is_boys_group(g2)
         # Only swap for 15+ tier (tier 3) - younger athletes need to finish first
         is_15plus = tier1 == 3
@@ -660,56 +669,63 @@ def add_venue_stickiness_constraints(
 
 
 
+# Physical start-position blocks keyed by distance-to-goal. Track events that
+# start at the same position need no starter move between them; different
+# positions require the starter team to relocate. (The stale index-range version
+# mis-grouped m600/m5000 and lumped m300/m1500/m3000/m400/m800 together.)
+_START_POSITION_BLOCKS: dict[EventType, int] = {
+    EventType.m60: 0, EventType.m60_hurdles: 0, EventType.m80_hurdles: 0,          # home straight (60-80m)
+    EventType.m100: 1, EventType.m100_hurdles: 1,                                  # home straight (100m)
+    EventType.m150: 2,                                                             # 150m to goal
+    EventType.m200: 3, EventType.m200_hurdles: 3, EventType.m600: 3, EventType.m5000: 3,  # 200m to goal
+    EventType.m300: 4, EventType.m1500: 4, EventType.m3000: 4,                     # 300m to goal
+    EventType.m400: 5, EventType.m800: 5,                                          # finish line (full laps)
+}
+
+
 def _needs_extra_spacing(earlier_type: EventType, later_type: EventType) -> bool:
-    """Check if transition between two track event types needs extra spacing.
+    """Check if a transition between two track event types needs extra spacing.
 
-    Extra spacing (2 slots / 10 min) is needed when:
-    - Switching to a different starting position on the track
-    - Switching to hurdles (need time to set up)
+    Extra spacing is needed when either:
+    - hurdles are set up or torn down (one side is hurdles, the other is not), or
+    - the start position changes (different distance-to-goal block).
 
-    Starting positions (clockwise from finish):
-    - Block 0: 60m, 60m_hurdles, 80m_hurdles (near finish)
-    - Block 1: 100m, 100m_hurdles (near finish)
-    - Block 2: 1500m (+100m mark)
-    - Block 3: 200m, 5000m (+200m mark)
-    - Block 4: 400m (further around curve)
-    - Block 5: 800m (even further)
+    The caller decides the gap size (hurdle setup costs more than a starter move).
     """
-    # Switching to hurdles always needs extra time
-    if is_hurdles_event(later_type) and not is_hurdles_event(earlier_type):
+    # Setting up or tearing down hurdles needs extra time.
+    if is_hurdles_event(earlier_type) != is_hurdles_event(later_type):
         return True
-
-    # Get the base distance order for both events
-    earlier_order = get_track_event_order(earlier_type)
-    later_order = get_track_event_order(later_type)
-
-    # Define distance blocks by their indices in TRACK_DISTANCE_ORDER:
-    # 0: m60, 1: m60_hurdles, 2: m80_hurdles, 3: m100, 4: m100_hurdles,
-    # 5: m200, 6: m1500, 7: m5000, 8: m400, 9: m800
-    distance_blocks = [
-        (0, 2),   # 60m block (60m, 60m_hurdles, 80m_hurdles)
-        (3, 4),   # 100m block (100m, 100m_hurdles)
-        (5, 7),   # 200m/1500m/5000m block (all around +200m mark)
-        (8, 8),   # 400m
-        (9, 9),   # 800m
-    ]
-
-    def get_block(order: int) -> int:
-        for i, (start, end) in enumerate(distance_blocks):
-            if start <= order <= end:
-                return i
-        return -1
-
-    earlier_block = get_block(earlier_order)
-    later_block = get_block(later_order)
-
-    # Different blocks = switching position = extra spacing
+    earlier_block = _START_POSITION_BLOCKS.get(earlier_type, -1)
+    later_block = _START_POSITION_BLOCKS.get(later_type, -1)
     return earlier_block != later_block
 
 
 def _is_young_track_group(group: EventGroup) -> bool:
     """Check if all athletes in a track event group are young (≤12)."""
     return all(is_young_category(e.age_category) for e in group.events)
+
+
+def _track_min_gap_slots(
+    earlier_group: EventGroup, later_group: EventGroup, slot_duration_minutes: int
+) -> tuple[int, str]:
+    """Minimum slot gap required between two consecutive track groups, with reason.
+
+    Shared by the spacing constraints and the Phase 4 pull-forward pass so both
+    agree on how close two track events may sit (e.g. a 400m may not run until
+    the hurdles have been cleared from the home straight).
+    """
+    if earlier_group.event_type in SPRINT_EVENTS and later_group.event_type in ROUND_EVENTS:
+        re_rig_slots = _models.ARENA.sprint_to_round_gap_minutes // slot_duration_minutes
+        if re_rig_slots > 0:
+            return re_rig_slots, f"sprint→round re-rig ({_models.ARENA.sprint_to_round_gap_minutes}min)"
+    if _needs_extra_spacing(earlier_group.event_type, later_group.event_type):
+        # Hurdle setup/teardown costs more than a plain starter move.
+        if is_hurdles_event(earlier_group.event_type) or is_hurdles_event(later_group.event_type):
+            return 2, "hurdle setup"
+        return 1, "position change"
+    if _is_young_track_group(earlier_group) and _is_young_track_group(later_group):
+        return 0, "young athletes, back-to-back OK"
+    return 1, "older athletes need prep time"
 
 
 def add_track_spacing_constraints(
@@ -745,29 +761,9 @@ def add_track_spacing_constraints(
         later_id = later_group.id
         earlier_duration = problem.event_duration_slots[earlier_id]
 
-        # Determine gap size based on event types and athlete ages
-        # Re-rig gap: sprint→round transition (e.g., 60m→200m) requires track reconfiguration
-        is_sprint_to_round = (
-            earlier_group.event_type in SPRINT_EVENTS
-            and later_group.event_type in ROUND_EVENTS
+        min_gap, gap_reason = _track_min_gap_slots(
+            earlier_group, later_group, problem.config.slot_duration_minutes
         )
-        re_rig_slots = _models.ARENA.sprint_to_round_gap_minutes // problem.config.slot_duration_minutes
-
-        if is_sprint_to_round and re_rig_slots > 0:
-            min_gap = re_rig_slots
-            gap_reason = f"sprint→round re-rig ({_models.ARENA.sprint_to_round_gap_minutes}min)"
-        elif _needs_extra_spacing(earlier_group.event_type, later_group.event_type):
-            # Switching position or to hurdles - always need 2 slots
-            min_gap = 2
-            gap_reason = "position/hurdles change"
-        elif _is_young_track_group(earlier_group) and _is_young_track_group(later_group):
-            # Both groups are young athletes - can run back-to-back
-            min_gap = 0
-            gap_reason = "young athletes, back-to-back OK"
-        else:
-            # At least one group has older athletes (13+) - need standard gap
-            min_gap = 1
-            gap_reason = "older athletes need prep time"
 
         # Calculate start times using Z3 expressions
         earlier_start = z3.Sum([
@@ -789,6 +785,51 @@ def add_track_spacing_constraints(
     print()
 
     return constraint_count
+
+
+def add_youngest_field_precedence(
+    solver: z3.Solver, problem: SchedulingProblem, variables: SchedulingVariables
+) -> int:
+    """Run Rekrutt (10-year-old) field groups before older groups at the same venue.
+
+    Field events at a venue run sequentially. Without this, the solver is free to
+    place an older group first and leave the Rekrutt group late. Forcing Rekrutt
+    first lets the 10-year-olds finish their field events (and go home) early.
+    Rekrutt athletes only have Rekrutt events, so this never creates an athlete
+    conflict.
+    """
+    by_venue: dict[Venue | None, list[EventGroup]] = {}
+    for g in problem.events.values():
+        if g.event_type in TRACK_DISTANCE_ORDER:
+            continue  # field events only
+        if not g.events:
+            continue
+        venue = get_venue_for_event(g.event_type, g.events[0].age_category)
+        by_venue.setdefault(venue, []).append(g)
+
+    count = 0
+    for groups in by_venue.values():
+        rekrutt = [g for g in groups if all(is_youngest_category(e.age_category) for e in g.events)]
+        older = [g for g in groups if not all(is_youngest_category(e.age_category) for e in g.events)]
+        if not rekrutt or not older:
+            continue
+        for rg in rekrutt:
+            if rg.id not in variables.event_start_slot_vars:
+                continue
+            rg_start = z3.Sum([
+                z3.If(variables.event_start_slot_vars[rg.id][slot], slot, 0)
+                for slot in range(problem.config.max_time_slots)
+            ])
+            for og in older:
+                if og.id not in variables.event_start_slot_vars:
+                    continue
+                og_start = z3.Sum([
+                    z3.If(variables.event_start_slot_vars[og.id][slot], slot, 0)
+                    for slot in range(problem.config.max_time_slots)
+                ])
+                solver.add(og_start >= rg_start + problem.event_duration_slots[rg.id])
+                count += 1
+    return count
 
 
 def add_youngest_athlete_finish_constraint(
@@ -1265,11 +1306,18 @@ def spread_events_post_process(
     youngest_ids = get_youngest_event_groups(problem.events)
 
     def violates_track_precedence(eid: str, new_start: int) -> bool:
-        """Check if moving eid to new_start would break track precedence."""
+        """Check if moving eid to new_start breaks track ordering or spacing.
+
+        Enforces both the relative order AND the minimum gap to other track
+        groups, so a young event is not pulled into, say, the hurdle-teardown
+        gap before it (a 400m can't run while hurdles are still on the straight).
+        """
         eg = problem.events[eid]
         if eg.event_type not in TRACK_DISTANCE_ORDER:
             return False
         eid_order = _get_event_group_sort_key(eg)
+        eid_dur = problem.event_duration_slots[eid]
+        slot_min = problem.config.slot_duration_minutes
         for other_eid, other_eg in problem.events.items():
             if other_eid == eid or other_eg.event_type not in TRACK_DISTANCE_ORDER:
                 continue
@@ -1277,10 +1325,15 @@ def spread_events_post_process(
                 continue
             other_order = _get_event_group_sort_key(other_eg)
             other_start = event_starts[other_eid]
-            if eid_order < other_order and new_start > other_start:
-                return True
-            if eid_order > other_order and new_start < other_start:
-                return True
+            other_dur = problem.event_duration_slots[other_eid]
+            if eid_order < other_order:
+                gap, _ = _track_min_gap_slots(eg, other_eg, slot_min)
+                if other_start < new_start + eid_dur + gap:
+                    return True
+            elif eid_order > other_order:
+                gap, _ = _track_min_gap_slots(other_eg, eg, slot_min)
+                if new_start < other_start + other_dur + gap:
+                    return True
         return False
 
     for eid in sorted(youngest_ids, key=lambda e: event_starts.get(e, 0), reverse=True):
@@ -1339,7 +1392,7 @@ def spread_events_post_process(
     # Goldens consistently schedule senior events late (after-work arrivals);
     # without this pass, the solver places them early to minimize total duration,
     # which doesn't reflect real meet scheduling practice.
-    SENIOR_CATEGORIES = {Category.j18_19, Category.g18_19, Category.ks, Category.ms}
+    SENIOR_CATEGORIES = {Category.j18_19, Category.g18_19, Category.ks, Category.ms} | MASTERS_CATEGORIES
 
     def _is_senior_only(eid: str) -> bool:
         eg = problem.events[eid]
@@ -1934,6 +1987,12 @@ def add_all_constraints(
     if verbose:
         print("Adding track spacing constraints...")
     add_track_spacing_constraints(solver, problem, variables)
+
+    if verbose:
+        print("Adding Rekrutt field precedence...")
+    rekrutt_field = add_youngest_field_precedence(solver, problem, variables)
+    if verbose:
+        print(f"  Total Rekrutt field precedence constraints added: {rekrutt_field}")
 
     if verbose:
         print("Adding basic constraints...")

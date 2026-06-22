@@ -3,10 +3,9 @@
 Generates an HTML document showing hurdle configurations per lane for each
 hurdle heat, for use by the hurdle setup crew.
 
-Supports heats with multiple distance zones (when --mix-hurdle-distances is
-used).  Between distance zones, 2 gutter lanes are inserted and styled as
-"SONE-SKILLE".  Within a distance zone, different heights still get 1 gutter
-lane styled as "LEDIG".
+Supports heats that mix hurdle distances and heights. Each distinct (distance,
+height) setup is separated from the next by one empty gutter lane; the lane between
+two different distances is styled "SONE-SKILLE" and between two heights "LEDIG".
 """
 
 from dataclasses import dataclass
@@ -38,7 +37,7 @@ class _LaneInfo:
     category: Category | None  # None = gutter lane
     height_cm: float | None
     distance_between_m: float | None = None
-    is_distance_gutter: bool = False  # True for 2-lane zone separator
+    is_distance_gutter: bool = False  # True for a distance-zone separator lane
     is_unavailable: bool = False  # True for blocked/damaged lanes
 
 
@@ -154,7 +153,7 @@ def _assign_lanes(
 ) -> list[_LaneInfo]:
     """Assign lanes for a hurdle heat.
 
-    Primary grouping: by distance_between_m (2 gutter lanes between zones).
+    Primary grouping: by distance_between_m (1 gutter lane between zones).
     Secondary grouping: by height_cm within a distance zone (1 gutter lane).
 
     When blocked lanes exist, tries to position the layout so blocked lanes
@@ -197,7 +196,6 @@ def _assign_lanes(
     layout: list[tuple[str, Category | None, float | None, float | None]] = []
     for dz_idx, dz_height_zones in enumerate(distance_zones):
         if dz_idx > 0:
-            layout.append((_DISTANCE_GUTTER, None, None, None))
             layout.append((_DISTANCE_GUTTER, None, None, None))
         for hz_idx, hz in enumerate(dz_height_zones):
             if hz_idx > 0:

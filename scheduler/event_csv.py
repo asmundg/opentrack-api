@@ -150,7 +150,8 @@ def import_event_overview_csv(csv_path: Path) -> list[EventScheduleRow]:
         if reader.fieldnames is None:
             raise ValueError("CSV file is empty or has no header")
 
-        # Validate required columns
+        # Validate required columns (duration_minutes is optional / reference-only:
+        # the start/end window is authoritative and duration is derived from it)
         required_columns = {
             'event_group_id',
             'event_type',
@@ -158,7 +159,6 @@ def import_event_overview_csv(csv_path: Path) -> list[EventScheduleRow]:
             'venue',
             'start_time',
             'end_time',
-            'duration_minutes',
         }
         missing_columns = required_columns - set(reader.fieldnames)
         if missing_columns:

@@ -95,8 +95,11 @@ This workflow allows for:
 - Individual events → EventGroups (merged categories)
 - Logic in: `__main__.py:group_events_by_type()`
 - Rules:
-  - Track events: Max 8 athletes per group (one heat)
-  - Field events: 3-8 athletes per group (equipment sharing)
+  - Track events: Max 8 athletes per group (one heat — hard lane cap)
+  - Field events: Strong preference for ≥4 athletes per group; cap of 8 is a
+    soft split target (oversized merged groups allowed with warning). See
+    `scheduler/CONSTRAINTS.md` for the cross-tier merge rules
+    (Masters↔15+, 11-14↔15-17).
 
 ### Processing: Constraint Solving
 - Input: EventGroups + Athletes + Configuration

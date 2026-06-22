@@ -159,10 +159,10 @@ def schedule(
         typer.Option(
             "--sticky/--no-sticky",
             help="Group events of the same type at one venue into a contiguous block "
-                 "(no DT-HT-DT interleaving). Track is exempt. Default off; hard "
-                 "constraint that may make tight schedules infeasible.",
+                 "(no DT-HT-DT interleaving). Track is exempt. Default on; pass "
+                 "--no-sticky to allow interleaving when needed to fit a schedule.",
         ),
-    ] = False,
+    ] = True,
 ) -> None:
     """Generate a track meet schedule from an Isonen XLSX file."""
     # Configure arena
@@ -255,9 +255,9 @@ def schedule(
     event_schedule = result_to_event_schedule_rows(result, base_datetime, slot_duration_minutes=5)
     try:
         validate_event_schedule(
-            events=event_schedule,
-            event_groups=result.events,
-            athletes=athletes,
+            event_schedule,
+            events,
+            athletes,
             slot_duration_minutes=5,
         )
     except ConstraintViolation as e:
@@ -382,14 +382,6 @@ def schedule_from_events(
         bool,
         typer.Option("--quiet", "-q", help="Suppress detailed output"),
     ] = False,
-    mix_genders: Annotated[
-        bool,
-        typer.Option("--mix-genders", help="Allow mixing genders in track heats (useful for youth events)"),
-    ] = False,
-    mix_hurdle_distances: Annotated[
-        bool,
-        typer.Option("--mix-hurdle-distances", help="Allow mixing hurdle distances in one heat (uses 2 gutter lanes per distance boundary)"),
-    ] = False,
     arena: Annotated[
         str,
         typer.Option("--arena", help="Arena name (e.g. 'tromsohallen') for venue-specific lane limits and markers"),
@@ -414,7 +406,7 @@ def schedule_from_events(
             help="Validate that event types form contiguous blocks per venue. "
                  "Pass the same value used for the original schedule.",
         ),
-    ] = False,
+    ] = True,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -457,15 +449,14 @@ def schedule_from_events(
     if not quiet:
         typer.echo(f"Parsing participant data from {input_file}...")
 
-    # Parse original data to get event groups and athletes
+    # Parse original data to get raw event atoms and athletes. Merging is the
+    # layout's job (the CSV); we do NOT re-derive groups here.
     events, athletes = parse_isonen_xlsx(str(input_file), filter_date=date)
-    event_groups = group_events_by_type(events, athletes, mix_genders_track=mix_genders, mix_hurdle_distances=mix_hurdle_distances)
 
     if not quiet:
         if date:
             typer.echo(f"Filtering to events on {date}")
         typer.echo(f"Found {len(events)} events and {len(athletes)} athletes")
-        typer.echo(f"Created {len(event_groups)} event groups")
         typer.echo(f"\nImporting event schedule from {events_csv}...")
 
     # Import event overview CSV
@@ -481,9 +472,9 @@ def schedule_from_events(
     # Validate constraints
     try:
         validate_event_schedule(
-            events=event_schedule,
-            event_groups=event_groups,
-            athletes=athletes,
+            event_schedule,
+            events,
+            athletes,
             slot_duration_minutes=5,
         )
     except ConstraintViolation as e:
@@ -502,9 +493,9 @@ def schedule_from_events(
     )
 
     result = build_scheduling_result_from_events(
-        events=event_schedule,
-        event_groups=event_groups,
-        athletes=athletes,
+        event_schedule,
+        events,
+        athletes,
         base_date=base_datetime,
         slot_duration_minutes=5,
     )

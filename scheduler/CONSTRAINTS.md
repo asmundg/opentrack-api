@@ -38,15 +38,49 @@ Track events follow a strict sequence based on starting position logistics:
    block. This is a soft policy and we can diverge from it when
    needed.
 
+**Rekrutt round-event exception**: a Rekrutt (10-year-old) round race (e.g. a
+400m) runs right after the sprint/hurdle block instead of being forced last by
+its distance, so the youngest finish early. Sprints/hurdles still come first
+overall — they occupy the home straight that the round race must run through.
+See `_get_event_group_sort_key`.
+
 This ordering minimizes equipment moves and starting position changes.
 
-### 4. Hurdle Event Merging
-Hurdle events have physical constraints that prevent arbitrary age-class merging:
-- **Same distance required**: Only categories with the same `distance_between_m` can share a heat. Different distances mean different hurdle positions on the track.
-- **Height gutter lanes**: Categories with different hurdle heights can share a heat, but need an empty "gutter" lane between height zones. This reduces lane capacity: `8 - (num_distinct_heights - 1)`.
-- When a distance sub-group exceeds its lane capacity, events are split using greedy packing sorted by height (to keep same-height events together and minimize gutter lanes per sub-group).
+#### Spacing between consecutive track events
+Implemented in `_track_min_gap_slots` (shared by the spacing constraints and the
+Phase 4 pull-forward pass, so both agree how close two events may sit):
+- **Hurdle setup/teardown** (one side is hurdles, the other is not, or a hurdle
+  distance/position changes): **2 slots**. A 400m cannot start until the hurdles
+  are cleared from the straight.
+- **Pure start-position change** (different distance-to-goal block, no hurdles):
+  **1 slot** — just a starter move.
+- **Both groups young (≤12)**: **0 slots** — back-to-back is fine.
+- **Otherwise**: **1 slot** of prep time.
+- **Sprint→round re-rig**: arena-specific (`ArenaConfig.sprint_to_round_gap_minutes`).
 
-Hurdle specs are defined in `models.py:HURDLE_SPECS`.
+Start positions are grouped by distance-to-goal in `_START_POSITION_BLOCKS`
+(e.g. 200m/200mH/600m/5000m share one position, so no extra gap between them).
+
+### 4. Hurdle Event Merging
+Hurdle categories may share a heat across different distances and heights, subject to
+lane capacity:
+- **One gutter per setup**: each distinct hurdle setup — a unique
+  `(distance_between_m, height_cm)` pair — needs an empty "gutter" lane between it and
+  the next, whether the difference is distance or height. Categories with the exact same
+  setup pack with no gutter between them. Capacity is therefore
+  `effective_lanes - (num_distinct_setups - 1)` (`hurdle_lane_capacity`), e.g. 8 lanes
+  with four setups leaves five athlete lanes. This is the rule the manual-layout
+  validator (`from-events`) and the hurdle setup-plan generator enforce.
+- **Hard <15 / 15+ boundary**: hurdle events are never pooled across the under-15 / 15+
+  age boundary (an 11-14 and a 15+ category never share a heat), even when the lanes
+  would fit. This can force single-person heats (e.g. one G14 and one J15 at 80m hurdles)
+  that cannot be merged.
+- **Solver note**: the Z3 grouping path (`schedule` command, `--mix-hurdle-distances`)
+  still uses the older, more conservative `mixed_hurdle_lane_capacity` (2 gutter lanes
+  per distance boundary). It therefore splits mixed-distance pools into more heats than
+  strictly necessary, but its output still satisfies the validator above.
+
+Hurdle specs (60m / 80m / 100m) are defined in `models.py:HURDLE_SPECS`. Boys 17+ run 110m hurdles, which has no event type and is therefore not modelled.
 
 ## Optimization Goals
 
@@ -57,6 +91,11 @@ Find the shortest possible schedule that satisfies all hard constraints.
 
 ### Priority 2: 10-Year-Olds Finish First
 Rekrutt (J/G-Rekrutt) athletes should finish as early as possible. Young children have limited attention spans and parents want to leave early.
+
+To make this concrete, Rekrutt field groups run before older groups at the same
+venue (`add_youngest_field_precedence`), and Rekrutt track races sort right after
+the sprint/hurdle block (see Track Event Ordering). Rekrutt athletes only have
+Rekrutt events, so neither rule creates an athlete conflict.
 
 ### Priority 3: 11/12-Year-Olds Finish Early
 After 10-year-olds, the 11/12 age groups should finish next.
@@ -73,10 +112,46 @@ Field events from similar age groups can be merged into a single event group tha
 - **Avoid rapid-fire**: A solo athlete would have attempts back-to-back with no recovery
 - **Equipment efficiency**: One setup serves multiple categories
 
-### Merging Tiers
-- **10-year-olds (Rekrutt)**: Separate tier, can merge J/G-Rekrutt together
-- **11-14 year-olds**: Can merge within this tier
-- **15+ year-olds**: Can merge within this tier, with smart unmerging (see below)
+### Merging Tiers (field)
+
+Field events are grouped into age tiers at each venue; deficient tiers are then
+combined conservatively (see "Rule of 4" below):
+
+- **10-year-olds (Rekrutt)**: Separate tier. J/G-Rekrutt merge together, but
+  Rekrutt **never** merges with any older tier, even if that leaves a tiny
+  group. (Enforced for both field and track in
+  `_validate_no_forbidden_combinations`.)
+- **11-12 and 13-14 year-olds**: Two youth tiers. Splitting youth at the 12/13
+  boundary keeps a self-sufficient younger group (≥4) from being dragged into an
+  over-wide span when an older group needs a partner.
+- **15+ year-olds**: Merge within this tier (15-17 + 18-19 + Sr), with smart
+  unmerging (see below).
+- **Masters**: Separate tier; may combine with 15+ when deficient.
+
+### Minimum Preferred Group Size (Rule of 4)
+
+Both field event groups and track heats strongly prefer **≥4 athletes** per
+group. When a bucket has fewer, the scheduler attempts cross-tier merges before
+settling for a tiny group.
+
+For **track heats**, the merge fires only when the combined size stays ≤8
+(hard lane cap). Below 4 with no eligible partner → small heat is accepted.
+
+For **field event groups**, the tiny-bucket rescue is deliberately conservative:
+- A bucket that already has ≥4 is **never padded** — so a self-sufficient
+  younger group is not pulled into a wider age span.
+- Only two **deficient** (<4) buckets are combined, preferring a result in
+  [4, 8].
+- Rekrutt buckets never participate.
+- A leftover one-person bucket is folded into the smallest sibling to avoid a
+  solo field event.
+
+The cap of 8 is a SOFT split target. When a merged bucket exceeds 8 and cannot
+be partitioned cleanly into [4,8]-sized groups, an oversized group is allowed
+and a warning is emitted on stdout (prefixed with ⚠️).
+
+**Hurdle events** are not affected by this rescue pass — they have their own
+distance/height/gutter constraints documented in section 4 above.
 
 ### The Merging vs Spacing Problem
 
