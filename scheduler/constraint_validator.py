@@ -18,6 +18,7 @@ The authoritative occupancy is each row's ``start_time``..``end_time`` window;
 """
 
 from collections import defaultdict
+from datetime import time
 
 from .dtos import EventScheduleRow
 from . import models as _models
@@ -226,15 +227,33 @@ def _validate_venue_stickiness(rows: list[EventScheduleRow]) -> None:
             seen[row.event_type] = idx
 
 
+def _to_minutes(t: time) -> int:
+    """Minutes since midnight for a datetime.time."""
+    return t.hour * 60 + t.minute
+
+
+# Recovery between an athlete's consecutive events. Hard floor for 13+, softer
+# target for 15+ (warned, not failed). See CONSTRAINTS.md (recovery gaps).
+_MIN_RECOVERY_MINUTES = 10  # hard: 13+ must have >= this gap
+_WARN_RECOVERY_MINUTES = 15  # soft: 15+ prefer >= this gap
+
+
 def _validate_athlete_conflicts(
     athletes: list[Athlete],
     rows_by_atom: dict[tuple[EventType, Category], EventScheduleRow],
 ) -> None:
-    """Validate that no athlete is placed in two overlapping rows."""
+    """Validate per-athlete timing across rows.
+
+    For every athlete: no two of their events may overlap (any age). Older
+    athletes additionally need recovery between consecutive events — a hard
+    >=10 min gap for 13+, and a soft >=15 min target for 15+ (a warning).
+    """
     for athlete in athletes:
         placed: list[EventScheduleRow] = []
         seen_rows: set[str] = set()
+        age_order = 0
         for e in athlete.events:
+            age_order = max(age_order, get_category_age_order(e.age_category))
             row = rows_by_atom.get((e.event_type, e.age_category))
             if row is not None and row.event_group_id not in seen_rows:
                 seen_rows.add(row.event_group_id)
@@ -242,11 +261,28 @@ def _validate_athlete_conflicts(
 
         placed.sort(key=lambda r: r.start_time)
         for current, nxt in zip(placed, placed[1:]):
-            if nxt.start_time < current.end_time:
+            gap = _to_minutes(nxt.start_time) - _to_minutes(current.end_time)
+            if gap < 0:
                 raise ConstraintViolation(
                     f"Athlete conflict for {athlete.name}: "
                     f"{current.event_group_id} ({current.start_time}-{current.end_time}) "
                     f"overlaps with {nxt.event_group_id} ({nxt.start_time}-{nxt.end_time})"
+                )
+            if age_order >= 13 and gap < _MIN_RECOVERY_MINUTES:
+                raise ConstraintViolation(
+                    f"Too little recovery time for {athlete.name}: only {gap} min "
+                    f"between {current.event_group_id} "
+                    f"({current.start_time}-{current.end_time}) and "
+                    f"{nxt.event_group_id} ({nxt.start_time}-{nxt.end_time}); "
+                    f"13+ athletes need >= {_MIN_RECOVERY_MINUTES} min"
+                )
+            if age_order >= 15 and gap < _WARN_RECOVERY_MINUTES:
+                print(
+                    f"⚠️  Short recovery (soft): {athlete.name} has only {gap} min "
+                    f"between {current.event_group_id} "
+                    f"({current.start_time}-{current.end_time}) and "
+                    f"{nxt.event_group_id} ({nxt.start_time}-{nxt.end_time}); "
+                    f"15+ prefer >= {_WARN_RECOVERY_MINUTES} min"
                 )
 
 

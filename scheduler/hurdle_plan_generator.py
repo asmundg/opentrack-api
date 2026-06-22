@@ -59,6 +59,24 @@ def _marker_icon(shape: str, color: str) -> str:
             f'<line x1="3" y1="10" x2="17" y2="10" stroke="{color}" stroke-width="4" stroke-linecap="round"/>'
             f'</svg>'
         )
+    if shape == "triangle":
+        return (
+            f'<svg class="marker-icon" viewBox="0 0 20 20">'
+            f'<polygon points="10,2 18,17 2,17" fill="{color}"/>'
+            f'</svg>'
+        )
+    if shape == "square":
+        return (
+            f'<svg class="marker-icon" viewBox="0 0 20 20">'
+            f'<rect x="3" y="3" width="14" height="14" fill="{color}"/>'
+            f'</svg>'
+        )
+    if shape == "line":
+        return (
+            f'<svg class="marker-icon" viewBox="0 0 20 20">'
+            f'<line x1="3" y1="10" x2="17" y2="10" stroke="{color}" stroke-width="4" stroke-linecap="round"/>'
+            f'</svg>'
+        )
     return (
         f'<svg class="marker-icon" viewBox="0 0 20 20">'
         f'<circle cx="10" cy="10" r="8" fill="{color}"/>'

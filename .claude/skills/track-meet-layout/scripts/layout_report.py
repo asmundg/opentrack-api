@@ -79,7 +79,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
     from scheduler.isonen_parser import parse_isonen_xlsx
     from scheduler.event_csv import import_event_overview_csv
     from scheduler.constraint_validator import age_merge_errors, _atom_counts
-    from scheduler.models import Category, EventType
+    from scheduler.models import Category, EventType, get_category_age_order
 
     if args.arena not in models.ARENAS:
         sys.exit(f"Unknown arena '{args.arena}'")
@@ -105,7 +105,11 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
                 continue
 
     conflicts: list[str] = []
+    recovery: list[str] = []
     for ath in athletes:
+        age_order = max(
+            (get_category_age_order(e.age_category) for e in ath.events), default=0
+        )
         seen: set[str] = set()
         intervals = []
         for e in ath.events:
@@ -120,10 +124,20 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
                     f"{ath.name}: {a[2]} ({a[0]//60:02d}:{a[0]%60:02d}-"
                     f"{a[1]//60:02d}:{a[1]%60:02d}) overlaps {b[2]} "
                     f"({b[0]//60:02d}:{b[0]%60:02d}-{b[1]//60:02d}:{b[1]%60:02d})")
+                continue
+            gap = b[0] - a[1]
+            if age_order >= 13 and gap < 10:
+                recovery.append(
+                    f"FAIL {ath.name}: only {gap}m between {a[2]} and {b[2]} "
+                    f"(13+ need >=10m)")
+            elif age_order >= 15 and gap < 15:
+                recovery.append(
+                    f"warn {ath.name}: only {gap}m between {a[2]} and {b[2]} "
+                    f"(15+ prefer >=15m)")
 
     counts = _atom_counts(athletes)
     age = age_merge_errors(rows, counts)
-    return conflicts, age
+    return conflicts, age, recovery
 
 
 def main() -> None:
@@ -282,7 +296,7 @@ def main() -> None:
         print("\nPre-checks OK (still run from-events for shared-venue/track rules).")
 
     if args.xlsx:
-        conflicts, age = _xlsx_checks(args.csv, args)
+        conflicts, age, recovery = _xlsx_checks(args.csv, args)
         if conflicts:
             print(f"\nATHLETE CONFLICTS ({len(conflicts)}) — move one event in each pair:")
             for c in conflicts:
@@ -295,6 +309,18 @@ def main() -> None:
                 print(f"  - {a}")
         else:
             print("No age-merge violations.")
+        fails = [r for r in recovery if r.startswith("FAIL")]
+        warns = [r for r in recovery if r.startswith("warn")]
+        if fails:
+            print(f"\nRECOVERY VIOLATIONS ({len(fails)}) — 13+ need >=10 min between events:")
+            for r in fails:
+                print(f"  - {r}")
+        else:
+            print("No recovery violations.")
+        if warns:
+            print(f"\nRECOVERY WARNINGS ({len(warns)}) — 15+ prefer >=15 min:")
+            for r in warns:
+                print(f"  - {r}")
 
 
 if __name__ == "__main__":

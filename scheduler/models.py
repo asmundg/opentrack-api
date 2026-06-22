@@ -269,6 +269,7 @@ HURDLES_EVENTS: frozenset[EventType] = frozenset(
         EventType.m60_hurdles,
         EventType.m80_hurdles,
         EventType.m100_hurdles,
+        EventType.m200_hurdles,
     }
 )
 
@@ -323,6 +324,11 @@ HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     (EventType.m100_hurdles, Category.j17): HurdleSpec(10, 13, 8.5, 76.2),
     (EventType.m100_hurdles, Category.j18_19): HurdleSpec(10, 13, 8.5, 84),
     (EventType.m100_hurdles, Category.ks): HurdleSpec(10, 13, 8.5, 84),
+    # 200m hurdles. The setup differs by gender (per the Valhall hurdle plan):
+    # women (J/K) run 16m to first, 19m between (rødt kvadrat marker); boys/men
+    # (G/M) run 18.29m/18.29m (gult kvadrat). Only KS (senior women) is
+    # registered for this meet, so it uses the women's 16/19 setup.
+    (EventType.m200_hurdles, Category.ks): HurdleSpec(10, 16, 19, 76.2),
 }
 
 
@@ -383,7 +389,21 @@ ARENA_TROMSOHALLEN = ArenaConfig(
 ARENA_VALHALL = ArenaConfig(
     name="valhall",
     total_lanes=8,
-    hurdle_markers={},
+    # Floor markers (banemerker) from the Valhall hurdle plan, keyed by
+    # (first_hurdle_m, distance_between_m). Labels match the physical markings
+    # the setup crew reads on the track. The 200m hurdle square markers differ
+    # by gender: women (16/19) use the red square, boys/men (18.29/18.29) the
+    # yellow square.
+    hurdle_markers={
+        (11.0, 6.5): ("Gult kors", "cross", "#DAA520"),
+        (11.0, 7.0): ("Rødt kors", "cross", "#E53935"),
+        (11.5, 7.5): ("Blått kors", "cross", "#1E88E5"),
+        (12.0, 8.0): ("Grønn trekant", "triangle", "#43A047"),
+        (13.0, 8.5): ("Gul strek", "line", "#DAA520"),
+        (16.0, 19.0): ("Rødt kvadrat", "square", "#E53935"),
+        (18.29, 18.29): ("Gult kvadrat", "square", "#DAA520"),
+        (50.0, 35.0): ("Grønn strek", "line", "#43A047"),
+    },
     hurdle_lane_limits={},
     pv_separate_from_hj=True,
 )

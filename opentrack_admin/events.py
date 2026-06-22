@@ -1274,47 +1274,50 @@ class EventScheduler:
         # Fill in the PB values
         return self.fill_pb_sb_values(pb_lookup)
 
-    def gather_entered_event_codes(self, competition_url: str) -> list[str]:
-        """Collect every OpenTrack event code that has at least one entry.
+    def gather_all_events(self, competition_url: str) -> list[tuple[str, str]]:
+        """Enumerate every event as (code, name) from the manage Events Table.
 
-        Walks the public competitor list and each competitor's page, reading the
-        event codes from their entry links (e.g. ".../event/T2/1/1/" -> "T2").
-        This enumerates exactly the events that need PBs without depending on the
-        events table or on per-category event names (which change when events are
-        merged). Returns codes in first-seen order.
+        Pages through the mdb datatable so it sees all events regardless of how
+        many fit on one page. Reading from the events table (rather than from
+        competitor entry pages) means PBs can be set before any seeding: track
+        events have no start lists yet and so do not appear on competitor pages,
+        but they are always listed here. Returns (code, name) in table order,
+        e.g. ("T2", "G/J 11-13 60 meter hekk").
         """
         page = self.page
         base = competition_url.rstrip("/")
-
-        page.goto(f"{base}/competitor/", wait_until="domcontentloaded")
+        page.goto(f"{base}/manage/events/", wait_until="domcontentloaded")
         page.wait_for_load_state("networkidle")
-        competitor_ids = page.evaluate(
-            """() => Array.from(new Set(
-                Array.from(document.querySelectorAll('a[href]'))
-                    .map(a => a.getAttribute('href'))
-                    .filter(h => /^\\.\\/\\d+\\/$/.test(h))
-                    .map(h => h.replace(/\\D/g, ''))
-            ))"""
-        )
-        logger.info("Found %d competitors", len(competitor_ids))
+        page.get_by_role("tab", name=" Events Table").click()
+        page.wait_for_timeout(600)
 
-        codes: list[str] = []
+        events: list[tuple[str, str]] = []
         seen: set[str] = set()
-        for cid in competitor_ids:
-            page.goto(f"{base}/competitor/{cid}/", wait_until="domcontentloaded")
-            page.wait_for_load_state("networkidle")
-            entry_codes = page.evaluate(
-                """() => Array.from(document.querySelectorAll('a[href*="/event/"]'))
-                    .map(a => (a.getAttribute('href').match(/\\/event\\/([TF]\\d+)/) || [])[1])
-                    .filter(Boolean)"""
+        next_btn = page.locator("button.table-editor__pagination-button").filter(
+            has=page.locator("i.fa-chevron-right")
+        )
+        for _ in range(50):  # generous page cap
+            rows = page.evaluate(
+                r"""() => Array.from(document.querySelectorAll('tr')).map(r => {
+                    const code = Array.from(r.querySelectorAll('a'))
+                        .map(x => (x.textContent || '').trim())
+                        .find(t => /^[TF]\d+$/.test(t));
+                    const nameCell = r.querySelector("td[data-mdb-field='name']");
+                    return code && nameCell
+                        ? {code, name: nameCell.textContent.trim()} : null;
+                }).filter(Boolean)"""
             )
-            for code in entry_codes:
-                if code not in seen:
-                    seen.add(code)
-                    codes.append(code)
+            for r in rows:
+                if r["code"] not in seen:
+                    seen.add(r["code"])
+                    events.append((r["code"], r["name"]))
+            if next_btn.count() == 0 or next_btn.first.is_disabled():
+                break
+            next_btn.first.click()
+            page.wait_for_timeout(700)
 
-        logger.info("Discovered %d entered events: %s", len(codes), codes)
-        return codes
+        logger.info("Discovered %d events from the events table", len(events))
+        return events
 
     @screenshot_on_error
     def open_event_competitors_by_code(self, competition_url: str, code: str) -> str:
@@ -1379,35 +1382,38 @@ class EventScheduler:
         debug: bool = False,
         checkpoint: "Checkpoint | None" = None,
     ) -> tuple[int, list[tuple[str, str]]]:
-        """Update PBs for every entered event, competitor-driven.
+        """Update PBs for every event, enumerated from the events table.
 
-        Discovers events from competitor entries, then for each event navigates
-        by code, derives the discipline from the event name, reads the pool with
-        per-athlete categories, looks up PBs (skipping athletes under 13), and
-        fills them. Robust to merged/renamed events because it never searches by
-        per-category name.
+        Lists all events (code + name) from the manage Events Table, then for
+        each navigates by code, derives the discipline from the event name, reads
+        the pool with per-athlete categories, looks up PBs (skipping athletes
+        under 13), and fills them. Enumerating from the events table (not from
+        competitor entry pages) means this works before seeding: unseeded track
+        events still appear here. Robust to merged/renamed events because the
+        discipline comes from the event name, never a per-category search.
 
         Returns (total_updated, errors) where errors is a list of
         (event_code, message).
         """
-        codes = self.gather_entered_event_codes(competition_url)
+        events = self.gather_all_events(competition_url)
 
         total_updated = 0
         errors: list[tuple[str, str]] = []
-        for i, code in enumerate(codes, 1):
+        for i, (code, name) in enumerate(events, 1):
             if checkpoint and checkpoint.is_done(code):
-                logger.info("Skipping %d/%d: %s (already done)", i, len(codes), code)
+                logger.info("Skipping %d/%d: %s (already done)", i, len(events), code)
                 continue
 
-            logger.info("Processing %d/%d: event %s", i, len(codes), code)
+            logger.info("Processing %d/%d: event %s (%s)", i, len(events), code, name)
             try:
-                event_name = self.open_event_competitors_by_code(competition_url, code)
-                discipline = event_code_from_event_title(event_name)
+                discipline = event_code_from_event_title(name)
                 if discipline is None:
                     raise RuntimeError(
-                        f"Could not derive discipline from event name {event_name!r}"
+                        f"Could not derive discipline from event name {name!r}"
                     )
-                logger.info("  %s -> %s (%s)", code, event_name, discipline)
+
+                self.open_event_competitors_by_code(competition_url, code)
+                logger.info("  %s -> %s (%s)", code, name, discipline)
 
                 pool = self.read_event_pool()
                 if not pool:

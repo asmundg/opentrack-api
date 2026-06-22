@@ -135,6 +135,7 @@ violation, so fix one and re-run. Track age-ordering and oversized field groups 
 | `Venue conflict at <venue>: A overlaps with B` | two rows share a venue/`--shared` bucket and overlap | move one later, or serialise the shared types |
 | `Venue stickiness violated at <venue>: ...` | a type is interleaved at a venue (`--sticky`) | make each type a contiguous block per venue |
 | `Athlete conflict for <name>: A overlaps with B` | someone is in two overlapping rows | move A or B, or re-merge so they share a row |
+| `Too little recovery time for <name>: only N min ...` | a 13+ athlete has < 10 min between two of their events | widen the gap to >= 10 min (>= 15 for 15+ to avoid the soft warning) |
 | `Track event ordering violation: ...` | track distances out of order (and not the Rekrutt round-race exception) | reorder track times into distance order |
 | `Age merge violation in X: ...` | a track heat mixes categories that may not run together | re-split the heat's categories (see age rules above) |
 | `Hurdle heat X has N athletes but only K usable lanes` | hurdle merge exceeds lane capacity after gutter lanes | split the heat or drop a setup |
@@ -202,8 +203,10 @@ Optimise only after the schedule is valid and reasonably tight, in this order
 1. **Young finish first.** J/G-Rekrutt (10yo) should end earliest, then 11/12. Place
    their rows in the first slots and keep them off late timelines.
 2. **Recovery gaps.** For athletes 13+ with multiple events, leave several idle slots
-   between their rows. Maximise the smallest such gap across athletes; do not spend
-   makespan you do not have.
+   between their rows. **>= 10 min between consecutive events is a hard rule for 13+**
+   (`from-events`/`layout_report.py` fail below it); 15+ should get **>= 15 min** (a
+   shorter gap only warns). Maximise the smallest such gap across athletes; do not
+   spend makespan you do not have beyond meeting these floors.
 
 ## Validation strategy
 

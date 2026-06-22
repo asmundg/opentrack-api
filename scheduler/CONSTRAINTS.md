@@ -109,6 +109,18 @@ After 10-year-olds, the 11/12 age groups should finish next.
 ### Priority 4: Maximize Recovery Gaps for Older Athletes
 Athletes aged 13+ who have multiple events need adequate recovery time between events. The scheduler maximizes the minimum gap across all such athletes.
 
+Recovery is partly a **hard constraint**, enforced by `constraint_validator.py` (and
+`from-events`):
+
+- **13+ athletes must have >= 10 minutes** between any two of their consecutive
+  events, or validation **fails**.
+- **15+ athletes should have >= 15 minutes**; a shorter (but >= 10 min) gap passes
+  with a **warning**.
+
+The gap is measured between one event's `end_time` and the next event's `start_time`
+for the same athlete. Younger than 13 has no recovery requirement (the overlap check
+still applies to everyone).
+
 ## Field Event Merging
 
 Field events from similar age groups can be merged into a single event group that runs sequentially sharing equipment.

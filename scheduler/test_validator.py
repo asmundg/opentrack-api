@@ -96,14 +96,94 @@ def test_athlete_conflict_across_rows_fails():
 
 
 def test_athlete_serial_rows_pass():
+    # Non-overlapping rows with adequate recovery (>=10 min for 13+) pass.
     sp = _atom(EventType.sp, Category.j13)
     lj = _atom(EventType.lj, Category.j13)
     athletes = [Athlete("A", [sp, lj])]
     rows = [
         _row("sp", EventType.sp, [Category.j13], "17:00", "17:20"),
-        _row("lj", EventType.lj, [Category.j13], "17:20", "17:40"),
+        _row("lj", EventType.lj, [Category.j13], "17:30", "17:50"),
     ]
     validate_event_schedule(rows, [sp, lj], athletes)  # no raise
+
+
+def test_athlete_recovery_under_10min_13plus_fails():
+    # A 13+ athlete with <10 min between consecutive events has too little
+    # recovery — hard failure.
+    sp = _atom(EventType.sp, Category.j13)
+    lj = _atom(EventType.lj, Category.j13)
+    athletes = [Athlete("A", [sp, lj])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j13], "17:00", "17:20"),
+        _row("lj", EventType.lj, [Category.j13], "17:25", "17:45"),  # 5 min gap
+    ]
+    with pytest.raises(ConstraintViolation, match="recovery time for A"):
+        validate_event_schedule(rows, [sp, lj], athletes)
+
+
+def test_athlete_recovery_under_10min_senior_fails():
+    # Seniors/masters are in the 13+ group too.
+    sp = _atom(EventType.sp, Category.ks)
+    lj = _atom(EventType.lj, Category.ks)
+    athletes = [Athlete("A", [sp, lj])]
+    rows = [
+        _row("sp", EventType.sp, [Category.ks], "17:00", "17:20"),
+        _row("lj", EventType.lj, [Category.ks], "17:28", "17:48"),  # 8 min gap
+    ]
+    with pytest.raises(ConstraintViolation, match="recovery time for A"):
+        validate_event_schedule(rows, [sp, lj], athletes)
+
+
+def test_athlete_recovery_under13_no_rule():
+    # The recovery rule applies only to 13+; younger athletes may run back-to-back.
+    sp = _atom(EventType.sp, Category.j12)
+    lj = _atom(EventType.lj, Category.j12)
+    athletes = [Athlete("A", [sp, lj])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j12], "17:00", "17:20"),
+        _row("lj", EventType.lj, [Category.j12], "17:20", "17:40"),  # 0 min gap
+    ]
+    validate_event_schedule(rows, [sp, lj], athletes)  # no raise
+
+
+def test_athlete_recovery_13_14_no_warn(capsys):
+    # 13-14: >=10 min passes with no warning (the <15 min warn is 15+ only).
+    sp = _atom(EventType.sp, Category.j14)
+    lj = _atom(EventType.lj, Category.j14)
+    athletes = [Athlete("A", [sp, lj])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j14], "17:00", "17:20"),
+        _row("lj", EventType.lj, [Category.j14], "17:32", "17:52"),  # 12 min gap
+    ]
+    validate_event_schedule(rows, [sp, lj], athletes)
+    assert "recovery" not in capsys.readouterr().out.lower()
+
+
+def test_athlete_recovery_15plus_under_15min_warns(capsys):
+    # 15+: a 10-14 min gap passes but emits a soft warning.
+    sp = _atom(EventType.sp, Category.j15)
+    lj = _atom(EventType.lj, Category.j15)
+    athletes = [Athlete("A", [sp, lj])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j15], "17:00", "17:20"),
+        _row("lj", EventType.lj, [Category.j15], "17:32", "17:52"),  # 12 min gap
+    ]
+    validate_event_schedule(rows, [sp, lj], athletes)  # no raise
+    out = capsys.readouterr().out.lower()
+    assert "recovery" in out and "a" in out
+
+
+def test_athlete_recovery_15plus_15min_ok(capsys):
+    # 15+ with >=15 min: no failure, no warning.
+    sp = _atom(EventType.sp, Category.j15)
+    lj = _atom(EventType.lj, Category.j15)
+    athletes = [Athlete("A", [sp, lj])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j15], "17:00", "17:20"),
+        _row("lj", EventType.lj, [Category.j15], "17:35", "17:55"),  # 15 min gap
+    ]
+    validate_event_schedule(rows, [sp, lj], athletes)
+    assert "recovery" not in capsys.readouterr().out.lower()
 
 
 def test_venue_conflict_fails():
