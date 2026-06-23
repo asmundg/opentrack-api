@@ -18,11 +18,12 @@ from pblookup.lookup import PBLookupService
 from .api import OpenTrackAPI, OpenTrackAPIError
 from .events import (
     AttemptConfig,
+    EventMergeGroup,
     EventSchedule,
     fold_masters_to_senior,
     get_category_age,
     is_horizontal_field_event,
-    lookup_athlete_pb,
+    lookup_athlete_pb_sb,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,6 +42,53 @@ def _to_api_event_code(schedule_code: str) -> str:
 def _discipline_from_api_code(api_code: str) -> str:
     """Inverse of :func:`_to_api_event_code`: API ``event_code`` to admin code."""
     return f"{api_code}m" if api_code.isdigit() else api_code
+
+
+def set_merged_names(
+    api: OpenTrackAPI,
+    comp_id: str,
+    merge_groups: list[EventMergeGroup],
+) -> tuple[int, list[tuple[str, str]]]:
+    """Set each merged track event's combined name on its primary, via the API.
+
+    Merging itself needs the browser, but the merged event's display name (e.g.
+    ``"G/J 11-13 60 meter hekk"``) is just the primary event's ``name`` field, so
+    it can be PATCHed over the API. Running this on the API path keeps names in
+    sync even when the browser merge phase is skipped (``--no-merge``) or when a
+    prior merge left the primary with its single-category name.
+
+    Each group's primary is matched to its OpenTrack event by ``(event_code,
+    category)``. Idempotent: a primary already carrying the combined name is left
+    untouched. Returns ``(updated, errors)``.
+    """
+    events = api.get_events(comp_id)
+    by_key: dict[tuple[str, str], dict] = {
+        (str(e["event_code"]), str(e["category"])): e for e in events
+    }
+
+    updated = 0
+    errors: list[tuple[str, str]] = []
+    for group in merge_groups:
+        primary = group.primary
+        label = group.merged_name
+        key = (_to_api_event_code(primary.event), primary.search_category)
+        event = by_key.get(key)
+        if event is None:
+            errors.append((label, "no matching OpenTrack event"))
+            logger.warning("No OpenTrack event for merged group %s (looked up %s)", label, key)
+            continue
+
+        if event.get("name") == group.merged_name:
+            continue
+
+        try:
+            api.patch_event(event, name=group.merged_name)
+            updated += 1
+            logger.info("Named %s (%s) -> %s", event["event_id"], key, group.merged_name)
+        except OpenTrackAPIError as e:
+            errors.append((label, str(e)))
+
+    return updated, errors
 
 
 def set_event_times(
@@ -103,11 +151,13 @@ def update_pbs(
     event_filter: str | None = None,
     category_filter: str | None = None,
 ) -> tuple[int, list[tuple[str, str]]]:
-    """Seed competitor PB values from the external stats site.
+    """Seed competitor PB and SB values from the external stats site.
 
     Competitor-driven: every entered event is read straight from the
     competitors endpoint, so this works before seeding and across merged/renamed
-    events. Athletes under 13 are skipped. Only competitors whose ``pb`` data
+    events. For each event the athlete's all-time personal best (``pb``) and
+    current-season best (``sb``) are looked up in a single matched pass.
+    Athletes under 13 are skipped. Only competitors whose ``pb``/``sb`` data
     actually changes are PUT back.
 
     Optional ``event_filter`` (admin discipline code, e.g. ``"LJ"``) and
@@ -142,11 +192,14 @@ def update_pbs(
                 continue
 
             discipline = _discipline_from_api_code(api_code)
-            pb_value = lookup_athlete_pb(
+            pb_value, sb_value = lookup_athlete_pb_sb(
                 service, name, club, "", discipline, category, debug=debug
             )
             if pb_value is not None and entry.get("pb") != pb_value:
                 entry["pb"] = pb_value
+                changed = True
+            if sb_value is not None and entry.get("sb") != sb_value:
+                entry["sb"] = sb_value
                 changed = True
 
         if not changed:

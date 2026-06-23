@@ -213,10 +213,10 @@ def schedule(
         schedules = parse_schedule_csv(file.read_text())
 
     # Track events sharing a start time (a multi-category row in the event
-    # overview) run as one heat, expressed in OpenTrack by merging them.
-    merge_groups = (
-        parse_event_merge_groups(file) if is_event_overview and not no_merge else []
-    )
+    # overview) run as one heat, expressed in OpenTrack by merging them. The
+    # groups also carry the merged display name, which is applied over the API
+    # regardless of --no-merge so names stay in sync.
+    merge_groups = parse_event_merge_groups(file) if is_event_overview else []
 
     if not schedules:
         print("❌ No valid events found in schedule file.")
@@ -227,7 +227,7 @@ def schedule(
         print(f"   {s.category} {s.event} @ {s.start_time.strftime('%H:%M')}")
     print()
 
-    if merge_groups:
+    if merge_groups and not no_merge:
         print(f"🔀 {len(merge_groups)} track group(s) will be merged:")
         for g in merge_groups:
             members = " + ".join(s.search_term for s in g.members)
@@ -253,9 +253,21 @@ def schedule(
             print(f"   - {label}: {error}")
         raise typer.Exit(1)
 
+    # Apply merged event names over the API (merging itself still needs the
+    # browser, but the combined name is just the primary's name field).
+    if merge_groups:
+        named, name_errors = sync.set_merged_names(api, comp_id, merge_groups)
+        if named:
+            print(f"✅ Named {named} merged event(s) via API")
+        if name_errors:
+            print()
+            print(f"⚠️  {len(name_errors)} merged name(s) could not be set:")
+            for label, error in name_errors:
+                print(f"   - {label}: {error}")
+
     # Browser phase: merging is not available via the API, so drive it with
     # Playwright when track groups need to be merged.
-    if not merge_groups:
+    if no_merge or not merge_groups:
         return
 
     checkpoint_name = (
@@ -293,13 +305,13 @@ def update_pbs(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     debug_pblookup: Annotated[bool, typer.Option("--debug-pblookup", help="Enable debug output from pblookup service")] = False,
 ) -> None:
-    """Update PB values for competitors via the OpenTrack API.
+    """Update PB and SB values for competitors via the OpenTrack API.
 
     Competitor-driven: reads every entered event straight from the competitors
-    endpoint and sets PBs, so it works before seeding and across merged/renamed
-    events. Use --event and --category to restrict to a single event. No browser
-    is launched. OpenTrack only allows competitor edits within 7 days of the
-    competition finish date.
+    endpoint and sets each athlete's all-time PB and current-season SB, so it
+    works before seeding and across merged/renamed events. Use --event and
+    --category to restrict to a single event. No browser is launched. OpenTrack
+    only allows competitor edits within 7 days of the competition finish date.
     """
     setup_logging(verbose=verbose)
 
@@ -311,9 +323,9 @@ def update_pbs(
 
     single_event_mode = bool(event and category)
     if single_event_mode:
-        print(f"📊 Updating PBs for single event: {category} {event}")
+        print(f"📊 Updating PB/SB for single event: {category} {event}")
     else:
-        print("📊 Updating PBs for all entered events (competitor-driven)...")
+        print("📊 Updating PB/SB for all entered events (competitor-driven)...")
     if club:
         print(f"   Default club: {club}")
     print()
@@ -337,7 +349,7 @@ def update_pbs(
     )
 
     print()
-    print(f"✅ Updated PBs for {total_updated} competitor(s)")
+    print(f"✅ Updated PB/SB for {total_updated} competitor(s)")
     if errors:
         print()
         print(f"⚠️  {len(errors)} competitor(s) failed to update:")

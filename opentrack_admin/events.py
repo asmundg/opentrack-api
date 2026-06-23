@@ -700,7 +700,7 @@ class EventMergeGroup:
         return f"{gender} {event_name}"
 
 
-def lookup_athlete_pb(
+def lookup_athlete_pb_sb(
     service: PBLookupService,
     name: str,
     club: str,
@@ -708,25 +708,25 @@ def lookup_athlete_pb(
     event: str,
     category: str,
     debug: bool = False,
-) -> str | None:
-    """Look up one athlete's formatted PB for a discipline, or ``None``.
+) -> tuple[str | None, str | None]:
+    """Look up one athlete's formatted all-time PB and season's best (SB).
 
-    ``event`` is an admin discipline code (e.g. ``"HJ"``, ``"100m"``, ``"60H"``);
-    it is translated into the pblookup vocabulary before searching. Returns the
-    OpenTrack-ready result string (e.g. ``"10.54"``, ``"6:00.80"``) or ``None``
-    when no result is found. Shared by the browser and API update-pbs paths.
+    ``event`` is an admin discipline code (e.g. ``"HJ"``, ``"100m"``, ``"60H"``).
+    Returns ``(pb, sb)`` OpenTrack-ready strings, each ``None`` when no result is
+    found. The athlete is matched once and both views are read in a single pass.
     """
     pblookup_event = pblookup_standardize_event(EVENT_NAMES.get(event, event))
     try:
-        result = service.lookup_pb(
+        pb, sb = service.lookup_pb_sb(
             name, club, birth_date, pblookup_event, category=category
         )
     except Exception as e:
-        logger.warning(f"Error looking up PB for {name}: {e}")
-        return None
-    if result is None:
-        return None
-    return result.get_result_formatted()
+        logger.warning(f"Error looking up PB/SB for {name}: {e}")
+        return None, None
+    return (
+        pb.get_result_formatted() if pb is not None else None,
+        sb.get_result_formatted() if sb is not None else None,
+    )
 
 
 class EventScheduler:
