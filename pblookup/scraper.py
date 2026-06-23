@@ -135,14 +135,33 @@ class MinfriidrettsScraper:
         return candidates
     
     @rate_limit(0.5)  # 1 request every 2 seconds
-    def fetch_athlete_profile(self, athlete_id: int) -> Optional[Athlete]:
-        """Fetch complete athlete profile by ID."""
+    def fetch_athlete_profile(
+        self, athlete_id: int, view: str = "PR"
+    ) -> Optional[Athlete]:
+        """Fetch an athlete profile by ID.
+
+        ``view`` selects which performances the profile carries:
+        - ``"PR"`` (default): all-time personal records (GET, the default page).
+        - ``"SB"``: the current season's bests (POST ``type=SB``).
+
+        Both views render the same table structure, so the parsed
+        ``outdoor_pbs``/``indoor_pbs`` hold all-time PBs or season bests
+        respectively.
+        """
         try:
-            url = f"{self.PROFILE_URL}?showathlete={athlete_id}"
-            if self.debug:
-                print(f"DEBUG: Fetching profile URL: {url}", file=sys.stderr)
-                
-            response = self.session.get(url, timeout=15)
+            if view == "SB":
+                if self.debug:
+                    print(f"DEBUG: Fetching SB view for athlete {athlete_id}", file=sys.stderr)
+                response = self.session.post(
+                    self.PROFILE_URL,
+                    data={"athlete": athlete_id, "type": "SB"},
+                    timeout=15,
+                )
+            else:
+                url = f"{self.PROFILE_URL}?showathlete={athlete_id}"
+                if self.debug:
+                    print(f"DEBUG: Fetching profile URL: {url}", file=sys.stderr)
+                response = self.session.get(url, timeout=15)
             response.raise_for_status()
             
             if self.debug:

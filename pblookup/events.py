@@ -286,3 +286,31 @@ def can_have_wind(event: str) -> bool:
 def is_indoor_event(event: str) -> bool:
     """Check if event name indicates indoor competition."""
     return "innendørs" in event.lower() or "indoor" in event.lower() or event.lower() in ["60m", "60 meter", "60m_hurdles", "60 meter hekk"]
+
+
+def is_better_result(event: str, candidate, current) -> bool:
+    """True if ``candidate`` beats ``current`` for ``event``.
+
+    Direction follows the event type: field events are higher-is-better, every
+    other event (track times) is lower-is-better. Values are parsed with
+    ``get_result_as_float`` so Norwegian formats compare correctly. A candidate
+    that cannot be parsed never wins; an unparseable incumbent always loses.
+    """
+    candidate_val = candidate.get_result_as_float()
+    if candidate_val is None:
+        return False
+    current_val = current.get_result_as_float()
+    if current_val is None:
+        return True
+    if is_field_event(event):
+        return candidate_val > current_val
+    return candidate_val < current_val
+
+
+def better_result(event: str, a, b):
+    """Return the better of two results for ``event`` (either may be None)."""
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a if is_better_result(event, a, b) else b

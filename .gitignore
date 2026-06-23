@@ -10,6 +10,8 @@ wheels/
 *.csv
 *.html
 *.pdf
+# but keep checked-in test fixtures
+!pblookup/fixtures/*.html
 
 # Virtual environments
 .venv

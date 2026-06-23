@@ -168,24 +168,10 @@ class Athlete:
             records[result.event] = result
 
     def _is_better_result(self, new_result: Result, existing_result: Result) -> bool:
-        """Compare two results to determine if new result is better."""
-        # This is a simplified comparison - in reality, we'd need event-specific logic
-        # For time events, lower is better; for field events, higher is better
-        try:
-            new_val = float(new_result.result.replace(',', '.'))
-            existing_val = float(existing_result.result.replace(',', '.'))
-            
-            # Simple heuristic: if event contains "m" and no "meter" in name, it's likely field event
-            is_field_event = ('m' in new_result.event.lower() and 
-                             'meter' not in new_result.event.lower())
-            
-            if is_field_event:
-                return new_val > existing_val  # Higher is better for field events
-            else:
-                return new_val < existing_val  # Lower is better for time events
-        except (ValueError, AttributeError):
-            # If we can't parse, assume new is better (safer for data updates)
-            return True
+        """Compare two results: field events higher-is-better, else lower."""
+        from .events import is_better_result
+
+        return is_better_result(new_result.event, new_result, existing_result)
 
 
 @dataclass
