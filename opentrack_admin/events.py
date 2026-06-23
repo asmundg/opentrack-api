@@ -546,10 +546,11 @@ def is_track_event(event_code: str) -> bool:
 def is_horizontal_field_event(event_code: str) -> bool:
     """Check if event code is a horizontal field event (has attempts).
 
-    Horizontal jumps and throws have a fixed number of attempts.
-    Vertical jumps (HJ, SHJ, PV) are height-based and don't use attempts.
+    Horizontal jumps and throws (including BT, the "Liten ball" ball throw) have
+    a fixed number of attempts. Vertical jumps (HJ, SHJ, PV) are height-based and
+    don't use attempts.
     """
-    return event_code in {"LJ", "SLJ", "TJ", "SP", "DT", "JT", "HT"}
+    return event_code in {"LJ", "SLJ", "TJ", "SP", "DT", "JT", "HT", "BT"}
 
 
 @dataclass
