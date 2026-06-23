@@ -25,8 +25,12 @@ def normalize_norwegian_name(name: str) -> str:
     for norwegian_char, replacement in char_mappings.items():
         normalized = normalized.replace(norwegian_char, replacement)
     
+    # Drop separators so "Surname, First" and "First Surname" compare equal once
+    # token order is normalized (the search site lists "Surname, First").
+    normalized = normalized.replace(',', ' ')
+
     # Remove extra whitespace and normalize
-    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
     
     return normalized
 
@@ -158,44 +162,62 @@ def calculate_age_in_year(birth_year: int, competition_year: int) -> int:
 
 
 def parse_age_category(category: str) -> Optional[int]:
-    """Parse age from category string like 'J15', 'G12', 'M17', 'K15'.
-    
-    Returns the expected age, or None if not parseable.
-    Norwegian categories:
+    """Parse the lower-bound age from a category string like 'J15', 'W50'.
+
+    Returns the youngest age the category covers, or None if not parseable
+    (e.g. 'Senior'). See parse_age_category_range for the full range.
+    """
+    rng = parse_age_category_range(category)
+    return rng[0] if rng else None
+
+
+# Masters (veteran) classes start at 35 and run in 5-year bands (W50 = 50-54).
+_MASTERS_MIN_AGE = 35
+
+
+def parse_age_category_range(category: str) -> Optional[Tuple[int, int]]:
+    """Parse a category string into an inclusive (low, high) age range.
+
+    Youth classes are a single year (the year you turn that age): 'J15' ->
+    (15, 15). Masters classes are 5-year bands: 'W50' -> (50, 54), 'M35' ->
+    (35, 39). Returns None for classes with no fixed age (Senior/Veteran) or
+    when the string can't be parsed.
+
+    Norwegian/international categories:
     - J = Jenter (girls), G = Gutter (boys) for youth
-    - M = Menn (men), K = Kvinner (women) for adults (but M17/K17 etc exist)
-    - Numbers indicate age (10-19) or special categories (U20, U23, Senior)
+    - K = Kvinner (women), M = Menn (men), W = women masters
+    - Numbers indicate age (youth 10-19) or the band floor (masters 35+)
     - G-rekrutt / J-rekrutt = age 10 (recruitment class)
     """
     if not category:
         return None
-    
+
     category = category.upper().strip()
-    
-    # Handle rekrutt (recruitment) categories - these are age 10
+
+    # Recruitment (recruitment) categories - age 10
     if category in ('G-REKRUTT', 'J-REKRUTT', 'REKRUTT'):
-        return 10
-    
-    # Handle U20, U23
+        return (10, 10)
+
+    # Under-X classes
     if category in ('U20', 'U-20'):
-        return 19  # U20 means under 20
+        return (19, 19)
     if category in ('U23', 'U-23'):
-        return 22  # U23 means under 23
-    
-    # Handle Senior/Veteran (no specific age)
+        return (22, 22)
+
+    # Senior/Veteran have no fixed age band
     if category in ('SENIOR', 'SEN', 'VETERAN', 'VET'):
         return None
-    
-    # Extract age from patterns like J15, G12, M17, K15
-    match = re.match(r'^[JGMK](\d{1,2})$', category)
+
+    # Letter prefix + age, e.g. J15, G12, M17, K15, W50, M35.
+    match = re.match(r'^[A-ZÆØÅ]+[\s-]*(\d{1,2})$', category)
+    if not match:
+        match = re.match(r'^(\d{1,2})$', category)
     if match:
-        return int(match.group(1))
-    
-    # Try just a number
-    match = re.match(r'^(\d{1,2})$', category)
-    if match:
-        return int(match.group(1))
-    
+        age = int(match.group(1))
+        if age >= _MASTERS_MIN_AGE:
+            return (age, age + 4)  # 5-year masters band
+        return (age, age)
+
     return None
 
 
@@ -208,39 +230,40 @@ def validate_age_category(
     
     Args:
         candidate_birth_date: Candidate's birth date (DD.MM.YYYY)
-        expected_category: Expected category like 'J15', 'G12'
+        expected_category: Expected category like 'J15', 'G12', 'W50'
         competition_year: Year of competition (defaults to current year)
         
     Returns:
         Tuple of (is_valid, score) where:
-        - is_valid: True if age matches category (exact or off-by-one)
-        - score: 1.0 for exact match, 0.5 for off-by-one, 0.0 for mismatch
+        - is_valid: True if age matches category (inside band, or off by one)
+        - score: 1.0 inside the band, 0.5 off-by-one at a band edge, else 0.0
     """
     if not candidate_birth_date or not expected_category:
         return False, 0.0  # Can't validate without both, reject match
-    
-    expected_age = parse_age_category(expected_category)
-    if expected_age is None:
-        return True, 0.5  # Can't parse category (e.g., Senior), allow match
-    
+
+    age_range = parse_age_category_range(expected_category)
+    if age_range is None:
+        return True, 0.5  # Can't pin an age (e.g. Senior), allow match
+
     birth_year = get_birth_year_from_date(candidate_birth_date)
     if birth_year is None:
         return False, 0.0  # Can't parse birth date, reject match
-    
+
     if competition_year is None:
         competition_year = date.today().year
-    
+
     actual_age = calculate_age_in_year(birth_year, competition_year)
-    
-    # Exact match
-    if actual_age == expected_age:
+    low, high = age_range
+
+    # Inside the band (exact age for youth, 5-year span for masters)
+    if low <= actual_age <= high:
         return True, 1.0
-    
-    # Off by one year (could be edge case or data issue)
-    if abs(actual_age - expected_age) == 1:
+
+    # Off by one year at either edge (edge case or data issue)
+    if actual_age == low - 1 or actual_age == high + 1:
         return True, 0.5
-    
-    # More than one year off - wrong person
+
+    # Clearly outside - wrong person
     return False, 0.0
 
 
@@ -272,48 +295,47 @@ def find_best_match(candidates: List[SearchCandidate],
     best_score = 0.0
     
     for candidate in candidates:
-        # First, validate age category if provided - this is a hard filter
+        # Age category is a hard filter, but only when we can actually evaluate
+        # it: the category must be parseable to an age band and the candidate
+        # must have a birth date. Otherwise age is simply an absent signal.
+        age_present = False
+        age_score = 0.0
         if expected_category:
-            age_valid, age_score = validate_age_category(
-                candidate.birth_date or "",
-                expected_category,
-                competition_year
+            age_range = parse_age_category_range(expected_category)
+            candidate_year = get_birth_year_from_date(candidate.birth_date or "")
+            if age_range is not None and candidate_year is not None:
+                age_valid, age_score = validate_age_category(
+                    candidate.birth_date or "",
+                    expected_category,
+                    competition_year,
+                )
+                if not age_valid:
+                    candidate.similarity_score = 0.0
+                    continue  # Hard reject: wrong age band
+                age_present = True
+
+        # Weight only the signals we actually have. Name is always present;
+        # birth date, age and club count only when both sides supply them, so a
+        # missing club or birth date neither helps nor penalizes (the score is
+        # renormalized over the present signals).
+        terms: List[Tuple[float, float]] = [
+            (0.5, calculate_name_similarity(candidate.name, target_name))
+        ]
+        if target_birth_date and candidate.birth_date:
+            terms.append(
+                (0.2, calculate_birth_date_similarity(
+                    candidate.birth_date, target_birth_date))
             )
-            # Hard reject: skip candidates that don't match age category
-            if not age_valid:
-                candidate.similarity_score = 0.0
-                continue  # Skip to next candidate - do not consider this one
-        else:
-            age_score = 0.5  # Neutral if no category provided
-        
-        # Only reach here if age validation passed (or no category was provided)
-        
-        # Calculate component scores
-        name_score = calculate_name_similarity(candidate.name, target_name)
-        club_score = calculate_club_similarity(candidate.club or "", target_club)
-        birth_date_score = calculate_birth_date_similarity(candidate.birth_date or "", target_birth_date)
-        
-        # Weighted overall score
-        # Name is most important, followed by birth date/age, then club
-        overall_score = (
-            name_score * 0.5 +
-            birth_date_score * 0.2 +
-            age_score * 0.2 +
-            club_score * 0.1
-        )
-        
-        # Bonus for exact birth date match
-        if birth_date_score == 1.0:
-            overall_score += 0.1
-            
-        # Bonus for exact club match
-        if club_score == 1.0:
-            overall_score += 0.05
-            
-        # Bonus for exact age category match
-        if age_score == 1.0:
-            overall_score += 0.05
-        
+        if age_present:
+            terms.append((0.2, age_score))
+        if target_club and candidate.club:
+            terms.append(
+                (0.1, calculate_club_similarity(candidate.club, target_club))
+            )
+
+        weight_sum = sum(weight for weight, _ in terms)
+        overall_score = sum(weight * score for weight, score in terms) / weight_sum
+
         # Update candidate with calculated score
         candidate.similarity_score = overall_score
         
