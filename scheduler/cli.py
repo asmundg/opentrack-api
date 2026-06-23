@@ -171,6 +171,16 @@ def schedule_from_events(
                  "Pass the same value used for the original schedule.",
         ),
     ] = True,
+    allow_conflicts: Annotated[
+        bool,
+        typer.Option(
+            "--allow-conflicts",
+            help="Downgrade athlete overlaps and recovery shortfalls to warnings "
+                 "and still emit outputs. Use when double-bookings are resolved "
+                 "by officials on the day. Venue, coverage, age and track-order "
+                 "checks stay hard.",
+        ),
+    ] = False,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -240,6 +250,7 @@ def schedule_from_events(
             events,
             athletes,
             slot_duration_minutes=5,
+            allow_athlete_conflicts=allow_conflicts,
         )
     except ConstraintViolation as e:
         typer.echo(f"\n❌ Constraint violation detected:", err=True)

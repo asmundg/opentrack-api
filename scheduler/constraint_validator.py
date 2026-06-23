@@ -100,6 +100,7 @@ def validate_event_schedule(
     athletes: list[Athlete],
     *,
     slot_duration_minutes: int = 5,
+    allow_athlete_conflicts: bool = False,
 ) -> None:
     """Validate the agent's layout against the raw entries.
 
@@ -107,6 +108,9 @@ def validate_event_schedule(
         rows: event-overview CSV rows (the layout, with merges and times).
         atom_events: the raw (event_type, category) events parsed from the XLSX.
         athletes: athletes with their event atoms.
+        allow_athlete_conflicts: when True, athlete overlaps and recovery
+            shortfalls are reported as warnings instead of raising, so a layout
+            with deliberate double-bookings (resolved on the day) still emits.
 
     Raises:
         ConstraintViolation: if any hard constraint is violated.
@@ -120,7 +124,9 @@ def validate_event_schedule(
     if _models.STICKY_VENUES:
         _validate_venue_stickiness(rows)
 
-    _validate_athlete_conflicts(athletes, rows_by_atom)
+    _validate_athlete_conflicts(
+        athletes, rows_by_atom, allow_conflicts=allow_athlete_conflicts
+    )
     _validate_track_ordering(regular_rows)
     _validate_age_merges(regular_rows, _atom_counts(athletes))
 
@@ -241,12 +247,18 @@ _WARN_RECOVERY_MINUTES = 15  # soft: 15+ prefer >= this gap
 def _validate_athlete_conflicts(
     athletes: list[Athlete],
     rows_by_atom: dict[tuple[EventType, Category], EventScheduleRow],
+    *,
+    allow_conflicts: bool = False,
 ) -> None:
     """Validate per-athlete timing across rows.
 
     For every athlete: no two of their events may overlap (any age). Older
     athletes additionally need recovery between consecutive events — a hard
     >=10 min gap for 13+, and a soft >=15 min target for 15+ (a warning).
+
+    When ``allow_conflicts`` is set, overlaps and recovery shortfalls are
+    printed as warnings instead of raising, for layouts whose double-bookings
+    are resolved by the officials on the day.
     """
     for athlete in athletes:
         placed: list[EventScheduleRow] = []
@@ -263,19 +275,27 @@ def _validate_athlete_conflicts(
         for current, nxt in zip(placed, placed[1:]):
             gap = _to_minutes(nxt.start_time) - _to_minutes(current.end_time)
             if gap < 0:
-                raise ConstraintViolation(
+                msg = (
                     f"Athlete conflict for {athlete.name}: "
                     f"{current.event_group_id} ({current.start_time}-{current.end_time}) "
                     f"overlaps with {nxt.event_group_id} ({nxt.start_time}-{nxt.end_time})"
                 )
+                if allow_conflicts:
+                    print(f"⚠️  Athlete conflict (allowed): {msg}")
+                    continue
+                raise ConstraintViolation(msg)
             if age_order >= 13 and gap < _MIN_RECOVERY_MINUTES:
-                raise ConstraintViolation(
+                msg = (
                     f"Too little recovery time for {athlete.name}: only {gap} min "
                     f"between {current.event_group_id} "
                     f"({current.start_time}-{current.end_time}) and "
                     f"{nxt.event_group_id} ({nxt.start_time}-{nxt.end_time}); "
                     f"13+ athletes need >= {_MIN_RECOVERY_MINUTES} min"
                 )
+                if allow_conflicts:
+                    print(f"⚠️  Short recovery (allowed): {msg}")
+                    continue
+                raise ConstraintViolation(msg)
             if age_order >= 15 and gap < _WARN_RECOVERY_MINUTES:
                 print(
                     f"⚠️  Short recovery (soft): {athlete.name} has only {gap} min "
