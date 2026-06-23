@@ -1,8 +1,13 @@
 # OpenTrack Admin Automation
 
-Playwright-based automation for administering [OpenTrack](https://norway.opentrack.run) events.
+Automation for administering [OpenTrack](https://norway.opentrack.run) events.
 
-Since OpenTrack doesn't provide an API, this tool uses browser automation to perform administrative tasks like creating competitions, managing entries, etc.
+OpenTrack's REST API handles the parts a director-level token is allowed to do:
+setting event start times / field attempts (`schedule`) and seeding PB data
+(`update-pbs`). Creating competitions, importing athletes and merging events are
+not available to a director token, so those run through Playwright browser
+automation. Commands target the API host derived from the competition URL, so
+pointing them at a `test-*` URL uses the matching [test server](https://docs.opentrack.run/start/testserver/).
 
 ## Setup
 
@@ -75,12 +80,19 @@ opentrack scheduler from-events <schedule_events.csv> --mix-genders
 
 ### Sync events
 
+Set start times and field attempts (API). When the schedule has merged track
+groups, merging runs as a second Playwright phase; pass `--no-merge` to skip it.
+
 ```bash
 opentrack admin schedule <opentrack-url> schedule.csv
 ```
 
+Seed PB values for every entered competitor (API, no browser). Restrict to a
+single event with `--event`/`--category`. OpenTrack only allows competitor edits
+within 7 days of the competition finish date.
+
 ```bash
-opentrack admin update-pbs <opentrack-url> schedule.csv
+opentrack admin update-pbs <opentrack-url>
 ```
 
 ```bash
@@ -90,7 +102,7 @@ opentrack admin set-implements <opentrack-url> schedule.csv
 `set-implements` updates the per-pool implement weight for every throwing
 event (SP, DT, JT, HT) in the schedule. Run `update-pbs` first so athletes
 are seeded into pools; otherwise the weight editor is empty and the command
-will fail.
+will fail. This step runs through the browser.
 
 ### Reports
 

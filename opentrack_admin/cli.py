@@ -8,10 +8,12 @@ from typing import Annotated, Optional
 
 import typer
 
+from .api import OpenTrackAPI
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig
 from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_file, parse_event_schedule_csv, parse_event_merge_groups, Checkpoint
+from . import sync
 from pblookup import PBLookupService
 
 # Create the typer app for admin commands
@@ -184,12 +186,16 @@ def schedule(
     no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
     no_merge: Annotated[bool, typer.Option("--no-merge", help="Don't merge track events that share a start time; schedule them as separate heats")] = False,
 ) -> None:
-    """Schedule events (set start times) for a competition."""
+    """Schedule events (set start times) for a competition.
+
+    Start times and field attempts are set through the OpenTrack API (no
+    browser). Merging track groups is not available via the API, so when the
+    schedule has merges they are applied with Playwright as a second phase.
+    """
     setup_logging(verbose=verbose)
-    logger = logging.getLogger(__name__)
-    
+
     config = OpenTrackConfig.from_env()
-    
+
     if not config.username or not config.password:
         print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
         raise typer.Exit(1)
@@ -228,54 +234,74 @@ def schedule(
             print(f"   {members} @ {g.primary.start_time.strftime('%H:%M')}")
         print()
 
-    # Extract checkpoint name from competition URL (use slug)
-    # e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/ -> ser9-25
-    checkpoint_name = competition_url.rstrip("/").split("/")[-1] if not no_checkpoint else None
+    # API phase: set start times (and field attempts) without a browser.
+    try:
+        api = OpenTrackAPI.from_credentials(
+            competition_url, config.username, config.password
+        )
+        comp_id = api.resolve_competition_id(competition_url)
+    except Exception as e:
+        print(f"❌ {e}")
+        raise typer.Exit(1)
+
+    updated, errors = sync.set_event_times(api, comp_id, schedules, day=day)
+    print(f"✅ Set times for {updated}/{len(schedules)} event(s) via API")
+    if errors:
+        print()
+        print(f"⚠️  {len(errors)} event(s) could not be set:")
+        for label, error in errors:
+            print(f"   - {label}: {error}")
+        raise typer.Exit(1)
+
+    # Browser phase: merging is not available via the API, so drive it with
+    # Playwright when track groups need to be merged.
+    if not merge_groups:
+        return
+
+    checkpoint_name = (
+        competition_url.rstrip("/").split("/")[-1] if not no_checkpoint else None
+    )
+    print()
+    print(f"🔀 Merging {len(merge_groups)} track group(s) via browser...")
     if checkpoint_name:
         print(f"📍 Using checkpoint: {checkpoint_name}")
-    
+
     with OpenTrackSession(config) as session:
         session.goto_home()
         if not session.is_logged_in():
             session.login()
 
         session.page.goto(competition_url)
-
         scheduler = EventScheduler(session)
-        
+
         try:
-            scheduler.schedule_events(schedules, checkpoint_name=checkpoint_name, day=day)
-            print()
-            print(f"✅ All {len(schedules)} events scheduled successfully!")
-            if merge_groups:
-                scheduler.merge_event_groups(merge_groups, checkpoint_name=checkpoint_name)
-                print(f"✅ Merged {len(merge_groups)} track group(s)!")
+            scheduler.merge_event_groups(merge_groups, checkpoint_name=checkpoint_name)
+            print(f"✅ Merged {len(merge_groups)} track group(s)!")
         except Exception as e:
             print()
-            print(f"❌ Failed: {e}")
+            print(f"❌ Merge failed: {e}")
             raise typer.Exit(1)
 
 
 @app.command("update-pbs")
 def update_pbs(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],
-    file: Annotated[Optional[Path], typer.Argument(help="Isonen-format CSV or XLSX file with events")] = None,
+    file: Annotated[Optional[Path], typer.Argument(help="Ignored (kept for backwards compatibility)")] = None,
     event: Annotated[Optional[str], typer.Option("--event", "-e", help="Single event code (e.g., 'LJ', 'SP', '100m')")] = None,
     category: Annotated[Optional[str], typer.Option("--category", "-c", help="Single event category (e.g., 'G14', 'J15')")] = None,
     club: Annotated[str, typer.Option("--club", help="Default club name for PB lookups (e.g., 'Tyrving')")] = "",
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
     debug_pblookup: Annotated[bool, typer.Option("--debug-pblookup", help="Enable debug output from pblookup service")] = False,
-    no_checkpoint: Annotated[bool, typer.Option("--no-checkpoint", help="Disable checkpoint (re-process all events even if previously done)")] = False,
 ) -> None:
-    """Update PB/SB values for competitors in events.
+    """Update PB values for competitors via the OpenTrack API.
 
-    By default this is competitor-driven: it reads every entered event straight
-    from OpenTrack (via the competitor pages) and sets PBs, so it works even when
-    track events have been merged/renamed. Use --event and --category to update a
-    single event instead. A schedule file is no longer required and is ignored.
+    Competitor-driven: reads every entered event straight from the competitors
+    endpoint and sets PBs, so it works before seeding and across merged/renamed
+    events. Use --event and --category to restrict to a single event. No browser
+    is launched. OpenTrack only allows competitor edits within 7 days of the
+    competition finish date.
     """
     setup_logging(verbose=verbose)
-    logger = logging.getLogger(__name__)
 
     config = OpenTrackConfig.from_env()
 
@@ -284,108 +310,40 @@ def update_pbs(
         raise typer.Exit(1)
 
     single_event_mode = bool(event and category)
-
-    # Checkpoint name: slug with -pbs suffix.
-    checkpoint_name = None
-    if not no_checkpoint:
-        slug = competition_url.rstrip("/").split("/")[-1]
-        checkpoint_name = f"{slug}-pbs"
-    checkpoint = Checkpoint(checkpoint_name) if checkpoint_name else None
-
     if single_event_mode:
-        from datetime import time as dt_time
-        schedules = [EventSchedule(category=category, event=event, start_time=dt_time(0, 0))]
         print(f"📊 Updating PBs for single event: {category} {event}")
     else:
         print("📊 Updating PBs for all entered events (competitor-driven)...")
     if club:
         print(f"   Default club: {club}")
-    if checkpoint_name:
-        print(f"📍 Using checkpoint: {checkpoint_name}")
     print()
 
-    with OpenTrackSession(config) as session:
-        session.goto_home()
-        if not session.is_logged_in():
-            session.login()
+    try:
+        api = OpenTrackAPI.from_credentials(
+            competition_url, config.username, config.password
+        )
+        comp_id = api.resolve_competition_id(competition_url)
+    except Exception as e:
+        print(f"❌ {e}")
+        raise typer.Exit(1)
 
-        session.page.goto(competition_url)
-        scheduler = EventScheduler(session)
+    total_updated, errors = sync.update_pbs(
+        api,
+        comp_id,
+        default_club=club,
+        debug=debug_pblookup,
+        event_filter=event if single_event_mode else None,
+        category_filter=category if single_event_mode else None,
+    )
 
-        if not single_event_mode:
-            # Competitor-driven: discover events from entries and set PBs.
-            total_updated, errors = scheduler.update_all_event_pbs(
-                competition_url=competition_url,
-                default_club=club,
-                debug=debug_pblookup,
-                checkpoint=checkpoint,
-            )
-            print()
-            print(f"✅ Updated PBs for {total_updated} total competitors")
-            if errors:
-                print()
-                print(f"⚠️  {len(errors)} events had errors:")
-                for code, error in errors:
-                    print(f"   - {code}: {error}")
-                raise typer.Exit(1)
-            return
-
-        # Single-event mode.
-        scheduler.navigate_to_events_table()
-        total_updated = 0
-        errors = []
-
-        for i, sched in enumerate(schedules, 1):
-            # Skip FIFA category (not defined in OpenTrack)
-            if sched.category.upper() == "FIFA":
-                logger.info(f"Skipping {i}/{len(schedules)}: {sched.search_term} (FIFA category)")
-                continue
-            
-            # Skip if already done
-            if checkpoint and checkpoint.is_done(sched.search_term):
-                print(f"⏭️  Skipping {i}/{len(schedules)}: {sched.search_term} (already done)")
-                continue
-            
-            print(f"🔍 Processing {i}/{len(schedules)}: {sched.search_term}")
-            
-            try:
-                # Find and click the event
-                scheduler.find_and_click_event(sched)
-                
-                # Update PBs
-                updated = scheduler.update_event_pbs(
-                    schedule=sched,
-                    default_club=club,
-                    debug=debug_pblookup,
-                )
-                total_updated += updated
-                print(f"   ✅ Updated {updated} competitors")
-                
-                # Mark as done in checkpoint
-                if checkpoint:
-                    checkpoint.mark_done(sched.search_term)
-                
-                # Navigate back to events table for next event
-                scheduler.navigate_to_events_table()
-                
-            except Exception as e:
-                logger.error(f"Error processing {sched.search_term}: {e}")
-                errors.append((sched.search_term, str(e)))
-                # Try to recover by navigating back to events table
-                try:
-                    scheduler.navigate_to_events_table()
-                except Exception:
-                    pass
-        
+    print()
+    print(f"✅ Updated PBs for {total_updated} competitor(s)")
+    if errors:
         print()
-        print(f"✅ Updated PBs for {total_updated} total competitors")
-        
-        if errors:
-            print()
-            print(f"⚠️  {len(errors)} events had errors:")
-            for event, error in errors:
-                print(f"   - {event}: {error}")
-            raise typer.Exit(1)
+        print(f"⚠️  {len(errors)} competitor(s) failed to update:")
+        for who, error in errors:
+            print(f"   - {who}: {error}")
+        raise typer.Exit(1)
 
 
 @app.command("set-implements")
