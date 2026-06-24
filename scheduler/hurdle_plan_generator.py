@@ -84,6 +84,14 @@ def _marker_icon(shape: str, color: str) -> str:
     )
 
 
+def _marker_cell(marker: tuple[str, str, str] | None) -> str:
+    """Render a lane's floor-marker cell (icon + label), or a dash if none."""
+    if not marker:
+        return '<span class="no-marker">&ndash;</span>'
+    label, shape, color = marker
+    return f'{_marker_icon(shape, color)} <strong>{label}</strong>'
+
+
 def generate_hurdle_plan_html(
     result: SchedulingResult,
     start_hour: int,
@@ -352,39 +360,33 @@ def _render_heat(heat: _HurdleHeat) -> str:
     categories = " / ".join(ev.age_category.value for ev in eg.events)
     header = f"{eg.event_type.value} &mdash; {categories} &mdash; {heat.start_time}"
 
-    # Setup info: one line per zone when multi-zone, single paragraph when single zone
+    # Setup info: one line per zone when multi-zone, single paragraph when single zone.
+    # The floor marker now lives per lane (Merke column), so it's not repeated here.
     if len(heat.zones) == 1:
         zone = heat.zones[0]
-        marker_html = ""
-        if zone.marker:
-            label, shape, color = zone.marker
-            marker_html = f'&middot; {_marker_icon(shape, color)} <strong>{label}</strong>'
         setup_html = (
             f'        <p class="setup-info">\n'
             f'            {zone.num_hurdles} hekker &middot;\n'
             f'            f&oslash;rste ved {_fmt(zone.first_hurdle_m)} m &middot;\n'
             f'            {_fmt(zone.distance_between_m)} m mellomrom\n'
-            f'            {marker_html}\n'
             f'        </p>'
         )
     else:
         lines = []
         for i, zone in enumerate(heat.zones):
-            marker_html = ""
-            if zone.marker:
-                label, shape, color = zone.marker
-                marker_html = f'&middot; {_marker_icon(shape, color)} <strong>{label}</strong>'
             lines.append(
                 f'            <li>Sone {i+1}: {zone.num_hurdles} hekker &middot; '
                 f'f&oslash;rste ved {_fmt(zone.first_hurdle_m)} m &middot; '
-                f'{_fmt(zone.distance_between_m)} m mellomrom '
-                f'{marker_html}</li>'
+                f'{_fmt(zone.distance_between_m)} m mellomrom</li>'
             )
         setup_html = (
-            f'        <ul class="setup-info">\n'
+            '        <ul class="setup-info">\n'
             + "\n".join(lines)
             + "\n        </ul>"
         )
+
+    # Marker per distance zone, looked up by each lane's spacing.
+    marker_by_dist = {z.distance_between_m: z.marker for z in heat.zones}
 
     rows = ""
     for lane in heat.lanes:
@@ -393,30 +395,32 @@ def _render_heat(heat: _HurdleHeat) -> str:
             rows += (
                 f'        <tr class="distance-gutter">'
                 f"<td>{lane.lane}</td>"
-                f'<td colspan="2">{label}</td>'
+                f'<td colspan="3">{label}</td>'
                 f"</tr>\n"
             )
         elif lane.is_unavailable:
             rows += (
                 f'        <tr class="unavailable">'
                 f"<td>{lane.lane}</td>"
-                f'<td colspan="2">SPERRET</td>'
+                f'<td colspan="3">SPERRET</td>'
                 f"</tr>\n"
             )
         elif lane.category is None:
             rows += (
                 f'        <tr class="gutter">'
                 f"<td>{lane.lane}</td>"
-                f'<td colspan="2">LEDIG</td>'
+                f'<td colspan="3">LEDIG</td>'
                 f"</tr>\n"
             )
         else:
             assert lane.height_cm is not None
+            marker = marker_by_dist.get(lane.distance_between_m)
             rows += (
                 f"        <tr>"
                 f"<td>{lane.lane}</td>"
                 f"<td>{lane.category.value}</td>"
                 f"<td>{_fmt(lane.height_cm)} cm</td>"
+                f"<td>{_marker_cell(marker)}</td>"
                 f"</tr>\n"
             )
 
@@ -426,7 +430,7 @@ def _render_heat(heat: _HurdleHeat) -> str:
 {setup_html}
         <table>
             <thead>
-                <tr><th>Bane</th><th>Klasse</th><th>H&oslash;yde</th></tr>
+                <tr><th>Bane</th><th>Klasse</th><th>H&oslash;yde</th><th>Merke</th></tr>
             </thead>
             <tbody>
 {rows}
@@ -488,4 +492,5 @@ _CSS = """\
             vertical-align: middle;
             margin-right: 2px;
         }
+        .no-marker { color: #bbb; }
 """
