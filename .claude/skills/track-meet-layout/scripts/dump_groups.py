@@ -53,8 +53,14 @@ from scheduler.models import (  # noqa: E402
 
 def _age_tier(category) -> str:
     """Coarse legal track grouping tier: Rekrutt (<=10), youth (11-17), or senior
-    (18-19/Sr/Masters). 11-14 may share a heat with 15-17, so they share one tier;
-    only Rekrutt and seniors are forced apart from it."""
+    (18-19/Sr/Masters).
+
+    These three tiers are exactly the legal track-merge boundaries enforced by
+    constraint_validator.age_merge_errors: Rekrutt never shares a heat with a
+    non-Rekrutt category, and 11-14 never shares with 18-19/Senior/Masters. 11-14 and
+    15-17 ARE allowed together, so they live in one "youth" tier (the 11-17 span is
+    intentional, not a 15+ split). The only remaining track cap (8 lanes) is enforced
+    separately by group sizing, not here."""
     age = get_category_age_order(category)
     if age <= 10:
         return "rekrutt"
@@ -67,9 +73,10 @@ def _split_track_by_age_tier(groups: list[EventGroup]) -> list[EventGroup]:
     """Split any TRACK group spanning multiple age tiers into one group per tier.
 
     Mixing genders (the default) can make the repo's grouping merge across an illegal
-    track boundary (Rekrutt with older, or 11-14 with seniors). Splitting into
-    Rekrutt / youth (11-17) / senior keeps the legal merges (incl. 11-14 + 15-17)
-    while removing the illegal cross-tier ones, so the proposal validates.
+    track boundary (Rekrutt with older, or 11-14 with 18-19/Senior/Masters). Splitting
+    into Rekrutt / youth (11-17) / senior keeps the legal merges (incl. 11-14 + 15-17)
+    while removing the illegal cross-tier ones, so the proposal validates against
+    constraint_validator's track age-merge rules.
     """
     out: list[EventGroup] = []
     for g in groups:

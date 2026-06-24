@@ -45,15 +45,17 @@ soft goals, and flags. Keep it open while working.
    ```
 
 2. **Detect mistakes** — list every athlete conflict, age-merge violation, short track
-   gap, short field reconfig gap and off-grid start at once:
+   gap, short field reconfig gap, shared-bucket overlap, stickiness violation, group
+   sizing/duration mismatch and off-grid start at once:
    ```bash
    uv run python .claude/skills/track-meet-layout/scripts/layout_report.py \
        schedule_events.csv --xlsx <participants.xlsx> --arena <arena> [--date ...] \
        [--shared jt,dt,ht ...]
    ```
-   Pass the same `--shared` groups you give `from-events` so cross-venue reconfig gaps
-   are checked. The tool detects problems; it does not design the layout. Deciding
-   merges and placement is your judgment (see the guide's heuristics).
+   Pass the same `--shared` groups you give `from-events` so the shared buckets and
+   cross-venue reconfig gaps are checked. The tool detects problems; it does not design
+   the layout. Deciding merges and placement is your judgment (see the guide's
+   heuristics).
 
 3. **Edit** times and merges to fix what the tool flagged and to compact. You decide
    the merges (right-size groups to ~4-8 per the guide's merging heuristic and age
@@ -78,8 +80,8 @@ soft goals, and flags. Keep it open while working.
 
 - `scripts/dump_groups.py` — emit a starting layout (proposed merges, venues parallel).
 - `scripts/layout_report.py` — mistake detector + compactness metrics: athlete conflicts,
-  age-merge violations, track-spacing gaps, field reconfig gaps, off-grid starts, idle
-  gaps, concurrency.
+  age-merge violations, track-spacing gaps, field reconfig gaps, shared-bucket overlaps,
+  venue stickiness, group sizing/durations, off-grid starts, idle gaps, concurrency.
 - `references/layout-guide.md` — CSV contract, venue model, merge + age rules, error
   catalog, heuristics, soft goals, flags.
 - `scheduler/CONSTRAINTS.md` (repo) — background on constraints and merge rationale.

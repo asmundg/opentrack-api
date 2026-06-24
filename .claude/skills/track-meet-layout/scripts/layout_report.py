@@ -8,14 +8,20 @@ stops at the FIRST violation; this surfaces ALL problems at once and adds compac
 metrics:
   - makespan, per-venue utilization, idle gaps (compaction opportunities), parallelism
   - cheap local pre-checks: 5-min slot alignment, same-venue overlaps
+  - shared-bucket overlaps: two different shared-personnel event types running at the
+    same time across their separate venues (pass the same --shared groups)
+  - venue stickiness: an event type reappearing at a venue/shared bucket after a
+    different type ran in between (mirrors from-events --sticky)
   - track-heat spacing (>=5 min on a start-position change or between hurdle heats)
   - field reconfig spacing (>=5 min when the event type changes at a venue/shared
     bucket; pass the same --shared groups you give from-events to catch cross-venue
     transitions like Spyd -> Slegge)
-  - with --xlsx: EVERY athlete double-booking and age-merge violation at once
+  - with --xlsx: EVERY athlete double-booking and age-merge violation at once, plus a
+    GROUP SIZING table (athletes + scheduler-computed slot duration per row)
 
-It does NOT replace `from-events`. Shared-venue (--shared), stickiness and track
-ordering are only enforced by `from-events`.
+It does NOT replace `from-events` (track ordering and the authoritative gate live
+there), but it now covers the shared-venue and stickiness rules locally so you can fix
+them in batch before spending a from-events round-trip.
 
     uv run python .claude/skills/track-meet-layout/scripts/layout_report.py schedule_events.csv
     uv run python .claude/skills/track-meet-layout/scripts/layout_report.py schedule_events.csv \
@@ -66,12 +72,47 @@ def _resolve_shared(shared: list[str]) -> list[set[str]]:
     return groups
 
 
-def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
-    """Return (athlete_conflicts, age_violations) for the agent's CSV layout.
+def _stream_overlaps(stream: list[dict], hhmm) -> list[str]:
+    """Overlap messages for events sharing one conflict bucket (sorted by start)."""
+    evs = sorted(stream, key=lambda x: x["start"])
+    out: list[str] = []
+    for a, b in zip(evs, evs[1:]):
+        if b["start"] < a["end"]:
+            out.append(f"{a['id']} ({a['type']}, {hhmm(a['start'])}-{hhmm(a['end'])}) "
+                       f"overlaps {b['id']} ({b['type']}, "
+                       f"{hhmm(b['start'])}-{hhmm(b['end'])})")
+    return out
+
+
+def _stream_sticky(stream: list[dict], hhmm) -> list[str]:
+    """Stickiness messages: a type reappears after a different type ran in between.
+
+    Mirrors constraint_validator._validate_venue_stickiness so the batch view and the
+    authoritative gate never drift.
+    """
+    evs = sorted(stream, key=lambda x: x["start"])
+    out: list[str] = []
+    seen: dict[str, int] = {}
+    for idx, ev in enumerate(evs):
+        t = ev["type"]
+        if t in seen and seen[t] != idx - 1:
+            offender = evs[seen[t] + 1]
+            out.append(
+                f"{t} runs at {hhmm(evs[seen[t]]['start'])} and again at "
+                f"{hhmm(ev['start'])} ({ev['id']}), with {offender['type']} "
+                f"({offender['id']}) at {hhmm(offender['start'])} in between")
+        seen[t] = idx
+    return out
+
+
+def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str], list[str]]:
+    """Return (athlete_conflicts, age_violations, recovery, sizing) for the layout.
 
     Athlete membership is taken from the CSV's own merges (each row's categories),
     matching exactly what from-events validates. Reuses the validator's age rules so
-    this batch view and the authoritative gate never drift.
+    this batch view and the authoritative gate never drift. ``sizing`` is one
+    human-readable line per row with the athlete count and the scheduler-computed slot
+    duration, so re-merged rows don't need a hand-computed end_time.
     """
     if (_REPO_ROOT / "scheduler").is_dir():
         sys.path.insert(0, str(_REPO_ROOT))
@@ -79,7 +120,10 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
     from scheduler.isonen_parser import parse_isonen_xlsx
     from scheduler.event_csv import import_event_overview_csv
     from scheduler.constraint_validator import age_merge_errors, _atom_counts
-    from scheduler.models import Category, EventType, get_category_age_order
+    from scheduler.models import (
+        Category, EventGroup, EventType, EventVenueMapping, Venue,
+        get_category_age_order,
+    )
 
     if args.arena not in models.ARENAS:
         sys.exit(f"Unknown arena '{args.arena}'")
@@ -90,6 +134,50 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
     events, athletes = parse_isonen_xlsx(str(args.xlsx), filter_date=args.date)
     rows = import_event_overview_csv(csv_path)
 
+    counts = _atom_counts(athletes)
+    age = age_merge_errors(rows, counts)
+
+    # Per-row sizing: athletes in the merge + the duration the scheduler would assign
+    # (built from the same Event objects/EventGroup as dump_groups, so it matches what
+    # from-events expects). Flags rows whose CSV window is shorter than the computed
+    # slot duration, and track merges over the 8-lane cap.
+    events_by_atom: dict[tuple[EventType, Category], object] = {}
+    for e in events:
+        events_by_atom[(e.event_type, e.age_category)] = e
+    sizing: list[str] = []
+    for r in rows:
+        atoms = []
+        for raw in r.categories.split(","):
+            name = raw.strip()
+            if not name:
+                continue
+            try:
+                atoms.append((r.event_type, Category(name)))
+            except ValueError:
+                continue
+        grp_events = [events_by_atom[a] for a in atoms if a in events_by_atom]
+        n_ath = sum(counts.get(a, 0) for a in atoms)
+        if grp_events:
+            calc = EventGroup(
+                id=r.event_group_id, event_type=r.event_type, events=grp_events
+            ).duration_minutes
+        else:
+            calc = 0
+        slot = math.ceil(calc / 5) * 5 if calc else 0
+        window = _mins(r.end_time.strftime("%H:%M")) - _mins(r.start_time.strftime("%H:%M"))
+        flags = []
+        if slot and window < slot:
+            flags.append(f"window {window}m < needs {slot}m")
+        is_track = EventVenueMapping.get(r.event_type) == Venue.TRACK
+        if is_track and n_ath > 8:
+            flags.append(f"{n_ath} athletes > 8-lane cap (split)")
+        flag = ("  ⚠️ " + "; ".join(flags)) if flags else ""
+        sizing.append(
+            f"{r.event_group_id:<34} {n_ath:>3} ath  slot={slot:>3}m  "
+            f"window={window:>3}m{flag}")
+
+    conflicts: list[str] = []
+    recovery: list[str] = []
     # atom (event_type, category) -> (group_id, start, end), from the CSV merges
     atom_to_row: dict[tuple[EventType, Category], tuple[str, int, int]] = {}
     for r in rows:
@@ -104,8 +192,6 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
             except ValueError:
                 continue
 
-    conflicts: list[str] = []
-    recovery: list[str] = []
     for ath in athletes:
         age_order = max(
             (get_category_age_order(e.age_category) for e in ath.events), default=0
@@ -135,9 +221,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str]]:
                     f"warn {ath.name}: only {gap}m between {a[2]} and {b[2]} "
                     f"(15+ prefer >=15m)")
 
-    counts = _atom_counts(athletes)
-    age = age_merge_errors(rows, counts)
-    return conflicts, age, recovery
+    return conflicts, age, recovery, sizing
 
 
 def main() -> None:
@@ -288,15 +372,55 @@ def main() -> None:
     elif field:
         print("\nField reconfig spacing OK.")
 
+    # --- shared-bucket overlaps + venue stickiness: mirror from-events conflict
+    # buckets (get_scheduling_venue_keys). A shared-personnel group is one serial
+    # stream across its separate venues, so two of its types running at once is a hard
+    # conflict; and each type must stay contiguous per venue / shared bucket (--sticky).
+    shared_groups = _resolve_shared(args.shared)
+    shared_conflicts: list[str] = []
+    for labels in shared_groups:
+        stream = [ev for ev in events if ev["type"] in labels]
+        shared_conflicts.extend(_stream_overlaps(stream, hhmm))
+    if shared_conflicts:
+        print(f"\nSHARED-BUCKET CONFLICTS ({len(shared_conflicts)}) — one shared "
+              f"officials team cannot run two events at once:")
+        for c in shared_conflicts:
+            print(f"  - {c}")
+
+    sticky_buckets: dict[str, list[dict]] = {}
+    for venue, evs in by_venue.items():
+        if venue == "track":
+            continue
+        sticky_buckets[venue] = evs
+    for labels in shared_groups:
+        sticky_buckets["shared:" + ",".join(sorted(labels))] = [
+            ev for ev in events if ev["type"] in labels]
+    sticky: list[str] = []
+    for name, evs in sticky_buckets.items():
+        for msg in _stream_sticky(evs, hhmm):
+            sticky.append(f"{name}: {msg}")
+    if sticky:
+        print(f"\nVENUE STICKINESS ({len(sticky)}) — keep each event type contiguous "
+              f"per venue/shared bucket (no A-B-A interleaving):")
+        for s in sticky:
+            print(f"  - {s}")
+
     if warnings:
         print("\nPRE-CHECK WARNINGS (fix before from-events):")
         for w in warnings:
             print(f"  - {w}")
-    else:
-        print("\nPre-checks OK (still run from-events for shared-venue/track rules).")
+    if not (warnings or shared_conflicts or sticky):
+        print("\nStructural pre-checks OK (slot alignment, venue + shared-bucket "
+              "overlaps, stickiness, spacing). Run from-events for track ordering and "
+              "the authoritative gate; athlete conflicts are listed below if --xlsx.")
 
     if args.xlsx:
-        conflicts, age, recovery = _xlsx_checks(args.csv, args)
+        conflicts, age, recovery, sizing = _xlsx_checks(args.csv, args)
+        if sizing:
+            print(f"\nGROUP SIZING ({len(sizing)}) — athletes + scheduler slot "
+                  f"duration per row (set end_time to start + slot):")
+            for s in sizing:
+                print(f"  {s}")
         if conflicts:
             print(f"\nATHLETE CONFLICTS ({len(conflicts)}) — move one event in each pair:")
             for c in conflicts:

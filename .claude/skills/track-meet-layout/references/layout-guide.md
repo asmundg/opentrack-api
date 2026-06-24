@@ -50,12 +50,15 @@ Two parallelism levers:
   (J/G-Rekrutt) run at `*_2` venues in parallel with the primary.
 - **`--shared` groups** fold several types onto one conflict bucket so they can NOT
   run in parallel even across venues (e.g. `--shared jt,dt,ht` when officials are
-  scarce). The seed lays venues out independently, so a `--shared` set will show as a
-  shared-bucket conflict only in `from-events` — fix by serialising those types. A
-  shared bucket is one serial stream: order its events to keep each type contiguous
-  and leave a >=5 min reconfig gap whenever the type changes (see heuristic 3).
+  scarce). The seed lays venues out independently, so a `--shared` set creates
+  shared-bucket conflicts you must fix by serialising those types. `layout_report.py`
+  (given the same `--shared`) now lists these conflicts directly, so you no longer need
+  a `from-events` round-trip to find them. A shared bucket is one serial stream: order
+  its events to keep each type contiguous and leave a >=5 min reconfig gap whenever the
+  type changes (see heuristic 3).
 - **`--sticky`** (default on): one event type must form a contiguous block per
-  venue (no DT-HT-DT). Track is exempt.
+  venue/shared bucket (no DT-HT-DT). Track is exempt. `layout_report.py` checks this
+  locally too (VENUE STICKINESS).
 
 ## Merging model
 
@@ -105,17 +108,22 @@ Decide each event type's groups like this:
   13+14, or 15-17 together) so the field cards stay tidy. Exceeding 8 is allowed when
   the alternative is a stranded single (it only warns).
 - **Track flat** (60m, 100m, 200m, 400m, 600m, ...): combine categories within the age
-  rules above (Rekrutt alone; 11-14 together; 15+ together; never 11-14 with 15+),
-  totalling ≤8 athletes. Genders may mix.
+  rules above (Rekrutt alone; 11-14 may merge with 15-17; never 11-14 with
+  18-19/Senior/Masters), totalling ≤8 athletes. Genders may mix.
 - **Hurdles**: combine within lane capacity. Distances and heights may both mix; each
   distinct (distance, height) setup costs a gutter lane, so capacity is
   `lanes - (distinct_setups - 1)`. E.g. with 8 lanes, four setups leave 5 athlete
   lanes. Stay within the age rules (hurdles are track events). Merging hurdle heats of
   different distances cuts the number of heats (and the reconfigure gaps between them),
   so it is often worth doing when the lanes fit.
-- **No legal partner**: keep the group as-is (a single senior thrower, the only 100m
-  hekk entry, a hurdle category that would overflow the lanes if merged). Do not force
-  an illegal or over-capacity merge just to avoid a single.
+- **No legal partner / acceptable singletons**: keep a group as-is when no legal,
+  in-capacity partner exists (a single senior thrower, the only 100m hekk entry, a
+  hurdle category that would overflow the lanes if merged). For **field** events any
+  ages may share, so a true singleton means it is the only entrant of that type, or
+  every neighbour would push the group well past 8. A lone field athlete is fine: it
+  just runs a short window at its venue and rarely drives the makespan. Do not force an
+  illegal or over-capacity merge, or stretch a merge across a long age gap, only to
+  avoid a single.
 
 This is your judgment call. `layout_report.py`/`from-events` do not suggest merges;
 they only tell you when a merge you made is illegal (age rule, lane capacity) or
@@ -208,18 +216,44 @@ Optimise only after the schedule is valid and reasonably tight, in this order
    shorter gap only warns). Maximise the smallest such gap across athletes; do not
    spend makespan you do not have beyond meeting these floors.
 
+### Compaction
+
+The makespan is set by the single busiest timeline. To compress it:
+
+- **Find the bottleneck.** Read `layout_report.py`'s per-venue table: the venue with
+  the largest `span` (and any `idle gaps`) is what to attack. Pull its rows earlier to
+  close leading/idle gaps; moving other venues rarely helps.
+- **Size each row correctly.** Run `layout_report.py --xlsx` and read **GROUP SIZING**:
+  it prints the athlete count and the scheduler's slot duration per row. Set each
+  `end_time` to `start + slot`; a `window < needs` flag means the row is too short and
+  will overrun on the day even though `from-events` (which treats `duration_minutes` as
+  reference-only) stays silent. An oversized window is wasted makespan to trim.
+- **Parallelise a field bottleneck with the secondary venue.** When one circle/area is
+  the long pole and the arena has a `*_2` venue (tromsohallen: `sp`, `hj`), move the
+  youngest categories' rows to the `_2` venue so they run in parallel with the primary
+  (the seed already routes J/G-Rekrutt there). You can also split one large field event
+  into two rows, one per circle, to halve its timeline. The `_2` venue is independent,
+  so this adds parallelism without a venue conflict.
+- **Merge to free venue time.** One row of 6 instead of three rows of 2 collapses two
+  reconfigure gaps and frees the venue earlier. Keep merges legal (age rules, 8 cap)
+  and within the same shared bucket's serial budget.
+- **Mind shared buckets.** Types in a `--shared` group are one serial stream across
+  their venues, so merging within a type there is the main lever; you cannot parallelise
+  two types in the same bucket. Order the stream to minimise type changes (each costs a
+  >=5 min reconfig gap).
+
 ## Validation strategy
 
 `from-events` is the only authoritative gate and it stops at the **first** violation.
 So:
 
-- Use `layout_report.py --xlsx` to clear ALL athlete conflicts, same-venue overlaps,
-  age-merge violations and short reconfig gaps in batch first (cheap, lists
-  everything). Give it the same `--shared` groups as `from-events` so it checks
-  cross-venue reconfig gaps too.
-- Then run `from-events`. It additionally enforces track ordering, `--shared` buckets,
-  `--sticky` and full coverage (every atom placed exactly once). Fix the one violation
-  it reports, then run it again.
+- Use `layout_report.py --xlsx` to clear ALL athlete conflicts, venue + shared-bucket
+  overlaps, stickiness violations, age-merge violations and short reconfig gaps in
+  batch first (cheap, lists everything). Give it the same `--shared` groups as
+  `from-events` so it checks the shared buckets and cross-venue reconfig gaps too.
+- Then run `from-events`. It is still the authoritative gate and additionally enforces
+  track ordering and full coverage (every atom placed exactly once). Fix the one
+  violation it reports, then run it again.
 - Repeat until it prints `All constraints validated successfully`. A clean run also
   writes the HTML and (for the full pipeline) the athlete CSV.
 - Always give `from-events` the full set of meet constraints (`--arena`, `--date`,
