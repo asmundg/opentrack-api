@@ -297,6 +297,49 @@ def schedule(
                 print(f"   - {label}: {error}")
 
 
+@app.command()
+def seed(
+    competition_url: Annotated[str, typer.Argument(help="URL of the competition")],
+    track: Annotated[bool, typer.Option("--track/--no-track", help="Seed track start lists")] = True,
+    field: Annotated[bool, typer.Option("--field/--no-field", help="Seed field start lists")] = True,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
+) -> None:
+    """Fetch start lists in random order.
+
+    Run this after `schedule`: merging track heats rebuilds them from the
+    combined categories, which discards any start list seeded beforehand.
+    """
+    setup_logging(verbose=verbose)
+
+    config = OpenTrackConfig.from_env()
+
+    if not config.username or not config.password:
+        print("❌ Error: OPENTRACK_USERNAME and OPENTRACK_PASSWORD must be set")
+        raise typer.Exit(1)
+
+    if not track and not field:
+        print("❌ Nothing to seed: --no-track and --no-field are mutually exclusive")
+        raise typer.Exit(1)
+
+    wanted = ", ".join(n for n, on in (("track", track), ("field", field)) if on)
+    print(f"🎲 Seeding {wanted} start lists for: {competition_url}")
+    print()
+
+    with OpenTrackSession(config) as session:
+        session.goto_home()
+        if not session.is_logged_in():
+            session.login()
+
+        session.page.goto(competition_url)
+
+        try:
+            CompetitionCreator(session).seed_start_lists(track=track, field=field)
+            print(f"✅ Seeded {wanted} start lists")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            raise typer.Exit(1)
+
+
 @app.command("update-pbs")
 def update_pbs(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition (e.g., https://norway.opentrack.run/x/2025/NOR/ser9-25/)")],

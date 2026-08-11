@@ -506,7 +506,9 @@ class CompetitionCreator:
         logger.info("Numbering competitors...")
         self._number_competitors()
         logger.info("Seeding start lists...")
-        self._apply_random_seeding()
+        # Track heats are merged in the schedule step, so seeding them here
+        # would be undone. `opentrack admin seed` covers them afterwards.
+        self.seed_start_lists(track=False)
         logger.info("Athletes prepared successfully")
 
     def _configure_photofinish(self) -> None:
@@ -576,14 +578,15 @@ class CompetitionCreator:
         logger.debug("Bib numbers assigned")
 
     @screenshot_on_error
-    def _apply_random_seeding(self) -> None:
-        """Fetch field-event start lists with random athlete order.
+    def seed_start_lists(self, *, track: bool = True, field: bool = True) -> None:
+        """Fetch start lists with random athlete order.
 
-        The seeding page exposes a "Fetch all field start lists" dropdown with
-        Random order / Sorted by bib / Sorted by category submit buttons. Only
-        field events are seeded: track heats are arranged in the schedule step
-        (categories sharing a heat are merged), so auto-seeding track start
-        lists is skipped.
+        The seeding page exposes "Fetch all start lists" (track) and "Fetch all
+        field start lists" dropdowns, each with Random order / Sorted by bib /
+        Sorted by category submit buttons.
+
+        Track heats must be merged before they are seeded: merging rebuilds the
+        heat from the combined categories, discarding an earlier start list.
         """
         page = self.page
 
@@ -596,13 +599,20 @@ class CompetitionCreator:
         # activity and trigger ERR_ABORTED on the stricter "load" wait.
         page.goto(seeding_url, wait_until="domcontentloaded")
 
-        # The Random order button is a form submit button living inside a
-        # hidden dropdown-menu, so dispatch the click directly — a regular
-        # .click() fails the visibility check.
-        logger.debug("Submitting random seeding for field start lists")
-        page.locator(
-            "button[name=fetch_all_field_start_lists_random]"
-        ).dispatch_event("click")
-        page.wait_for_load_state("load")
-        self._wait_for_background_task("seed field")
-        logger.debug("Random seeding applied (field)")
+        wanted = [
+            (label, name)
+            for label, name, enabled in (
+                ("track", "fetch_all_start_lists_random", track),
+                ("field", "fetch_all_field_start_lists_random", field),
+            )
+            if enabled
+        ]
+        for label, button_name in wanted:
+            # The Random order button is a form submit button living inside a
+            # hidden dropdown-menu, so dispatch the click directly — a regular
+            # .click() fails the visibility check.
+            logger.debug("Submitting random seeding for %s start lists", label)
+            page.locator(f"button[name={button_name}]").dispatch_event("click")
+            page.wait_for_load_state("load")
+            self._wait_for_background_task(f"seed {label}")
+            logger.info("Random seeding applied (%s)", label)
