@@ -9,6 +9,8 @@ from typing import Any
 from .models import MASTERS_MEN, MASTERS_WOMEN, Venue, Category, EventGroup, get_venue_for_event
 from .types import SchedulingResult
 
+SLOT_ROW_HEIGHT_PX = 30
+
 
 def generate_html_schedule_table(
     result: SchedulingResult,
@@ -539,8 +541,12 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
     else:
         duration_text = f"{event.duration_minutes}min • {participant_count} totalt"
 
-    # Calculate the height based on number of slots (40px per slot from CSS + borders)
-    calculated_height = duration_slots * 40 + (duration_slots - 1) * 1  # 1px for borders
+    # Track heats are one slot with the count already in the title; the duration line
+    # only eats vertical space there.
+    is_track = get_venue_for_event(event.event_type) == Venue.TRACK
+    duration_line = "" if is_track else f'\n        <div class="event-duration">{duration_text}</div>'
+
+    calculated_height = duration_slots * SLOT_ROW_HEIGHT_PX + (duration_slots - 1)  # 1px borders
 
     # Handle both solid colors and gradients
     if category_color.startswith("linear-gradient"):
@@ -551,14 +557,12 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
     # Build the HTML content
     if len(event.events) == 1:
         return f"""<div class="spanning-event-block" style="{background_style}; min-height: {calculated_height}px;">
-        <div class="event-title">{event_name}</div>
-        <div class="event-duration">{duration_text}</div>
+        <div class="event-title">{event_name}</div>{duration_line}
     </div>"""
     else:
         return f"""<div class="spanning-event-block" style="{background_style}; min-height: {calculated_height}px;">
         <div class="event-title">{event_name}</div>
-        <div class="event-categories">{categories_line}</div>
-        <div class="event-duration">{duration_text}</div>
+        <div class="event-categories">{categories_line}</div>{duration_line}
     </div>"""
 
 
@@ -651,10 +655,10 @@ def _get_css_styles() -> str:
         .schedule-table th,
         .schedule-table td {
             border: 1px solid #ddd;
-            padding: 4px;
+            padding: 2px;
             text-align: left;
             vertical-align: top;
-            height: 40px; /* Ensure consistent row height */
+            height: $SLOT_H; /* Ensure consistent row height */
         }
         
         .schedule-table td.spanning-event {
@@ -679,7 +683,7 @@ def _get_css_styles() -> str:
             text-align: center;
             min-width: 60px;
             color: #555;
-            padding: 8px 4px;
+            padding: 2px 4px;
         }
         
         .venue-cell {
@@ -708,7 +712,7 @@ def _get_css_styles() -> str:
             bottom: 0;
             width: 100%;
             height: 100%;
-            padding: 8px;
+            padding: 4px;
             border-radius: 4px;
             border: 2px solid #4CAF50;
             box-sizing: border-box;
@@ -721,21 +725,22 @@ def _get_css_styles() -> str:
         
         .event-title {
             font-weight: bold;
-            font-size: 13px;
-            line-height: 1.2;
-            margin-bottom: 2px;
+            font-size: 12px;
+            line-height: 1.15;
+            margin-bottom: 1px;
             color: #333;
         }
 
         .event-categories {
-            font-size: 11px;
-            line-height: 1.3;
-            margin-bottom: 2px;
+            font-size: 10px;
+            line-height: 1.15;
+            margin-bottom: 1px;
             color: #333;
         }
 
         .event-duration {
-            font-size: 10px;
+            font-size: 9px;
+            line-height: 1.15;
             color: #555;
             font-style: italic;
         }
@@ -798,11 +803,11 @@ def _get_css_styles() -> str:
             }
             
             .spanning-event-block {
-                min-height: 40px;
+                min-height: $SLOT_H;
                 padding: 4px;
             }
         }
-    """
+    """.replace("$SLOT_H", f"{SLOT_ROW_HEIGHT_PX}px")
 
 
 def save_html_schedule(
