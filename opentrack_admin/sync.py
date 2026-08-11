@@ -96,6 +96,7 @@ def set_event_times(
     comp_id: str,
     schedules: list[EventSchedule],
     day: int | None = None,
+    merge_groups: list[EventMergeGroup] | None = None,
 ) -> tuple[int, list[tuple[str, str]]]:
     """Set start time (and, for horizontal field events, attempts) per event.
 
@@ -104,11 +105,20 @@ def set_event_times(
     field events also get ``max_field_attempts`` and ``cut_after_round`` from the
     category's :class:`AttemptConfig`.
 
+    Non-primary members of ``merge_groups`` stop existing as separate OpenTrack
+    events once merged, and their primary carries the time, so a missing one is
+    skipped rather than reported as an error.
+
     Returns ``(updated, errors)`` where ``errors`` is ``(label, message)``.
     """
     events = api.get_events(comp_id)
     by_key: dict[tuple[str, str], dict] = {
         (str(e["event_code"]), str(e["category"])): e for e in events
+    }
+    merged_away = {
+        (_to_api_event_code(s.event), fold_masters_to_senior(s.category))
+        for group in merge_groups or []
+        for s in group.others
     }
 
     updated = 0
@@ -121,6 +131,9 @@ def set_event_times(
         key = (_to_api_event_code(sched.event), fold_masters_to_senior(sched.category))
         event = by_key.get(key)
         if event is None:
+            if key in merged_away:
+                logger.info("%s already merged into its primary, skipping", label)
+                continue
             errors.append((label, "no matching OpenTrack event"))
             logger.warning("No OpenTrack event for %s (looked up %s)", label, key)
             continue

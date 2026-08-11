@@ -764,8 +764,6 @@ class EventScheduler:
         Returns:
             True if event was found and clicked, False otherwise
         """
-        page = self.page
-
         if schedule.search_category != normalize_category(schedule.category):
             logger.info(
                 "Searching for event: %s (folded from %s)",
@@ -775,10 +773,25 @@ class EventScheduler:
         else:
             logger.info("Searching for event: %s", schedule.search_term)
 
+        if self._click_event_named(schedule.search_term):
+            return True
+        raise RuntimeError(
+            f"No exact match for '{schedule.search_term}'. "
+            f"Found: {self._listed_event_names()}"
+        )
+
+    def _click_event_named(self, expected_name: str) -> bool:
+        """Search the events table for `expected_name` and open that event.
+
+        Returns False when the filtered table holds no row with exactly that
+        name (the search box matches substrings, so the name cell decides).
+        """
+        page = self.page
+
         # Use the search box to filter
         search_box = page.get_by_role("textbox", name="Search")
         search_box.click()
-        search_box.fill(schedule.search_term)
+        search_box.fill(expected_name)
 
         # Click the search button
         page.locator("#search_advanced_btn").click()
@@ -789,7 +802,6 @@ class EventScheduler:
         # Find matching rows by checking the event name column for an exact match.
         # The search box returns partial matches (e.g., "Høyde" matches both
         # "Høyde" and "Høyde uten tilløp"), so we must verify the name cell.
-        expected_name = schedule.search_term  # e.g., "J18-19 Høyde"
         rows = page.locator("tr").filter(
             has=page.locator("a").filter(has_text=re.compile(r"^[TF]\d+$"))
         )
@@ -811,14 +823,19 @@ class EventScheduler:
                 return True
 
         # No exact match found - raise error (screenshot taken by wrapper)
-        found_names = []
-        for i in range(count):
+        return False
+
+    def _listed_event_names(self) -> list[str]:
+        """Names currently listed in the (filtered) events table, for errors."""
+        rows = self.page.locator("tr").filter(
+            has=self.page.locator("a").filter(has_text=re.compile(r"^[TF]\d+$"))
+        )
+        names = []
+        for i in range(rows.count()):
             name_cell = rows.nth(i).locator("td[data-mdb-field='name']")
             if name_cell.count() > 0:
-                found_names.append((name_cell.text_content() or "").strip())
-        raise RuntimeError(
-            f"No exact match for '{expected_name}'. Found: {found_names}"
-        )
+                names.append((name_cell.text_content() or "").strip())
+        return names
 
     @screenshot_on_error
     def set_implement_weights(self, event_code: str) -> None:
@@ -970,6 +987,20 @@ class EventScheduler:
             page.get_by_role("button", name="Save").first.click()
         logger.info("Implement weights saved")
 
+    def _open_merge_primary(self, group: EventMergeGroup) -> None:
+        """Open the primary event's detail page.
+
+        The primary carries its single-category name until it is merged, and the
+        combined name afterwards, so a resumed run has to look for both.
+        """
+        for name in (group.primary.search_term, group.merged_name):
+            if self._click_event_named(name):
+                return
+        raise RuntimeError(
+            f"No exact match for '{group.primary.search_term}' or "
+            f"'{group.merged_name}'. Found: {self._listed_event_names()}"
+        )
+
     @screenshot_on_error
     def merge_event_group(self, group: EventMergeGroup) -> None:
         """Merge a group's sibling track events into its primary event.
@@ -993,7 +1024,7 @@ class EventScheduler:
             group.primary.search_term,
             [s.search_term for s in group.others],
         )
-        self.find_and_click_event(group.primary)
+        self._open_merge_primary(group)
         detail_url = page.url
 
         if page.locator("#eventMergeForm").count() == 0:

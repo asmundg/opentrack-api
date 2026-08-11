@@ -244,7 +244,9 @@ def schedule(
         print(f"❌ {e}")
         raise typer.Exit(1)
 
-    updated, errors = sync.set_event_times(api, comp_id, schedules, day=day)
+    updated, errors = sync.set_event_times(
+        api, comp_id, schedules, day=day, merge_groups=merge_groups
+    )
     print(f"✅ Set times for {updated}/{len(schedules)} event(s) via API")
     if errors:
         print()
@@ -253,8 +255,37 @@ def schedule(
             print(f"   - {label}: {error}")
         raise typer.Exit(1)
 
-    # Apply merged event names over the API (merging itself still needs the
-    # browser, but the combined name is just the primary's name field).
+    # Browser phase: merging is not available via the API, so drive it with
+    # Playwright when track groups need to be merged. The merge form applies
+    # the combined name itself; the API pass below covers the --no-merge case
+    # and any primary left with its single-category name.
+    if not no_merge and merge_groups:
+        checkpoint_name = (
+            competition_url.rstrip("/").split("/")[-1] if not no_checkpoint else None
+        )
+        print()
+        print(f"🔀 Merging {len(merge_groups)} track group(s) via browser...")
+        if checkpoint_name:
+            print(f"📍 Using checkpoint: {checkpoint_name}")
+
+        with OpenTrackSession(config) as session:
+            session.goto_home()
+            if not session.is_logged_in():
+                session.login()
+
+            session.page.goto(competition_url)
+            scheduler = EventScheduler(session)
+
+            try:
+                scheduler.merge_event_groups(merge_groups, checkpoint_name=checkpoint_name)
+                print(f"✅ Merged {len(merge_groups)} track group(s)!")
+            except Exception as e:
+                print()
+                print(f"❌ Merge failed: {e}")
+                raise typer.Exit(1)
+
+    # Apply merged event names over the API (the combined name is just the
+    # primary's name field).
     if merge_groups:
         named, name_errors = sync.set_merged_names(api, comp_id, merge_groups)
         if named:
@@ -264,35 +295,6 @@ def schedule(
             print(f"⚠️  {len(name_errors)} merged name(s) could not be set:")
             for label, error in name_errors:
                 print(f"   - {label}: {error}")
-
-    # Browser phase: merging is not available via the API, so drive it with
-    # Playwright when track groups need to be merged.
-    if no_merge or not merge_groups:
-        return
-
-    checkpoint_name = (
-        competition_url.rstrip("/").split("/")[-1] if not no_checkpoint else None
-    )
-    print()
-    print(f"🔀 Merging {len(merge_groups)} track group(s) via browser...")
-    if checkpoint_name:
-        print(f"📍 Using checkpoint: {checkpoint_name}")
-
-    with OpenTrackSession(config) as session:
-        session.goto_home()
-        if not session.is_logged_in():
-            session.login()
-
-        session.page.goto(competition_url)
-        scheduler = EventScheduler(session)
-
-        try:
-            scheduler.merge_event_groups(merge_groups, checkpoint_name=checkpoint_name)
-            print(f"✅ Merged {len(merge_groups)} track group(s)!")
-        except Exception as e:
-            print()
-            print(f"❌ Merge failed: {e}")
-            raise typer.Exit(1)
 
 
 @app.command("update-pbs")
