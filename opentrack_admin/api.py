@@ -125,3 +125,9 @@ class OpenTrackAPI:
 
     def patch_event(self, event: dict, **fields) -> None:
         self._request("PATCH", event["url"], json=fields)
+
+    def get_unit(self, unit_url: str) -> dict:
+        return self._request("GET", unit_url).json()
+
+    def patch_unit(self, unit_url: str, **fields) -> None:
+        self._request("PATCH", unit_url, json=fields)

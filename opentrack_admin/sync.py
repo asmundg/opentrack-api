@@ -4,6 +4,7 @@ Covers the parts of the workflow a director-level API token can do:
 
 * setting event start times / day / field attempts (``set_event_times``)
 * seeding competitor PB data (``update_pbs``)
+* drawing track lanes from seeding performances (``draw_lanes``)
 
 Creating competitions, importing athletes and merging events are not available
 to a director token (the API rejects the relevant POSTs), so those stay on the
@@ -23,6 +24,7 @@ from .events import (
     fold_masters_to_senior,
     get_category_age,
     is_horizontal_field_event,
+    is_track_event,
     lookup_athlete_pb_sb,
 )
 
@@ -224,5 +226,90 @@ def update_pbs(
             logger.info("Updated PBs for %s (%s)", comp.get("competitor_id"), name)
         except OpenTrackAPIError as e:
             errors.append((name, str(e)))
+
+    return updated, errors
+
+
+def parse_seed_performance(sp: str | None) -> float | None:
+    """Parse an OpenTrack seeding performance into seconds.
+
+    Handles ``"11.65"``, ``"1:59.39"`` and ``"1:02:03.4"``, with either a dot or
+    a comma as the decimal separator. Returns ``None`` for blank or unparseable
+    values so unseeded athletes can be sorted last.
+    """
+    if not sp:
+        return None
+    parts = str(sp).strip().replace(",", ".").split(":")
+    try:
+        values = [float(p) for p in parts]
+    except ValueError:
+        return None
+    seconds = 0.0
+    for value in values:
+        seconds = seconds * 60 + value
+    return seconds
+
+
+def lane_preference(lanes: int) -> list[int]:
+    """Lane numbers in seeding preference order, fastest athlete first.
+
+    Middle lanes are drawn first, working outwards and preferring the inner lane
+    of each pair: 8 lanes give 4, 5, 3, 6, 2, 7, 1, 8.
+    """
+    return sorted(range(1, lanes + 1), key=lambda lane: (abs(2 * lane - lanes - 1), lane))
+
+
+def draw_lanes(
+    api: OpenTrackAPI, comp_id: str
+) -> tuple[int, list[tuple[str, str]]]:
+    """Assign track lanes by seeding performance, fastest to the middle lanes.
+
+    OpenTrack only seeds by performance when it splits entries into several
+    heats; a single heat keeps whatever order the start-list fetch produced. So
+    read each track heat's start list, order it by the ``sp`` value that
+    ``update_pbs`` populated (athletes without one go to the outside lanes), and
+    write the lanes back.
+
+    Returns ``(units_updated, errors)`` where ``errors`` is ``(label, message)``.
+    """
+    updated = 0
+    errors: list[tuple[str, str]] = []
+    for event in api.get_events(comp_id):
+        code = str(event["event_code"])
+        if not is_track_event(_discipline_from_api_code(code)):
+            continue
+
+        lanes = lane_preference(int(event.get("lanes") or 8))
+        for unit_ref in event.get("units") or []:
+            label = f"{event.get('name') or code} {unit_ref.get('heat_name', '')}".strip()
+            try:
+                unit = api.get_unit(unit_ref["url"])
+                results = unit.get("results") or []
+                if not results:
+                    continue
+                if len(results) > len(lanes):
+                    errors.append((label, f"{len(results)} athletes for {len(lanes)} lanes"))
+                    continue
+
+                # Missing seed times sort last, then by bib for a stable order.
+                ordered = sorted(
+                    results,
+                    key=lambda r: (
+                        parse_seed_performance(r.get("sp")) is None,
+                        parse_seed_performance(r.get("sp")) or 0.0,
+                        str(r.get("bib") or ""),
+                    ),
+                )
+                for lane, row in zip(lanes, ordered):
+                    row["lane"] = lane
+                api.patch_unit(unit_ref["url"], results=results)
+                updated += 1
+                logger.info(
+                    "Lanes drawn for %s: %s",
+                    label,
+                    ", ".join(f"{r['lane']}={r.get('bib')}" for r in ordered),
+                )
+            except OpenTrackAPIError as e:
+                errors.append((label, str(e)))
 
     return updated, errors

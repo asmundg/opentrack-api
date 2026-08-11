@@ -302,12 +302,14 @@ def seed(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition")],
     track: Annotated[bool, typer.Option("--track/--no-track", help="Seed track start lists")] = True,
     field: Annotated[bool, typer.Option("--field/--no-field", help="Seed field start lists")] = True,
+    lanes: Annotated[bool, typer.Option("--lanes/--no-lanes", help="Draw track lanes by seed time")] = True,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
 ) -> None:
-    """Fetch start lists in random order.
+    """Fetch start lists in random order, then draw track lanes by seed time.
 
     Run this after `schedule`: merging track heats rebuilds them from the
-    combined categories, which discards any start list seeded beforehand.
+    combined categories, which discards any start list seeded beforehand. Run
+    `update-pbs` first so the lane draw has seeding performances to sort on.
     """
     setup_logging(verbose=verbose)
 
@@ -338,6 +340,27 @@ def seed(
         except Exception as e:
             print(f"❌ Error: {e}")
             raise typer.Exit(1)
+
+    if not track or not lanes:
+        return
+
+    try:
+        api = OpenTrackAPI.from_credentials(
+            competition_url, config.username, config.password
+        )
+        comp_id = api.resolve_competition_id(competition_url)
+    except Exception as e:
+        print(f"❌ {e}")
+        raise typer.Exit(1)
+
+    drawn, lane_errors = sync.draw_lanes(api, comp_id)
+    print(f"✅ Drew lanes by seed time for {drawn} heat(s)")
+    if lane_errors:
+        print()
+        print(f"⚠️  {len(lane_errors)} heat(s) could not be drawn:")
+        for label, error in lane_errors:
+            print(f"   - {label}: {error}")
+        raise typer.Exit(1)
 
 
 @app.command("update-pbs")
