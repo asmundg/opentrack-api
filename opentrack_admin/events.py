@@ -293,6 +293,14 @@ def get_implement_weight(event_code: str, category: str) -> str | None:
 
     # Determine gender
     normalized = normalize_category(category)
+    # OpenTrack's U-codes carry gender as a suffix ("U23K"); the bare form is
+    # men's, matching how the rest of the codebase reads "U20"/"U23".
+    u_code = re.match(r"^U(\d+)([MK])$", normalized)
+    if u_code:
+        return _lookup_weight(
+            event_code, "J" if u_code.group(2) == "K" else "G", int(u_code.group(1))
+        )
+
     if normalized.startswith("G") or normalized in ("M", "MS", "U20", "U23"):
         gender = "G"
     elif normalized.startswith("J") or normalized in ("W", "K", "KS"):
@@ -320,8 +328,21 @@ def get_implement_weight(event_code: str, category: str) -> str | None:
             )
 
     # Look up weight
-    event_weights = IMPLEMENT_WEIGHTS.get(event_code, {})
-    gender_weights = event_weights.get(gender, {})
+    return _lookup_weight(event_code, gender, age)
+
+
+def _lookup_weight(event_code: str, gender: str, age: int) -> str | None:
+    """Resolve a weight from :data:`IMPLEMENT_WEIGHTS` for an exact age.
+
+    Returns None when the event is not offered at that age (e.g. discus for
+    rekrutt), which callers treat as "nothing to set".
+    """
+    gender_weights = IMPLEMENT_WEIGHTS.get(event_code, {}).get(gender, {})
+
+    # OpenTrack derives categories from birth year, so it emits real ages below
+    # 10 ("G9"). They all throw the rekrutt implement, which the table keys as
+    # age 10.
+    age = max(age, 10)
 
     # Find the appropriate age bracket
     if age in gender_weights:
@@ -486,6 +507,12 @@ _MASTERS_LONGFORM_RE = re.compile(
     re.IGNORECASE,
 )
 
+# OpenTrack's own masters codes, derived from birth year: "M75", "K60". The
+# age floor keeps these apart from senior codes and from anything else that
+# happens to be a letter plus digits.
+_MASTERS_OPENTRACK_RE = re.compile(r"^([MK])(\d{2,3})$")
+MASTERS_MIN_AGE = 35
+
 
 def normalize_category(category: str) -> str:
     """Map any known category alias to its canonical OpenTrack short code.
@@ -495,6 +522,7 @@ def normalize_category(category: str) -> str:
       - Scheduler enum values: "J-Rekrutt" -> "J10", "Menn Senior" -> "MS"
       - Masters long form: "Menn masters 60-64" -> "MV60-64",
         "Kvinner masters 75-79" -> "KV75-79"
+      - OpenTrack's own masters codes: "M75" -> "MV75", "K60" -> "KV60"
       - Already-canonical codes ("G14", "J18-19", "KS", "MS", "MV60-64") pass through.
 
     This is the single normalization mechanism used by both the schedule
@@ -507,6 +535,9 @@ def normalize_category(category: str) -> str:
     if m:
         prefix = "MV" if m.group(1).lower() == "menn" else "KV"
         return f"{prefix}{m.group(2)}"
+    m = _MASTERS_OPENTRACK_RE.match(category.strip())
+    if m and int(m.group(2)) >= MASTERS_MIN_AGE:
+        return f"{m.group(1)}V{m.group(2)}"
     return _CATEGORY_ALIASES.get(category.lower(), category)
 
 
