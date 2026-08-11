@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from openpyxl import load_workbook
 
@@ -203,8 +203,11 @@ class CompetitionCreator:
             logger.debug("HTTP %s at %s, treating as new competition", status, public_url)
             return False
 
-        # Verify we landed on the expected URL (no redirect to a different comp / home)
-        if not page.url.rstrip("/").startswith(public_url.rstrip("/")):
+        # Verify we landed on the expected competition (no redirect to a different
+        # comp / home). OpenTrack redirects to a language-prefixed path
+        # (/en-gb/x/...), so compare path suffixes rather than whole URLs.
+        expected_path = urlparse(public_url).path.rstrip("/")
+        if not urlparse(page.url).path.rstrip("/").endswith(expected_path):
             logger.debug(
                 "URL after navigation (%s) does not match expected (%s), treating as new",
                 page.url,
@@ -223,14 +226,17 @@ class CompetitionCreator:
         return True
 
     def _navigate_to_manage_page(self) -> None:
-        """From the public competition page, navigate to the Manage page.
+        """From the public competition page, navigate to the settings form.
 
-        The Manage page is where the settings form (Hide from public, Display,
-        Scoring tabs, etc.) and the 'Manage entries' link live. Verifies we
-        landed on a page with the expected settings form.
+        ' Manage' lands on the manage dashboard; the settings form (Hide from
+        public, Display, Scoring tabs, etc.) and the 'Manage entries' link sit
+        one click further under 'Competition details'. Verifies we landed on a
+        page with the expected settings form.
         """
         page = self.page
         page.get_by_role("link", name=" Manage").click()
+        page.wait_for_load_state("networkidle")
+        page.get_by_role("link", name="Competition details").first.click()
         page.wait_for_load_state("networkidle")
         # Assert we're on the settings form (has the advanced submit button)
         page.locator('button[name="adv_submit"]').wait_for(
@@ -412,8 +418,10 @@ class CompetitionCreator:
         points_checkbox = page.get_by_role("checkbox", name="Show individual points?")
         if not points_checkbox.is_checked():
             points_checkbox.check()
-        page.get_by_role("button", name="Save").nth(3).click(no_wait_after=True)
-        page.wait_for_load_state("networkidle")
+        # The save POSTs and reloads; networkidle alone can resolve on the
+        # pre-navigation page and leave the next goto to be aborted.
+        with page.expect_navigation(wait_until="load"):
+            page.get_by_role("button", name="Save").nth(3).click(no_wait_after=True)
 
     @screenshot_on_error
     def _configure_scoring(self, details: CompetitionDetails) -> None:
@@ -510,18 +518,15 @@ class CompetitionCreator:
         page.get_by_role("link", name="TV and photofinish").click()
         page.get_by_role("link", name="FinishLynx").click()
 
-        # Enable photofinish file generation
+        # Enable photofinish file generation. Matched by field id: the labels
+        # are not exposed as accessible names.
         logger.debug("Enabling photofinish settings")
-        photofinish_files = page.get_by_role(
-            "checkbox", name="Photofinish files should"
-        )
+        photofinish_files = page.locator("#id_lynx_include_people")
         if not photofinish_files.is_checked():
             photofinish_files.check()
 
         # Enable results from photofinish
-        results_from_photofinish = page.get_by_role(
-            "checkbox", name="Results from photofinish"
-        )
+        results_from_photofinish = page.locator("#id_official_from_photofinish")
         if not results_from_photofinish.is_checked():
             results_from_photofinish.check()
 
