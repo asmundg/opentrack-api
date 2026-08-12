@@ -51,7 +51,21 @@ from scheduler.models import (  # noqa: E402
 )
 
 
-def _age_tier(category) -> str:
+# Below this distance a heat is a sprint, where a two-year age spread among the
+# youngest is a big performance spread. At 600m and up the field strings out anyway,
+# so 11-12 and 13-14 may share. Also imported by layout_report.py.
+SPRINT_MAX_DISTANCE_M = 600
+
+
+def is_sprint(event_type: EventType) -> bool:
+    """True for track events shorter than 600m (flat or hurdles)."""
+    name = event_type.name
+    if not name.startswith("m") or not name[1:].split("_")[0].isdigit():
+        return False
+    return int(name[1:].split("_")[0]) < SPRINT_MAX_DISTANCE_M
+
+
+def _age_tier(category, event_type=None) -> str:
     """Coarse legal track grouping tier: Rekrutt (<=10), youth (11-17), or senior
     (18-19/Sr/Masters).
 
@@ -60,11 +74,17 @@ def _age_tier(category) -> str:
     non-Rekrutt category, and 11-14 never shares with 18-19/Senior/Masters. 11-14 and
     15-17 ARE allowed together, so they live in one "youth" tier (the 11-17 span is
     intentional, not a 15+ split). The only remaining track cap (8 lanes) is enforced
-    separately by group sizing, not here."""
+    separately by group sizing, not here.
+
+    On sprints (< 600m) the youth tier splits again at 12/13: an 11-year-old and a
+    14-year-old in the same short heat is an unfair race. This one is a skill
+    preference, not a from-events rule."""
     age = get_category_age_order(category)
     if age <= 10:
         return "rekrutt"
     if age <= 17:
+        if event_type is not None and is_sprint(event_type) and age <= 12:
+            return "youth11-12"
         return "youth"
     return "senior"
 
@@ -76,7 +96,8 @@ def _split_track_by_age_tier(groups: list[EventGroup]) -> list[EventGroup]:
     track boundary (Rekrutt with older, or 11-14 with 18-19/Senior/Masters). Splitting
     into Rekrutt / youth (11-17) / senior keeps the legal merges (incl. 11-14 + 15-17)
     while removing the illegal cross-tier ones, so the proposal validates against
-    constraint_validator's track age-merge rules.
+    constraint_validator's track age-merge rules. Sprints split the youth tier once
+    more at 12/13 (see _age_tier).
     """
     out: list[EventGroup] = []
     for g in groups:
@@ -85,7 +106,7 @@ def _split_track_by_age_tier(groups: list[EventGroup]) -> list[EventGroup]:
             continue
         by_tier: dict[str, list] = {}
         for e in g.events:
-            by_tier.setdefault(_age_tier(e.age_category), []).append(e)
+            by_tier.setdefault(_age_tier(e.age_category, g.event_type), []).append(e)
         if len(by_tier) <= 1:
             out.append(g)
             continue

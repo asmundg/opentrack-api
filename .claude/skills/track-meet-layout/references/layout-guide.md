@@ -96,6 +96,12 @@ warning, since field events run sequentially.
 
 Gender is not enforced: you may merge boys and girls in a row if you choose.
 
+**Sprint age band (skill preference, not enforced by from-events):** in track events
+shorter than **600m**, keep **11-12** and **13-14** in separate heats. Three years is a
+large performance spread over 60-400m. From 600m up the field strings out anyway, so
+11-14 may share. 13-14 with 15-17 stays fine at any distance. `layout_report.py` lists
+these as `AGE-MERGE WARNINGS`, and the seed already splits sprints at 12/13.
+
 ### Choosing groups (merging heuristic)
 
 The seed proposes merges by age tier; treat them as a starting point and adjust by
@@ -109,11 +115,13 @@ Decide each event type's groups like this:
   the alternative is a stranded single (it only warns).
 - **Track flat** (60m, 100m, 200m, 400m, 600m, ...): combine categories within the age
   rules above (Rekrutt alone; 11-14 may merge with 15-17; never 11-14 with
-  18-19/Senior/Masters), totalling ≤8 athletes. Genders may mix.
+  18-19/Senior/Masters), totalling ≤8 athletes. Under 600m also split 11-12 from 13-14.
+  Genders may mix.
 - **Hurdles**: combine within lane capacity. Distances and heights may both mix; each
   distinct (distance, height) setup costs a gutter lane, so capacity is
   `lanes - (distinct_setups - 1)`. E.g. with 8 lanes, four setups leave 5 athlete
-  lanes. Stay within the age rules (hurdles are track events). Merging hurdle heats of
+  lanes. Stay within the age rules (hurdles are track events, so the sprint 12/13 split
+  applies too). Merging hurdle heats of
   different distances cuts the number of heats (and the reconfigure gaps between them),
   so it is often worth doing when the lanes fit.
 - **No legal partner / acceptable singletons**: keep a group as-is when no legal,

@@ -105,6 +105,35 @@ def _stream_sticky(stream: list[dict], hhmm) -> list[str]:
     return out
 
 
+def _sprint_age_warnings(rows) -> list[str]:
+    """Sprint heats (< 600m) mixing 11-12 with 13-14, prefixed 'warn'.
+
+    from-events allows this, so it is a preference the agent enforces, not a gate.
+    The rule itself lives in dump_groups so the seed and this check agree.
+    """
+    from dump_groups import is_sprint
+    from scheduler.models import Category, get_category_age_order
+
+    out: list[str] = []
+    for r in rows:
+        if not is_sprint(r.event_type):
+            continue
+        ages = set()
+        for raw in r.categories.split(","):
+            name = raw.strip()
+            if not name:
+                continue
+            try:
+                ages.add(get_category_age_order(Category(name)))
+            except ValueError:
+                continue
+        if ages & {11, 12} and ages & {13, 14}:
+            out.append(
+                f"warn {r.event_group_id} ({r.event_type.value}): mixes 11-12 with "
+                f"13-14 in a sprint — split at 12/13 (allowed from 600m up)")
+    return out
+
+
 def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str], list[str]]:
     """Return (athlete_conflicts, age_violations, recovery, sizing) for the layout.
 
@@ -136,6 +165,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
 
     counts = _atom_counts(athletes)
     age = age_merge_errors(rows, counts)
+    age += _sprint_age_warnings(rows)
 
     # Per-row sizing: athletes in the merge + the duration the scheduler would assign
     # (built from the same Event objects/EventGroup as dump_groups, so it matches what
@@ -428,9 +458,20 @@ def main() -> None:
         else:
             print("\nNo athlete conflicts.")
         if age:
-            print(f"\nAGE-MERGE VIOLATIONS ({len(age)}) — re-split the row's categories:")
-            for a in age:
-                print(f"  - {a}")
+            hard = [a for a in age if not a.startswith("warn ")]
+            soft = [a for a in age if a.startswith("warn ")]
+            if hard:
+                print(f"\nAGE-MERGE VIOLATIONS ({len(hard)}) — re-split the row's "
+                      f"categories:")
+                for a in hard:
+                    print(f"  - {a}")
+            else:
+                print("No age-merge violations.")
+            if soft:
+                print(f"\nAGE-MERGE WARNINGS ({len(soft)}) — allowed by from-events, "
+                      f"but prefer to split:")
+                for a in soft:
+                    print(f"  - {a[5:]}")
         else:
             print("No age-merge violations.")
         fails = [r for r in recovery if r.startswith("FAIL")]
