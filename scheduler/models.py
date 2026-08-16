@@ -637,12 +637,7 @@ class EventGroup:
             return max(event.duration_minutes for event in self.events)
         else:
             # Field events share equipment, so sum the durations
-            total = sum(event.duration_minutes for event in self.events)
-            # HJ/PV: each individual event includes +5 min setup.
-            # Merged groups only pay setup once.
-            if self.event_type in (EventType.hj, EventType.pv) and len(self.events) > 1:
-                total -= 5 * (len(self.events) - 1)
-            return total
+            return sum(event.duration_minutes for event in self.events)
 
 
 @dataclass
@@ -668,69 +663,35 @@ EventDuration: dict[EventType, int] = {
     EventType.m80_hurdles: 5,
     EventType.m100_hurdles: 5,
     EventType.m200_hurdles: 5,
-    # Field events take time x number of participants
-    # Throw
-    EventType.sp: 6,
-    EventType.dt: 6,
-    EventType.jt: 6,
-    EventType.ht: 6,
-    EventType.bt: 3,
-    # Horizontal jump
-    EventType.lj: 6,
-    EventType.lj_standing: 4,
-    EventType.tj: 6,
-    # Vertical jump
+    # Vertical jumps take time x number of participants (horizontal field events
+    # are derived from their attempt count instead, see HORIZONTAL_FIELD_EVENTS)
     EventType.hj: 6,
     EventType.hj_standing: 4,
-    EventType.pv: 12,
+    EventType.pv: 10,
 }
 
-EventCategoryDurationOverride: dict[tuple[EventType, Category], int] = {
-    (EventType.sp, Category.j10): 2,
-    (EventType.sp, Category.j11): 4,
-    (EventType.sp, Category.j12): 4,
-    (EventType.sp, Category.g10): 2,
-    (EventType.sp, Category.g11): 4,
-    (EventType.sp, Category.g12): 4,
-    (EventType.ht, Category.j11): 4,
-    (EventType.ht, Category.j12): 4,
-    (EventType.ht, Category.g11): 4,
-    (EventType.ht, Category.g12): 4,
-    (EventType.dt, Category.j11): 4,
-    (EventType.dt, Category.j12): 4,
-    (EventType.dt, Category.g11): 4,
-    (EventType.dt, Category.g12): 4,
-    (EventType.jt, Category.j11): 4,
-    (EventType.jt, Category.j12): 4,
-    (EventType.jt, Category.g11): 4,
-    (EventType.jt, Category.g12): 4,
-    (EventType.lj, Category.j10): 3,
-    (EventType.lj, Category.j11): 4,
-    (EventType.lj, Category.j12): 4,
-    (EventType.lj, Category.g10): 3,
-    (EventType.lj, Category.g11): 4,
-    (EventType.lj, Category.g12): 4,
-    (EventType.hj, Category.j10): 4,
-    (EventType.hj, Category.g10): 4,
+# Horizontal field events are scored per attempt: 1 minute per attempt per
+# athlete. Attempt counts follow the Norwegian age rules (mirrors
+# opentrack_admin.events.AttemptConfig).
+HORIZONTAL_FIELD_EVENTS: set[EventType] = {
+    EventType.sp,
+    EventType.dt,
+    EventType.jt,
+    EventType.ht,
+    EventType.bt,
+    EventType.lj,
+    EventType.lj_standing,
+    EventType.tj,
 }
 
-EventCategoryDuration: dict[tuple[EventType, Category], int] = {
-    (EventType.m60, Category.j10): 5,
-    (EventType.m60, Category.j11): 5,
-    (EventType.m60, Category.j12): 5,
-    (EventType.m60, Category.j13): 5,
-    (EventType.m60, Category.j14): 5,
-    (EventType.m60, Category.j15): 5,
-    (EventType.m60, Category.j16): 5,
-    (EventType.m60, Category.j17): 5,
-    (EventType.m60, Category.j18_19): 5,
-    (EventType.m60, Category.g10): 5,
-    (EventType.m60, Category.g11): 5,
-    (EventType.m60, Category.g12): 5,
-    (EventType.m60, Category.g13): 5,
-    (EventType.m60, Category.g14): 5,
-    (EventType.m60, Category.g15): 5,
-    (EventType.m60, Category.g16): 5,
-    (EventType.m60, Category.g17): 5,
-    (EventType.m60, Category.g18_19): 5,
-}
+MINUTES_PER_ATTEMPT = 1
+
+
+def field_attempts(category: Category) -> int:
+    """Number of attempts an athlete of this category gets in a field event."""
+    age = get_category_age_order(category)
+    if age <= 10:
+        return 3
+    if age <= 12:
+        return 4
+    return 6

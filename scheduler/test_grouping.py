@@ -122,3 +122,51 @@ def test_80m_hurdles_respect_hard_15_boundary():
     for cats, _ in heats:
         assert not ({"G14"} <= cats and {"J15"} <= cats), cats
 
+
+
+def test_hj_merged_group_pays_setup_per_class():
+    # Planning key: per class, athletes * 0.75min * 8 jumps + 5min setup.
+    # Merging does not save setup time.
+    from scheduler.isonen_parser import _calculate_event_duration
+    from scheduler.models import EventGroup
+
+    per_class = [
+        _calculate_event_duration(EventType.hj, Category.g13, 3),
+        _calculate_event_duration(EventType.hj, Category.g14, 2),
+    ]
+    assert per_class == [3 * 6 + 5, 2 * 6 + 5]
+
+    events, _ = _build(EventType.hj, {Category.g13: 3, Category.g14: 2})
+    for ev, minutes in zip(events, per_class):
+        ev.duration_minutes = minutes
+    assert EventGroup(id="hj", event_type=EventType.hj, events=events).duration_minutes == sum(per_class)
+
+
+def test_field_duration_is_not_capped():
+    # A large class runs as long as its athletes need; no 60-minute truncation.
+    from scheduler.isonen_parser import _calculate_event_duration
+
+    assert _calculate_event_duration(EventType.hj, Category.g15, 12) == 12 * 6 + 5
+    assert _calculate_event_duration(EventType.jt, Category.g15, 12) == 12 * 6
+
+
+def test_pv_duration_key():
+    # Planning key: athletes * 1.25min * 8 jumps + 5min setup.
+    from scheduler.isonen_parser import _calculate_event_duration
+
+    assert _calculate_event_duration(EventType.pv, Category.g15, 4) == 4 * 10 + 5
+
+
+def test_horizontal_field_duration_follows_attempt_count():
+    # Key: athletes * 1 min * attempts, where attempts are 3 (<=10), 4 (11-12), 6 (13+).
+    from scheduler.isonen_parser import _calculate_event_duration
+
+    cases = {
+        Category.g10: 3,
+        Category.g12: 4,
+        Category.g13: 6,
+        Category.ms: 6,
+    }
+    for cat, attempts in cases.items():
+        for event_type in (EventType.sp, EventType.lj, EventType.tj, EventType.bt):
+            assert _calculate_event_duration(event_type, cat, 5) == 5 * attempts, (event_type, cat)

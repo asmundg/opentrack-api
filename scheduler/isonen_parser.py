@@ -171,42 +171,32 @@ def _calculate_event_duration(
     event_type: EventType, category: Category, participant_count: int
 ) -> int:
     """Calculate event duration based on type, category, and participant count."""
-    from .models import EventCategoryDurationOverride, EventDuration
+    from .models import (
+        HORIZONTAL_FIELD_EVENTS,
+        MINUTES_PER_ATTEMPT,
+        EventDuration,
+        field_attempts,
+    )
 
-    # Check for specific overrides first
-    override_key = (event_type, category)
-    if override_key in EventCategoryDurationOverride:
-        base_duration = EventCategoryDurationOverride[override_key]
-    else:
-        base_duration = EventDuration[event_type]
+    athletes = max(1, participant_count)
 
-    # For field events, duration scales with participant count
-    field_events = {
-        EventType.sp,
-        EventType.dt,
-        EventType.jt,
-        EventType.ht,
-        EventType.bt,
-        EventType.lj,
-        EventType.tj,
+    # Horizontal field events: one minute per attempt, attempts vary by age.
+    if event_type in HORIZONTAL_FIELD_EVENTS:
+        return athletes * MINUTES_PER_ATTEMPT * field_attempts(category)
+
+    base_duration = EventDuration[event_type]
+
+    # Vertical jumps: per-athlete jump time plus a one-off setup per class.
+    vertical_jumps = {
         EventType.hj,
+        EventType.hj_standing,
         EventType.pv,
     }
-
-    if event_type in field_events:
-        # Scale duration based on participant count
-        # For field events, multiply base duration by participant count
-        scaled_duration = base_duration * max(1, participant_count)
-
-        # Add setup time for jumping events
-        jumping_events = {EventType.hj, EventType.pv}
-        if event_type in jumping_events:
-            scaled_duration += 5  # 5 minutes setup time
-
-        return min(scaled_duration, 60)  # Cap at 60 minutes
+    if event_type in vertical_jumps:
+        return base_duration * athletes + 5
 
     # Track events: multiply by number of heats (max 8 per heat)
-    heats = -(-max(1, participant_count) // 8)  # ceil division
+    heats = -(-athletes // 8)  # ceil division
     return base_duration * heats
 
 
