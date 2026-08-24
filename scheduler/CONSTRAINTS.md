@@ -153,6 +153,18 @@ group's starting size; `attempt_minutes()` in `models.py` holds the table.
 - **Avoid rapid-fire**: A solo athlete would have attempts back-to-back with no recovery
 - **Equipment efficiency**: One setup serves multiple categories
 
+### Vertical jumps merge by ability, not by convenience
+
+Høyde and stav run **one shared bar progression** for the whole group, so the
+usual "any ages may merge" rule does not apply. A group spanning a wide ability
+range wastes the venue: the youngest are eliminated long before the oldest enter,
+and the bar spends the middle of the competition at heights nobody is jumping.
+
+Merge **adjacent** categories only (G13+G14, J15+J16, J17+KS). Splitting a wide
+group into two narrow ones costs venue time but is still the right call. A group
+merging categories more than four age tiers apart is flagged by
+`layout_report.py` under `AGE-MERGE WARNINGS`.
+
 ### Merging Tiers (field)
 
 Field events are grouped into age tiers at each venue; deficient tiers are then

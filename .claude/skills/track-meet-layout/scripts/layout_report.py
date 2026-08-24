@@ -134,6 +134,42 @@ def _sprint_age_warnings(rows) -> list[str]:
     return out
 
 
+def _vertical_merge_warnings(rows) -> list[str]:
+    """Vertical jump groups spanning a wide ability range, prefixed 'warn'.
+
+    Høyde and stav share one bar progression, so a group whose categories start
+    at very different heights wastes venue time: the youngest are out before the
+    oldest come in. Two adjacent groups beat one wide one.
+    """
+    from scheduler.models import (
+        Category, VERTICAL_FIELD_EVENTS, get_category_age_order,
+    )
+
+    # Senior and masters sort as 99; treat them as one adult tier for spread.
+    def tier(cat: Category) -> int:
+        return min(get_category_age_order(cat), 20)
+
+    out: list[str] = []
+    for r in rows:
+        if r.event_type not in VERTICAL_FIELD_EVENTS:
+            continue
+        tiers = set()
+        for raw in r.categories.split(","):
+            name = raw.strip()
+            if not name:
+                continue
+            try:
+                tiers.add(tier(Category(name)))
+            except ValueError:
+                continue
+        if tiers and max(tiers) - min(tiers) > 4:
+            out.append(
+                f"warn {r.event_group_id} ({r.event_type.value}): merges categories "
+                f"{max(tiers) - min(tiers)} age tiers apart — they share one bar "
+                f"progression, so split into adjacent groups")
+    return out
+
+
 def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str], list[str]]:
     """Return (athlete_conflicts, age_violations, recovery, sizing) for the layout.
 
@@ -166,6 +202,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
     counts = _atom_counts(athletes)
     age = age_merge_errors(rows, counts)
     age += _sprint_age_warnings(rows)
+    age += _vertical_merge_warnings(rows)
 
     # Per-row sizing: athletes in the merge + the duration the scheduler would assign
     # (built from the same Event objects/EventGroup as dump_groups, so it matches what
