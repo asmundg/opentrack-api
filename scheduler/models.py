@@ -324,11 +324,27 @@ HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     (EventType.m100_hurdles, Category.j17): HurdleSpec(10, 13, 8.5, 76.2),
     (EventType.m100_hurdles, Category.j18_19): HurdleSpec(10, 13, 8.5, 84),
     (EventType.m100_hurdles, Category.ks): HurdleSpec(10, 13, 8.5, 84),
-    # 200m hurdles. The setup differs by gender (per the Valhall hurdle plan):
-    # women (J/K) run 16m to first, 19m between (rødt kvadrat marker); boys/men
-    # (G/M) run 18.29m/18.29m (gult kvadrat). Only KS (senior women) is
-    # registered for this meet, so it uses the women's 16/19 setup.
+    # 200m hurdles. Two age bands per gender (11-13 and 14-Senior), and the
+    # setup differs by gender: girls/women run 16m to first, 19m between (rødt
+    # kvadrat marker); boys/men run 18.29m/18.29m (gult kvadrat).
+    (EventType.m200_hurdles, Category.j11): HurdleSpec(10, 16, 19, 68),
+    (EventType.m200_hurdles, Category.j12): HurdleSpec(10, 16, 19, 68),
+    (EventType.m200_hurdles, Category.j13): HurdleSpec(10, 16, 19, 68),
+    (EventType.m200_hurdles, Category.j14): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j15): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j16): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j17): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j18_19): HurdleSpec(10, 16, 19, 76.2),
     (EventType.m200_hurdles, Category.ks): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.g11): HurdleSpec(10, 18.29, 18.29, 68),
+    (EventType.m200_hurdles, Category.g12): HurdleSpec(10, 18.29, 18.29, 68),
+    (EventType.m200_hurdles, Category.g13): HurdleSpec(10, 18.29, 18.29, 68),
+    (EventType.m200_hurdles, Category.g14): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g15): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g16): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g17): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g18_19): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.ms): HurdleSpec(10, 18.29, 18.29, 76.2),
 }
 
 
