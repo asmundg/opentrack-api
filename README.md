@@ -40,6 +40,20 @@ opentrack admin import-athletes <opentrack url> <isonen xlsx>
 
 ### Schedule
 
+Pull the participant list straight from iSonen instead of downloading it by
+hand. Login goes through Idrettens ID and can't be scripted, so the command
+borrows the session from a Chrome you are already logged in to:
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+    --remote-debugging-port=9222 --user-data-dir=~/Library/Application\ Support/ChromeCDP
+
+opentrack scheduler fetch-participants https://isonen.no/event/<event-id>/ -o participants.xlsx
+```
+
+This is the same "Last ned deltakerliste" export as the web UI (Standard,
+Excel), fetched through iSonen's GraphQL API.
+
 ```bash
 opentrack scheduler schedule <isonen xlsx> --date <date> --start-hour <start> --arena <arena> --max-duration <duration>
 ```

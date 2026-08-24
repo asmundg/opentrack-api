@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 from .html_schedule_generator import save_html_schedule
+from .isonen_download import DEFAULT_CDP_URL, download_participant_xlsx
 from .isonen_parser import parse_isonen_xlsx
 from .models import Event, EventType
 from . import models
@@ -70,6 +71,36 @@ def _echo_shared_groups(quiet: bool) -> None:
         for group in models.SHARED_VENUE_GROUPS
     ]
     typer.echo(f"Shared venue groups: {'; '.join(descriptions)}")
+
+
+@app.command("fetch-participants")
+def fetch_participants(
+    event: Annotated[
+        str,
+        typer.Argument(help="iSonen event URL or event id"),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", "-o", help="Where to write the XLSX"),
+    ] = Path("participants.xlsx"),
+    cdp_url: Annotated[
+        str,
+        typer.Option("--cdp-url", help="CDP endpoint of a Chrome logged in to iSonen"),
+    ] = DEFAULT_CDP_URL,
+) -> None:
+    """Download the standard participant list from iSonen.
+
+    Requires a Chrome started with --remote-debugging-port that is logged in as
+    an organiser for the event.
+    """
+    try:
+        path = download_participant_xlsx(event, output, cdp_url=cdp_url)
+    except (ValueError, RuntimeError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    events, athletes = parse_isonen_xlsx(str(path))
+    typer.echo(f"Wrote {path} ({len(athletes)} athletes, {len(events)} events)")
 
 
 @app.command("info")
