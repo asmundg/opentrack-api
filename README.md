@@ -15,8 +15,9 @@ pointing them at a `test-*` URL uses the matching [test server](https://docs.ope
 # Install dependencies
 uv sync
 
-# Install Playwright browsers
-uv run playwright install chromium
+# Browser automation drives your installed Google Chrome (OpenTrack's
+# Cloudflare challenge rejects Playwright's bundled Chromium), using a
+# dedicated profile under ~/.opentrack-admin/chrome-profile.
 
 # Copy and configure environment
 cp .env.example .env
