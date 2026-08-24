@@ -110,6 +110,21 @@ within 7 days of the competition finish date.
 opentrack admin update-pbs <opentrack-url>
 ```
 
+Seed start lists and draw track lanes by seed time. Run it after `schedule`
+(merging rebuilds heats and discards earlier start lists) and after
+`update-pbs` (the draw sorts on seeding performances).
+
+```bash
+opentrack admin seed <opentrack-url> \
+    --hurdle-lanes <schedule>_hurdle_lanes.csv
+```
+
+Pass `--hurdle-lanes` whenever the meet has hurdles. A heat mixing hurdle
+setups needs an empty gutter lane between each distinct (distance, height)
+pair, which seeding order knows nothing about, so those lanes come from the
+same plan `from-events` prints for the setup crew. Without it the draw can put
+two heights in adjacent lanes, which cannot be rigged.
+
 ```bash
 opentrack admin set-implements <opentrack-url> schedule.csv
 ```

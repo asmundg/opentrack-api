@@ -303,6 +303,7 @@ def seed(
     track: Annotated[bool, typer.Option("--track/--no-track", help="Seed track start lists")] = True,
     field: Annotated[bool, typer.Option("--field/--no-field", help="Seed field start lists")] = True,
     lanes: Annotated[bool, typer.Option("--lanes/--no-lanes", help="Draw track lanes by seed time")] = True,
+    hurdle_lanes: Annotated[Optional[Path], typer.Option("--hurdle-lanes", help="*_hurdle_lanes.csv from `scheduler from-events`; makes hurdle heats match the setup plan")] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
 ) -> None:
     """Fetch start lists in random order, then draw track lanes by seed time.
@@ -322,6 +323,11 @@ def seed(
     if not track and not field:
         print("❌ Nothing to seed: --no-track and --no-field are mutually exclusive")
         raise typer.Exit(1)
+
+    if hurdle_lanes and not hurdle_lanes.exists():
+        print(f"❌ File not found: {hurdle_lanes}")
+        raise typer.Exit(1)
+    hurdle_lane_plan = sync.parse_hurdle_lane_csv(hurdle_lanes) if hurdle_lanes else None
 
     wanted = ", ".join(n for n, on in (("track", track), ("field", field)) if on)
     print(f"🎲 Seeding {wanted} start lists for: {competition_url}")
@@ -353,7 +359,7 @@ def seed(
         print(f"❌ {e}")
         raise typer.Exit(1)
 
-    drawn, lane_errors = sync.draw_lanes(api, comp_id)
+    drawn, lane_errors = sync.draw_lanes(api, comp_id, hurdle_lane_plan)
     print(f"✅ Drew lanes by seed time for {drawn} heat(s)")
     if lane_errors:
         print()

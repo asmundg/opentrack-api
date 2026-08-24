@@ -107,6 +107,27 @@ def generate_hurdle_plan_html(
     return _render_html(heats)
 
 
+def hurdle_lane_assignments(
+    result: SchedulingResult,
+    start_hour: int,
+    start_minute: int,
+) -> list[tuple[str, str, int]]:
+    """Return the athlete lanes of the hurdle plan as (event_type, category, lane).
+
+    One entry per occupied lane, so a category with three athletes yields three
+    lanes. Gutter and blocked lanes are omitted — they are exactly the lanes
+    absent from this list. This is the same assignment the printed plan shows,
+    exported so the OpenTrack start lists can be drawn to match it instead of
+    diverging from the crew's setup.
+    """
+    return [
+        (heat.event_group.event_type.value, lane.category.value, lane.lane)
+        for heat in _collect_hurdle_heats(result, start_hour, start_minute)
+        for lane in heat.lanes
+        if lane.category is not None
+    ]
+
+
 def _collect_hurdle_heats(
     result: SchedulingResult,
     start_hour: int,

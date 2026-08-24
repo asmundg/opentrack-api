@@ -11,8 +11,10 @@ to a director token (the API rejects the relevant POSTs), so those stay on the
 Playwright path.
 """
 
+import csv
 import logging
 import re
+from pathlib import Path
 
 from pblookup.lookup import PBLookupService
 
@@ -21,11 +23,14 @@ from .events import (
     AttemptConfig,
     EventMergeGroup,
     EventSchedule,
+    event_code_from_scheduler_name,
     fold_masters_to_senior,
     get_category_age,
     is_horizontal_field_event,
+    is_hurdles_event,
     is_track_event,
     lookup_athlete_pb_sb,
+    normalize_category,
 )
 
 logger = logging.getLogger(__name__)
@@ -280,8 +285,31 @@ def lane_preference(lanes: int, staggered: bool = False) -> list[int]:
     return sorted(range(1, lanes + 1), key=lambda lane: (abs(2 * lane - lanes - 1), lane))
 
 
+def parse_hurdle_lane_csv(path: Path) -> dict[tuple[str, str], list[int]]:
+    """Parse a ``*_hurdle_lanes.csv`` from `scheduler from-events`.
+
+    Returns ``{(api_event_code, category): [lanes]}``. A hurdle heat mixing
+    setups needs an empty gutter lane between each distinct (distance, height)
+    pair, which the seeding order knows nothing about, so the lanes are taken
+    from the same plan the setup crew rigs from.
+    """
+    lanes: dict[tuple[str, str], list[int]] = {}
+    with path.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            code = _to_api_event_code(
+                event_code_from_scheduler_name(row["event_type"].strip())
+            )
+            category = normalize_category(row["category"].strip())
+            lanes.setdefault((code, category), []).append(int(row["lane"]))
+    for assigned in lanes.values():
+        assigned.sort()
+    return lanes
+
+
 def draw_lanes(
-    api: OpenTrackAPI, comp_id: str
+    api: OpenTrackAPI,
+    comp_id: str,
+    hurdle_lanes: dict[tuple[str, str], list[int]] | None = None,
 ) -> tuple[int, list[tuple[str, str]]]:
     """Assign track lanes by seeding performance.
 
@@ -291,10 +319,15 @@ def draw_lanes(
     ``update_pbs`` populated (athletes without one go to the least favoured
     lanes), and write the lanes back. See :func:`lane_preference` for the order.
 
+    ``hurdle_lanes`` (from :func:`parse_hurdle_lane_csv`) overrides the draw for
+    hurdle heats, where lanes are dictated by the hurdle setup rather than by
+    seeding. Within one category the fastest still gets the first lane.
+
     Returns ``(units_updated, errors)`` where ``errors`` is ``(label, message)``.
     """
     updated = 0
     errors: list[tuple[str, str]] = []
+    categories = _competitor_categories(api, comp_id) if hurdle_lanes else {}
     for event in api.get_events(comp_id):
         code = str(event["event_code"])
         discipline = _discipline_from_api_code(code)
@@ -311,21 +344,18 @@ def draw_lanes(
                 results = unit.get("results") or []
                 if not results:
                     continue
-                if len(results) > len(lanes):
-                    errors.append((label, f"{len(results)} athletes for {len(lanes)} lanes"))
-                    continue
 
-                # Missing seed times sort last, then by bib for a stable order.
-                ordered = sorted(
-                    results,
-                    key=lambda r: (
-                        parse_seed_performance(r.get("sp")) is None,
-                        parse_seed_performance(r.get("sp")) or 0.0,
-                        str(r.get("bib") or ""),
-                    ),
-                )
-                for lane, row in zip(lanes, ordered):
-                    row["lane"] = lane
+                planned = _planned_hurdle_lanes(hurdle_lanes, code, results, categories)
+                if planned is not None:
+                    ordered = planned
+                else:
+                    if len(results) > len(lanes):
+                        errors.append((label, f"{len(results)} athletes for {len(lanes)} lanes"))
+                        continue
+                    ordered = _by_seed_time(results)
+                    for lane, row in zip(lanes, ordered):
+                        row["lane"] = lane
+
                 api.patch_unit(unit_ref["url"], results=results)
                 updated += 1
                 logger.info(
@@ -337,3 +367,57 @@ def draw_lanes(
                 errors.append((label, str(e)))
 
     return updated, errors
+
+
+def _by_seed_time(results: list[dict]) -> list[dict]:
+    """Results fastest first; missing seed times sort last, then by bib."""
+    return sorted(
+        results,
+        key=lambda r: (
+            parse_seed_performance(r.get("sp")) is None,
+            parse_seed_performance(r.get("sp")) or 0.0,
+            str(r.get("bib") or ""),
+        ),
+    )
+
+
+def _competitor_categories(api: OpenTrackAPI, comp_id: str) -> dict[str, str]:
+    """Map bib -> normalized category for every competitor."""
+    return {
+        str(c["competitor_id"]): normalize_category(str(c.get("category") or ""))
+        for c in api.get_competitors(comp_id)
+    }
+
+
+def _planned_hurdle_lanes(
+    hurdle_lanes: dict[tuple[str, str], list[int]] | None,
+    code: str,
+    results: list[dict],
+    categories: dict[str, str],
+) -> list[dict] | None:
+    """Apply the hurdle plan's lanes to `results`, or None if it does not apply.
+
+    Raises when the plan and the start list disagree on who is in the heat:
+    falling back to a seeded draw would put athletes in lanes rigged for a
+    different hurdle height.
+    """
+    if not hurdle_lanes or not is_hurdles_event(_discipline_from_api_code(code)):
+        return None
+
+    by_category: dict[str, list[dict]] = {}
+    for row in results:
+        by_category.setdefault(categories.get(str(row.get("bib")), ""), []).append(row)
+
+    ordered: list[dict] = []
+    for category, rows in by_category.items():
+        planned = hurdle_lanes.get((code, category), [])
+        if len(planned) != len(rows):
+            raise OpenTrackAPIError(
+                f"hurdle plan has {len(planned)} lane(s) for {category or '?'} but "
+                f"the start list has {len(rows)} athlete(s) — regenerate the plan "
+                "with `scheduler from-events`"
+            )
+        for lane, row in zip(planned, _by_seed_time(rows)):
+            row["lane"] = lane
+        ordered.extend(rows)
+    return sorted(ordered, key=lambda r: r["lane"])
