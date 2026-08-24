@@ -30,6 +30,7 @@ scheduler/
 ├── types.py                    # Shared type definitions (SchedulingResult)
 ├── dtos.py                     # Pydantic DTOs for CSV I/O validation
 │
+├── isonen_download.py          # Fetch participant XLSX from iSonen via CDP Chrome
 ├── isonen_parser.py            # Parse Isonen XLSX → Events & Athletes (one per category)
 │
 ├── event_csv.py                # Event Overview CSV ↔ slot assignments

@@ -155,13 +155,21 @@ def _collect_hurdle_heats(
 
 
 def _extract_zones(eg: EventGroup) -> list[_DistanceZone]:
-    """Extract distinct distance zones from an EventGroup's categories."""
+    """Extract distinct distance zones from an EventGroup's categories.
+
+    Raises if a category has no hurdle spec: the crew cannot rig a heat we have
+    no geometry for, and silently dropping it would print a plan missing a race.
+    """
     # Collect unique (distance, first_hurdle, num_hurdles) combos
     seen: dict[float, _DistanceZone] = {}  # keyed by distance_between_m
     for ev in eg.events:
         spec = get_hurdle_spec(eg.event_type, ev.age_category)
         if spec is None:
-            continue
+            raise ValueError(
+                f"No hurdle spec for {eg.event_type.value} "
+                f"{ev.age_category.value}: add it to HURDLE_SPECS in "
+                "scheduler/models.py so the setup crew gets a card for this heat."
+            )
         if spec.distance_between_m not in seen:
             marker = models.ARENA.hurdle_markers.get((spec.first_hurdle_m, spec.distance_between_m))
             seen[spec.distance_between_m] = _DistanceZone(

@@ -83,6 +83,15 @@ their other events).
 through Masters together is allowed). Oversize groups (> 8 athletes) only get a
 warning, since field events run sequentially.
 
+**Vertical jumps (høyde, stav) are the exception.** A group shares one bar
+progression, so merging categories with very different starting heights buys
+nothing: the youngest are eliminated long before the oldest enter, and the bar
+sits at heights nobody is jumping. Merge **adjacent** categories only (G13+G14,
+J15+J16, J17+KS); do not put a 13-14 year old in with a senior. Two separate
+groups that each run their own progression beat one group with a wide spread,
+even though the two groups cost more venue time. `layout_report.py` flags a wide
+vertical merge under `VERTICAL JUMP MERGES`.
+
 **Track heats** must obey these or `from-events` reports an `Age merge violation`:
 
 - **Rekrutt** (J/G-Rekrutt, the 10-year-olds) never share a heat with any older
@@ -101,6 +110,12 @@ shorter than **600m**, keep **11-12** and **13-14** in separate heats. Three yea
 large performance spread over 60-400m. From 600m up the field strings out anyway, so
 11-14 may share. 13-14 with 15-17 stays fine at any distance. `layout_report.py` lists
 these as `AGE-MERGE WARNINGS`, and the seed already splits sprints at 12/13.
+
+**Override it to rescue a lone athlete.** A single entrant left alone in a heat is
+worse than a mixed-age heat, so merging her up (J12 into a G13-14 heat) is the
+right call. Leave **1-2 empty lanes** between the age bands when you do — that is
+a lane-draw instruction for the start list, not something the event CSV records,
+so say it out loud in the handover.
 
 ### Choosing groups (merging heuristic)
 
@@ -151,7 +166,7 @@ violation, so fix one and re-run. Track age-ordering and oversized field groups 
 | `Venue conflict at <venue>: A overlaps with B` | two rows share a venue/`--shared` bucket and overlap | move one later, or serialise the shared types |
 | `Venue stickiness violated at <venue>: ...` | a type is interleaved at a venue (`--sticky`) | make each type a contiguous block per venue |
 | `Athlete conflict for <name>: A overlaps with B` | someone is in two overlapping rows | move A or B, or re-merge so they share a row |
-| `Too little recovery time for <name>: only N min ...` | a 13+ athlete has < 10 min between two of their events | widen the gap to >= 10 min (>= 15 for 15+ to avoid the soft warning) |
+| `Too little recovery time for <name>: only N min ...` | a 13+ athlete has < 10 min between two of their events | widen the gap to >= 10 min (>= 15 for 15+ to avoid the soft warning); if both events are field events and the meet runs them on one team, `--no-field-recovery` waives it |
 | `Track event ordering violation: ...` | track distances out of order (and not the Rekrutt round-race exception) | reorder track times into distance order |
 | `Age merge violation in X: ...` | a track heat mixes categories that may not run together | re-split the heat's categories (see age rules above) |
 | `Hurdle heat X has N athletes but only K usable lanes` | hurdle merge exceeds lane capacity after gutter lanes | split the heat or drop a setup |
@@ -176,12 +191,25 @@ Then:
    race (e.g. their 400m) may run out of order — typically first, on a clear track
    before the hurdles are set up — so the youngest finish early. `from-events` allows
    this with a warning. It pushes the hurdle block back by the hurdle setup time
-   (~10 min), which is usually worth it for the kids.
+   (~10 min), which is usually worth it for the kids. When you use this exception,
+   put the same group's **sprint last in its distance block** so they get a real
+   break between their two races: opening the meet with the Rekrutt 400m and then
+   running their 60m first as well leaves them no recovery. The resulting
+   "younger after older" age-ordering warning is expected, not a mistake.
 3. **Space track heats only where needed.** Compress the track timeline, but leave a
    >=5 min gap between two consecutive track heats when the **start position changes**
-   (a different race distance — one starter team must walk to the new start) or when
-   **both heats use hurdles** (time to reconfigure the hurdles). Consecutive
-   same-distance flat heats can run back-to-back. The same reconfiguration logic
+   (a different race distance — the starter team and the wind gauge must both move to
+   the new start) or when **both heats use hurdles** (time to reconfigure the hurdles).
+   Consecutive same-distance flat heats can run back-to-back. Two refinements:
+   - **Entering the hurdle block costs more than moving within it.** The first hurdle
+     race of the meet needs the hurdles carried out and set from scratch, so give it
+     **~10 min** rather than 5.
+   - **A hurdle race does not block a following middle-distance race.** The hurdles
+     stand in the outer lanes (e.g. 5-6) and a 600m/800m runs the inside, so 200m hekk
+     into 600m needs **no gap at all**. `layout_report.py` does not know this and will
+     flag the 0-minute gap; that warning is safe to ignore for a hurdles →
+     middle-distance transition.
+   The same reconfiguration logic
    applies on the **field**: leave >=5 min whenever the event **type changes** at a
    venue or within a `--shared` personnel bucket (Liten ball -> Spyd, Spyd -> Slegge,
    Slegge -> Diskos), because implements and the runway/circle must be reset and the
@@ -206,6 +234,13 @@ Then:
 6. **Compact.** The report prints idle gaps per venue and concurrency. Pull rows
    earlier into gaps when it introduces no conflict. Target: high concurrency (4-6
    venues active), small makespan, while respecting the track spacing above.
+   **The track is the exception: do not over-compress it.** Spreading races out
+   costs little (the track is rarely the makespan driver) and buys athlete recovery,
+   so prefer a roomy track timeline over a tight one.
+7. **Finish the track early when the crew must rig down.** Hurdles, the wind gauge
+   and the start equipment all have to come in, and that cannot start while races are
+   running. Ask for a target time and treat it as a deadline: a track that ends 30 min
+   before the last throw lets the crew strike the straight while the field finishes.
 
 Times are on a 5-minute grid relative to the earliest event. Move rows by whole
 5-minute steps. Set `end_time = start_time +` the group's real running time (it grows
@@ -224,6 +259,10 @@ Optimise only after the schedule is valid and reasonably tight, in this order
    shorter gap only warns). Maximise the smallest such gap across athletes; do not
    spend makespan you do not have beyond meeting these floors.
 
+   **15 min is not enough for a sprint/hurdles double.** An athlete doubling 80m hekk
+   into 100m, or any two maximal sprints, wants **>= 20 min**. The track is cheap to
+   stretch (heuristic 6), so give it to them even though the tool stays quiet at 15.
+
 ### Compaction
 
 The makespan is set by the single busiest timeline. To compress it:
@@ -231,6 +270,11 @@ The makespan is set by the single busiest timeline. To compress it:
 - **Find the bottleneck.** Read `layout_report.py`'s per-venue table: the venue with
   the largest `span` (and any `idle gaps`) is what to attack. Pull its rows earlier to
   close leading/idle gaps; moving other venues rarely helps.
+- **Do not assume a small group is quick.** The per-attempt clock slows as a
+  field shrinks (a lone high jumper gets 3 min per attempt, a lone thrower 2),
+  so a solo row can need *more* time than a pair. `EventGroup.duration_minutes`
+  already accounts for this; read the slot it reports rather than scaling by
+  athlete count.
 - **Size each row correctly.** Run `layout_report.py --xlsx` and read **GROUP SIZING**:
   it prints the athlete count and the scheduler's slot duration per row. Set each
   `end_time` to `start + slot`; a `window < needs` flag means the row is too short and
@@ -249,6 +293,19 @@ The makespan is set by the single busiest timeline. To compress it:
   their venues, so merging within a type there is the main lever; you cannot parallelise
   two types in the same bucket. Order the stream to minimise type changes (each costs a
   >=5 min reconfig gap).
+- **Order a shared bucket by venue, then break the tie for the track.** Types sharing a
+  physical venue (Slegge+Diskos in the cage, Spyd+Liten ball in the javelin area) should
+  sit next to each other so the crew does not walk back and forth. Then check what the
+  order does to athletes who also race: a thrower who runs a track event is blocked
+  until their throw is done, so pulling their event earlier in the bucket can pull the
+  whole track finish earlier. When the two goals conflict, say what each costs rather
+  than silently picking one.
+- **A saturated bucket dictates when track heats can run.** When a shared bucket runs
+  back-to-back from the first slot to the last, an athlete in it is free only while the
+  events they are *not* in are running. A merged heat needs a window where *every*
+  member is free, so it can only sit inside the one or two bucket events that involve
+  none of them. Find that window first and build the track around it; merging more
+  categories into a heat shrinks it.
 
 ## Validation strategy
 
@@ -282,6 +339,7 @@ validation-time only, so pass them to `from-events` on every run.
 | `--date DD.MM.YYYY` | yes | yes | filter a multi-day meet to one day |
 | `--shared a,b,c` (repeatable) | no | yes | event types sharing officials/equipment; cannot run in parallel |
 | `--sticky / --no-sticky` | no | yes | force each event type into a contiguous block per venue (default on) |
+| `--no-field-recovery` | yes | yes | let an athlete's consecutive **field** events run back-to-back (one throws/jumps team; the athlete only walks between venues). Track pairs and overlaps are unaffected. Off by default. |
 
 Gender is **not** a constraint: `from-events` never checks it, so a heat may mix boys and
 girls. The seed merges genders in track heats by default (splitting only where that would

@@ -1,3 +1,4 @@
+import math
 from dataclasses import dataclass
 from enum import Enum
 
@@ -324,11 +325,27 @@ HURDLE_SPECS: dict[tuple[EventType, Category], HurdleSpec] = {
     (EventType.m100_hurdles, Category.j17): HurdleSpec(10, 13, 8.5, 76.2),
     (EventType.m100_hurdles, Category.j18_19): HurdleSpec(10, 13, 8.5, 84),
     (EventType.m100_hurdles, Category.ks): HurdleSpec(10, 13, 8.5, 84),
-    # 200m hurdles. The setup differs by gender (per the Valhall hurdle plan):
-    # women (J/K) run 16m to first, 19m between (rødt kvadrat marker); boys/men
-    # (G/M) run 18.29m/18.29m (gult kvadrat). Only KS (senior women) is
-    # registered for this meet, so it uses the women's 16/19 setup.
+    # 200m hurdles. Two age bands per gender (11-13 and 14-Senior), and the
+    # setup differs by gender: girls/women run 16m to first, 19m between (rødt
+    # kvadrat marker); boys/men run 18.29m/18.29m (gult kvadrat).
+    (EventType.m200_hurdles, Category.j11): HurdleSpec(10, 16, 19, 68),
+    (EventType.m200_hurdles, Category.j12): HurdleSpec(10, 16, 19, 68),
+    (EventType.m200_hurdles, Category.j13): HurdleSpec(10, 16, 19, 68),
+    (EventType.m200_hurdles, Category.j14): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j15): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j16): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j17): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.j18_19): HurdleSpec(10, 16, 19, 76.2),
     (EventType.m200_hurdles, Category.ks): HurdleSpec(10, 16, 19, 76.2),
+    (EventType.m200_hurdles, Category.g11): HurdleSpec(10, 18.29, 18.29, 68),
+    (EventType.m200_hurdles, Category.g12): HurdleSpec(10, 18.29, 18.29, 68),
+    (EventType.m200_hurdles, Category.g13): HurdleSpec(10, 18.29, 18.29, 68),
+    (EventType.m200_hurdles, Category.g14): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g15): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g16): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g17): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.g18_19): HurdleSpec(10, 18.29, 18.29, 76.2),
+    (EventType.m200_hurdles, Category.ms): HurdleSpec(10, 18.29, 18.29, 76.2),
 }
 
 
@@ -612,6 +629,7 @@ class Event:
     duration_minutes: int
     personnel_required: int
     priority_weight: int  # higher = schedule earlier
+    participants: int = 0  # entries in this category, for group-size timing
 
 
 @dataclass
@@ -624,20 +642,38 @@ class EventGroup:
     def duration_minutes(self) -> int:
         """Calculate duration for the event group.
 
-        For track events: Use maximum duration (events run simultaneously)
-        For field events: Sum durations (events run sequentially with shared equipment)
+        Track events run simultaneously, so the group takes the longest heat.
+
+        Field events run sequentially through the group's attempts, and the
+        per-attempt clock depends on how many athletes are in the competition
+        (see ``attempt_minutes``) — a small group is slower per attempt, so its
+        window does not shrink linearly with the entry count.
         """
         if not self.events:
             return 0
 
-        # Check if this is a track event
         venue = EventVenueMapping.get(self.event_type)
         if venue == Venue.TRACK:
             # Track events run simultaneously, so use the maximum duration
             return max(event.duration_minutes for event in self.events)
-        else:
-            # Field events share equipment, so sum the durations
+
+        group_size = sum(event.participants for event in self.events)
+        if group_size == 0:
+            # No entry counts recorded; fall back to the precomputed durations.
             return sum(event.duration_minutes for event in self.events)
+
+        rate = attempt_minutes(self.event_type, group_size)
+        if self.event_type in VERTICAL_FIELD_EVENTS:
+            # For vertical jumps EventDuration is attempts per athlete (equal to
+            # minutes at the base one-minute rate).
+            attempts = EventDuration[self.event_type] * group_size
+            return math.ceil(attempts * rate) + VERTICAL_SETUP_MINUTES
+
+        attempts = sum(
+            field_attempts(event.age_category) * event.participants
+            for event in self.events
+        )
+        return math.ceil(attempts * rate * MINUTES_PER_ATTEMPT)
 
 
 @dataclass
@@ -685,6 +721,41 @@ HORIZONTAL_FIELD_EVENTS: set[EventType] = {
 }
 
 MINUTES_PER_ATTEMPT = 1
+
+# One-off setup (bar, stands, starting height) per vertical jump group.
+VERTICAL_SETUP_MINUTES = 5
+
+VERTICAL_FIELD_EVENTS: set[EventType] = {
+    EventType.hj,
+    EventType.hj_standing,
+    EventType.pv,
+}
+
+
+def attempt_minutes(event_type: EventType, group_size: int) -> float:
+    """Minutes allowed per attempt, given how many athletes are in the group.
+
+    Per the competition rules a shrinking field gets *more* time per attempt,
+    not less: a lone high jumper is entitled to 3 minutes between attempts
+    (5 in pole vault), and a lone thrower takes consecutive attempts at 2
+    minutes. So a solo group needs the longest window, not the shortest.
+
+    ponytail: keyed on the group's starting size, so a large group that dwindles
+    to one athlete late in the competition is budgeted a little short. Upgrade
+    path is to model the elimination curve round by round.
+    """
+    if group_size <= 1:
+        if event_type is EventType.pv:
+            return 5.0
+        if event_type in VERTICAL_FIELD_EVENTS:
+            return 3.0
+        return 2.0
+    if group_size <= 3:
+        if event_type is EventType.pv:
+            return 2.0
+        if event_type in VERTICAL_FIELD_EVENTS:
+            return 1.5
+    return 1.0
 
 
 def field_attempts(category: Category) -> int:
