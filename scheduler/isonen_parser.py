@@ -355,6 +355,7 @@ def parse_isonen_xlsx(
     # Update event durations based on participant counts
     for event_id, event in events.items():
         participant_count = event_participant_counts.get(event_id, 1)
+        event.participants = participant_count
         event.duration_minutes = _calculate_event_duration(
             event.event_type, event.age_category, participant_count
         )

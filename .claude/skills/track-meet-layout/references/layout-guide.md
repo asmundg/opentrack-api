@@ -231,6 +231,11 @@ The makespan is set by the single busiest timeline. To compress it:
 - **Find the bottleneck.** Read `layout_report.py`'s per-venue table: the venue with
   the largest `span` (and any `idle gaps`) is what to attack. Pull its rows earlier to
   close leading/idle gaps; moving other venues rarely helps.
+- **Do not assume a small group is quick.** The per-attempt clock slows as a
+  field shrinks (a lone high jumper gets 3 min per attempt, a lone thrower 2),
+  so a solo row can need *more* time than a pair. `EventGroup.duration_minutes`
+  already accounts for this; read the slot it reports rather than scaling by
+  athlete count.
 - **Size each row correctly.** Run `layout_report.py --xlsx` and read **GROUP SIZING**:
   it prints the athlete count and the scheduler's slot duration per row. Set each
   `end_time` to `start + slot`; a `window < needs` flag means the row is too short and

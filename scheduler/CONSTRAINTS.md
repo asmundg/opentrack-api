@@ -131,6 +131,23 @@ unless the meet is actually run that way.
 
 Field events from similar age groups can be merged into a single event group that runs sequentially sharing equipment.
 
+### Event duration and the per-attempt clock
+
+A field group's window is `attempts × minutes-per-attempt`, and the per-attempt
+clock depends on how many athletes are in the competition. A shrinking field is
+entitled to **more** time per attempt, so halving the entries does not halve the
+window:
+
+| Athletes | High jump | Pole vault | Throws, LJ, TJ |
+| --- | --- | --- | --- |
+| 4+ | 1 min | 1 min | 1 min |
+| 2-3 | 1.5 min | 2 min | 1 min |
+| 1 | 3 min | 5 min | 2 min (consecutive attempts) |
+
+A lone high jumper therefore needs ~23 minutes, not the ~11 a flat per-athlete
+rate would suggest. `EventGroup.duration_minutes` applies this, keyed on the
+group's starting size; `attempt_minutes()` in `models.py` holds the table.
+
 ### Why Merge?
 - **Rest between attempts**: With 4-8 athletes, each person gets ~3-5 minutes between their attempts
 - **Avoid rapid-fire**: A solo athlete would have attempts back-to-back with no recovery
