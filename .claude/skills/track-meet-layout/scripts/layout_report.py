@@ -222,6 +222,12 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
             except ValueError:
                 continue
 
+    field_rows = {
+        r.event_group_id
+        for r in rows
+        if EventVenueMapping.get(r.event_type) is not Venue.TRACK
+    }
+
     for ath in athletes:
         age_order = max(
             (get_category_age_order(e.age_category) for e in ath.events), default=0
@@ -242,6 +248,8 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
                     f"({b[0]//60:02d}:{b[0]%60:02d}-{b[1]//60:02d}:{b[1]%60:02d})")
                 continue
             gap = b[0] - a[1]
+            if args.no_field_recovery and a[2] in field_rows and b[2] in field_rows:
+                continue
             if age_order >= 13 and gap < 10:
                 recovery.append(
                     f"FAIL {ath.name}: only {gap}m between {a[2]} and {b[2]} "
@@ -261,6 +269,9 @@ def main() -> None:
                     help="Report idle gaps >= this many minutes (default 5)")
     ap.add_argument("--xlsx", type=Path, default=None,
                     help="Participant XLSX; enables full athlete-conflict listing")
+    ap.add_argument("--no-field-recovery", action="store_true",
+                    help="Allow an athlete's consecutive field events to run "
+                         "back-to-back (matches from-events --no-field-recovery)")
     ap.add_argument("--arena", default="generic")
     ap.add_argument("--date", default=None)
     ap.add_argument("--shared", action="append", default=[],

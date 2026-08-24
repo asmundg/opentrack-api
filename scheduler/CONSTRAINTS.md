@@ -121,6 +121,12 @@ The gap is measured between one event's `end_time` and the next event's `start_t
 for the same athlete. Younger than 13 has no recovery requirement (the overlap check
 still applies to everyone).
 
+`--no-field-recovery` waives the floor for **field-to-field** pairs only, for meets
+where the throws and jumps queue on one officials team and the athlete just walks
+between venues instead of recovering from an effort. Recovery still applies whenever
+a track event is on either side of the gap, and overlaps still fail. Leave it off
+unless the meet is actually run that way.
+
 ## Field Event Merging
 
 Field events from similar age groups can be merged into a single event group that runs sequentially sharing equipment.

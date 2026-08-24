@@ -151,7 +151,7 @@ violation, so fix one and re-run. Track age-ordering and oversized field groups 
 | `Venue conflict at <venue>: A overlaps with B` | two rows share a venue/`--shared` bucket and overlap | move one later, or serialise the shared types |
 | `Venue stickiness violated at <venue>: ...` | a type is interleaved at a venue (`--sticky`) | make each type a contiguous block per venue |
 | `Athlete conflict for <name>: A overlaps with B` | someone is in two overlapping rows | move A or B, or re-merge so they share a row |
-| `Too little recovery time for <name>: only N min ...` | a 13+ athlete has < 10 min between two of their events | widen the gap to >= 10 min (>= 15 for 15+ to avoid the soft warning) |
+| `Too little recovery time for <name>: only N min ...` | a 13+ athlete has < 10 min between two of their events | widen the gap to >= 10 min (>= 15 for 15+ to avoid the soft warning); if both events are field events and the meet runs them on one team, `--no-field-recovery` waives it |
 | `Track event ordering violation: ...` | track distances out of order (and not the Rekrutt round-race exception) | reorder track times into distance order |
 | `Age merge violation in X: ...` | a track heat mixes categories that may not run together | re-split the heat's categories (see age rules above) |
 | `Hurdle heat X has N athletes but only K usable lanes` | hurdle merge exceeds lane capacity after gutter lanes | split the heat or drop a setup |
@@ -282,6 +282,7 @@ validation-time only, so pass them to `from-events` on every run.
 | `--date DD.MM.YYYY` | yes | yes | filter a multi-day meet to one day |
 | `--shared a,b,c` (repeatable) | no | yes | event types sharing officials/equipment; cannot run in parallel |
 | `--sticky / --no-sticky` | no | yes | force each event type into a contiguous block per venue (default on) |
+| `--no-field-recovery` | yes | yes | let an athlete's consecutive **field** events run back-to-back (one throws/jumps team; the athlete only walks between venues). Track pairs and overlaps are unaffected. Off by default. |
 
 Gender is **not** a constraint: `from-events` never checks it, so a heat may mix boys and
 girls. The seed merges genders in track heats by default (splitting only where that would

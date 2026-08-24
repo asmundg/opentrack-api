@@ -212,6 +212,15 @@ def schedule_from_events(
                  "checks stay hard.",
         ),
     ] = False,
+    no_field_recovery: Annotated[
+        bool,
+        typer.Option(
+            "--no-field-recovery",
+            help="Let an athlete's consecutive field events run back-to-back. "
+                 "Use when throws/jumps queue on one officials team and the "
+                 "athlete only walks between venues. Overlaps still fail.",
+        ),
+    ] = False,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -282,6 +291,7 @@ def schedule_from_events(
             athletes,
             slot_duration_minutes=5,
             allow_athlete_conflicts=allow_conflicts,
+            waive_field_recovery=no_field_recovery,
         )
     except ConstraintViolation as e:
         typer.echo(f"\n❌ Constraint violation detected:", err=True)
