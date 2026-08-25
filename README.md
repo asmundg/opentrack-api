@@ -115,7 +115,7 @@ Seed start lists and draw track lanes by seed time. Run it after `schedule`
 `update-pbs` (the draw sorts on seeding performances).
 
 ```bash
-opentrack admin seed <opentrack-url> \
+opentrack admin seed <opentrack-url> schedule_events.csv \
     --track-lanes <schedule>_track_lanes.csv
 ```
 
@@ -125,6 +125,11 @@ between each distinct (distance, height) pair, and a sprint heat mixing block
 starters with standing ones needs one between the age bands. Both come from the
 scheduler's plan, so the start lists match what the crew rigs. Seeding still
 decides who gets which lane inside a band.
+
+The event CSV is optional but worth passing: seeding rebuilds the heats, so
+`seed` re-asserts the merged track names as its final step. A merged heat that
+keeps its primary's single-category name misnames every athlete merged into it,
+e.g. "J12 60 meter" for a heat G13 and G14 also run in.
 
 ```bash
 opentrack admin set-implements <opentrack-url> schedule.csv

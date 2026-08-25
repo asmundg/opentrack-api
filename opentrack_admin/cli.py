@@ -300,6 +300,7 @@ def schedule(
 @app.command()
 def seed(
     competition_url: Annotated[str, typer.Argument(help="URL of the competition")],
+    file: Annotated[Optional[Path], typer.Argument(help="schedule_events.csv; re-asserts merged track names after the draw")] = None,
     track: Annotated[bool, typer.Option("--track/--no-track", help="Seed track start lists")] = True,
     field: Annotated[bool, typer.Option("--field/--no-field", help="Seed field start lists")] = True,
     lanes: Annotated[bool, typer.Option("--lanes/--no-lanes", help="Draw track lanes by seed time")] = True,
@@ -311,6 +312,10 @@ def seed(
     Run this after `schedule`: merging track heats rebuilds them from the
     combined categories, which discards any start list seeded beforehand. Run
     `update-pbs` first so the lane draw has seeding performances to sort on.
+
+    Pass the event CSV to re-assert merged track names as the final step, so a
+    heat cannot go to print calling itself "J12 60 meter" while G13 and G14 run
+    in it.
     """
     setup_logging(verbose=verbose)
 
@@ -328,6 +333,11 @@ def seed(
         print(f"❌ File not found: {track_lanes}")
         raise typer.Exit(1)
     lane_plan = sync.parse_track_lane_csv(track_lanes) if track_lanes else None
+
+    if file and not file.exists():
+        print(f"❌ File not found: {file}")
+        raise typer.Exit(1)
+    merge_groups = parse_event_merge_groups(file) if file else []
 
     wanted = ", ".join(n for n, on in (("track", track), ("field", field)) if on)
     print(f"🎲 Seeding {wanted} start lists for: {competition_url}")
@@ -347,7 +357,8 @@ def seed(
             print(f"❌ Error: {e}")
             raise typer.Exit(1)
 
-    if not track or not lanes:
+    drawing = track and lanes
+    if not drawing and not merge_groups:
         return
 
     try:
@@ -359,11 +370,22 @@ def seed(
         print(f"❌ {e}")
         raise typer.Exit(1)
 
-    drawn, lane_errors = sync.draw_lanes(api, comp_id, lane_plan)
-    print(f"✅ Drew lanes by seed time for {drawn} heat(s)")
+    lane_errors: list[tuple[str, str]] = []
+    if drawing:
+        drawn, lane_errors = sync.draw_lanes(api, comp_id, lane_plan)
+        print(f"✅ Drew lanes by seed time for {drawn} heat(s)")
+
+    # Re-seeding rebuilds the heats, so re-assert the combined names last:
+    # a merged heat still carrying its primary's single-category name misnames
+    # every athlete merged into it on the start list.
+    if merge_groups:
+        named, name_errors = sync.set_merged_names(api, comp_id, merge_groups)
+        print(f"✅ Re-asserted {named} merged track name(s)")
+        lane_errors += name_errors
+
     if lane_errors:
         print()
-        print(f"⚠️  {len(lane_errors)} heat(s) could not be drawn:")
+        print(f"⚠️  {len(lane_errors)} problem(s):")
         for label, error in lane_errors:
             print(f"   - {label}: {error}")
         raise typer.Exit(1)
