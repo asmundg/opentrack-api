@@ -140,6 +140,18 @@ event (SP, DT, JT, HT) in the schedule. Run `update-pbs` first so athletes
 are seeded into pools; otherwise the weight editor is empty and the command
 will fail. This step runs through the browser.
 
+**Run it after `seed`, not before.** Seeding rebuilds every pool, which clears
+the weights, and they are browser-only so nothing can read them back to warn
+you — the field cards just print an empty Vekt column. `seed` says so when the
+meet has throwing events. Re-running needs `--no-checkpoint`, since the
+checkpoint still believes the earlier run finished.
+
+### Order
+
+```
+create → import-athletes → schedule → update-pbs → seed → set-implements → reports
+```
+
 ### Reports
 
 ```bash

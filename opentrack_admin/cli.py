@@ -12,7 +12,7 @@ from .api import OpenTrackAPI
 from .browser import OpenTrackSession
 from .competition import CompetitionCreator, CompetitionDetails
 from .config import OpenTrackConfig
-from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_file, parse_event_schedule_csv, parse_event_merge_groups, Checkpoint
+from .events import EventSchedule, EventScheduler, parse_schedule_csv, parse_schedule_file, parse_event_schedule_csv, parse_event_merge_groups, Checkpoint, THROWING_EVENTS
 from . import sync
 from pblookup import PBLookupService
 
@@ -389,6 +389,30 @@ def seed(
         for label, error in lane_errors:
             print(f"   - {label}: {error}")
         raise typer.Exit(1)
+
+    _warn_implements_cleared(api, comp_id, competition_url)
+
+
+def _warn_implements_cleared(api, comp_id: str, competition_url: str) -> None:
+    """Warn that seeding wiped the per-athlete implement weights.
+
+    Seeding rebuilds each pool, which clears the weights `set-implements` typed
+    in. They are browser-only, so nothing here can read them back to check —
+    the only safe assumption after a seed is that they are gone.
+    """
+    throws = sorted(
+        {
+            str(e["event_code"])
+            for e in api.get_events(comp_id)
+            if str(e["event_code"]) in THROWING_EVENTS
+        }
+    )
+    if not throws:
+        return
+    print()
+    print(f"⚠️  Seeding cleared the implement weights for {', '.join(throws)}.")
+    print("   Re-run set-implements before generating field cards:")
+    print(f"   opentrack admin set-implements {competition_url} <schedule_events.csv> --no-checkpoint")
 
 
 @app.command("update-pbs")
