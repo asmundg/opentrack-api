@@ -280,6 +280,33 @@ def is_hurdles_event(event_type: EventType) -> bool:
     return event_type in HURDLES_EVENTS
 
 
+# Athletes crouch-start from blocks from this age; younger ones start standing.
+BLOCKS_MIN_AGE = 13
+
+# Races started from blocks: everything up to 400m. From 600m the whole field
+# starts standing, so the age bands need no separating.
+BLOCK_START_EVENTS: frozenset[EventType] = SPRINT_EVENTS | {
+    EventType.m150,
+    EventType.m200,
+    EventType.m200_hurdles,
+    EventType.m300,
+    EventType.m400,
+}
+
+
+def uses_starting_blocks(event_type: EventType, category: Category) -> bool:
+    """Whether this category starts the race from blocks.
+
+    A heat mixing block and standing starters needs an empty lane between the
+    two: the blocks sit behind the line and the crew has to reach them, so a
+    standing starter alongside is in the way.
+    """
+    return (
+        event_type in BLOCK_START_EVENTS
+        and get_category_age_order(category) >= BLOCKS_MIN_AGE
+    )
+
+
 @dataclass(frozen=True)
 class HurdleSpec:
     num_hurdles: int

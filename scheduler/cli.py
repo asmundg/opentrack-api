@@ -15,7 +15,7 @@ from . import models
 from .event_csv import import_event_overview_csv
 from .constraint_validator import validate_event_schedule, ConstraintViolation
 from .schedule_builder import build_scheduling_result_from_events
-from .hurdle_plan_generator import generate_hurdle_plan_html, hurdle_lane_assignments
+from .lane_plan import generate_hurdle_plan_html, track_lane_assignments
 
 app = typer.Typer(
     name="scheduler",
@@ -340,18 +340,16 @@ def schedule_from_events(
         hurdle_output.write_text(hurdle_html)
         typer.echo(f"Hurdle plan saved to: {hurdle_output.absolute()}")
 
-        # The same lanes as machine-readable input for `opentrack admin seed`,
-        # so the start lists match the setup the crew rigs.
-        lanes_output = output.parent / f"{output.stem}_hurdle_lanes.csv"
+    # Lanes that the start lists must respect (hurdle setups, block starts), as
+    # machine-readable input for `opentrack admin seed --track-lanes`.
+    lane_rows = track_lane_assignments(result, earliest_time.hour, earliest_time.minute)
+    if lane_rows:
+        lanes_output = output.parent / f"{output.stem}_track_lanes.csv"
         with lanes_output.open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["event_type", "category", "lane"])
-            writer.writerows(
-                hurdle_lane_assignments(
-                    result, earliest_time.hour, earliest_time.minute
-                )
-            )
-        typer.echo(f"Hurdle lane draw saved to: {lanes_output.absolute()}")
+            writer.writerow(["event_type", "categories", "lane"])
+            writer.writerows(lane_rows)
+        typer.echo(f"Track lane draw saved to: {lanes_output.absolute()}")
 
 
 if __name__ == "__main__":

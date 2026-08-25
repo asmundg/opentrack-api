@@ -27,7 +27,6 @@ from .events import (
     fold_masters_to_senior,
     get_category_age,
     is_horizontal_field_event,
-    is_hurdles_event,
     is_track_event,
     lookup_athlete_pb_sb,
     normalize_category,
@@ -285,13 +284,13 @@ def lane_preference(lanes: int, staggered: bool = False) -> list[int]:
     return sorted(range(1, lanes + 1), key=lambda lane: (abs(2 * lane - lanes - 1), lane))
 
 
-def parse_hurdle_lane_csv(path: Path) -> dict[tuple[str, str], list[int]]:
-    """Parse a ``*_hurdle_lanes.csv`` from `scheduler from-events`.
+def parse_track_lane_csv(path: Path) -> dict[tuple[str, str], list[int]]:
+    """Parse a ``*_track_lanes.csv`` from `scheduler from-events`.
 
-    Returns ``{(api_event_code, category): [lanes]}``. A hurdle heat mixing
-    setups needs an empty gutter lane between each distinct (distance, height)
-    pair, which the seeding order knows nothing about, so the lanes are taken
-    from the same plan the setup crew rigs from.
+    Returns ``{(api_event_code, categories): [lanes]}``, where ``categories`` is
+    one band — athletes sharing the same hurdle setup and start type. Lanes
+    within a band are interchangeable; the empty lanes between bands are what
+    the plan is protecting, and seeding order knows nothing about them.
     """
     lanes: dict[tuple[str, str], list[int]] = {}
     with path.open(encoding="utf-8") as f:
@@ -299,17 +298,17 @@ def parse_hurdle_lane_csv(path: Path) -> dict[tuple[str, str], list[int]]:
             code = _to_api_event_code(
                 event_code_from_scheduler_name(row["event_type"].strip())
             )
-            category = normalize_category(row["category"].strip())
-            lanes.setdefault((code, category), []).append(int(row["lane"]))
-    for assigned in lanes.values():
-        assigned.sort()
+            band = ",".join(
+                sorted(normalize_category(c.strip()) for c in row["categories"].split(","))
+            )
+            lanes.setdefault((code, band), []).append(int(row["lane"]))
     return lanes
 
 
 def draw_lanes(
     api: OpenTrackAPI,
     comp_id: str,
-    hurdle_lanes: dict[tuple[str, str], list[int]] | None = None,
+    track_lanes: dict[tuple[str, str], list[int]] | None = None,
 ) -> tuple[int, list[tuple[str, str]]]:
     """Assign track lanes by seeding performance.
 
@@ -319,15 +318,15 @@ def draw_lanes(
     ``update_pbs`` populated (athletes without one go to the least favoured
     lanes), and write the lanes back. See :func:`lane_preference` for the order.
 
-    ``hurdle_lanes`` (from :func:`parse_hurdle_lane_csv`) overrides the draw for
-    hurdle heats, where lanes are dictated by the hurdle setup rather than by
-    seeding. Within one category the fastest still gets the first lane.
+    ``track_lanes`` (from :func:`parse_track_lane_csv`) constrains the heats it
+    covers to the planned lanes, so hurdle setups and block starts keep their
+    gutter lanes. Seeding still decides who gets which lane within a band.
 
     Returns ``(units_updated, errors)`` where ``errors`` is ``(label, message)``.
     """
     updated = 0
     errors: list[tuple[str, str]] = []
-    categories = _competitor_categories(api, comp_id) if hurdle_lanes else {}
+    categories = _competitor_categories(api, comp_id) if track_lanes else {}
     for event in api.get_events(comp_id):
         code = str(event["event_code"])
         discipline = _discipline_from_api_code(code)
@@ -345,7 +344,7 @@ def draw_lanes(
                 if not results:
                     continue
 
-                planned = _planned_hurdle_lanes(hurdle_lanes, code, results, categories)
+                planned = _planned_lanes(track_lanes, code, results, categories, lanes)
                 if planned is not None:
                     ordered = planned
                 else:
@@ -389,35 +388,57 @@ def _competitor_categories(api: OpenTrackAPI, comp_id: str) -> dict[str, str]:
     }
 
 
-def _planned_hurdle_lanes(
-    hurdle_lanes: dict[tuple[str, str], list[int]] | None,
+def _planned_lanes(
+    track_lanes: dict[tuple[str, str], list[int]] | None,
     code: str,
     results: list[dict],
     categories: dict[str, str],
+    preference: list[int],
 ) -> list[dict] | None:
-    """Apply the hurdle plan's lanes to `results`, or None if it does not apply.
+    """Apply the planned lanes to `results`, or None if this heat has no plan.
 
     Raises when the plan and the start list disagree on who is in the heat:
-    falling back to a seeded draw would put athletes in lanes rigged for a
-    different hurdle height.
+    falling back to a seeded draw would drop the gutter lanes that keep hurdle
+    setups and block starts apart.
     """
-    if not hurdle_lanes or not is_hurdles_event(_discipline_from_api_code(code)):
+    if not track_lanes:
+        return None
+    bands = {
+        (event, category): band
+        for event, band in track_lanes
+        for category in band.split(",")
+    }
+    # Several heats share one event code, so the heat this plan applies to is the
+    # one whose athletes it names. A heat it says nothing about keeps the draw.
+    categories_present = {categories.get(str(r.get("bib")), "") for r in results}
+    if not any((code, category) in bands for category in categories_present):
         return None
 
-    by_category: dict[str, list[dict]] = {}
+    by_band: dict[str, list[dict]] = {}
     for row in results:
-        by_category.setdefault(categories.get(str(row.get("bib")), ""), []).append(row)
+        category = categories.get(str(row.get("bib")), "")
+        band = bands.get((code, category))
+        if band is None:
+            raise OpenTrackAPIError(
+                f"{category or 'an athlete'} is in the start list but not in the "
+                "lane plan — regenerate it with `scheduler from-events`"
+            )
+        by_band.setdefault(band, []).append(row)
 
     ordered: list[dict] = []
-    for category, rows in by_category.items():
-        planned = hurdle_lanes.get((code, category), [])
+    for band, rows in by_band.items():
+        planned = track_lanes[(code, band)]
         if len(planned) != len(rows):
             raise OpenTrackAPIError(
-                f"hurdle plan has {len(planned)} lane(s) for {category or '?'} but "
-                f"the start list has {len(rows)} athlete(s) — regenerate the plan "
-                "with `scheduler from-events`"
+                f"lane plan has {len(planned)} lane(s) for {band} but the start "
+                f"list has {len(rows)} athlete(s) — regenerate the plan with "
+                "`scheduler from-events`"
             )
-        for lane, row in zip(planned, _by_seed_time(rows)):
+        # Best lane in the band goes to the fastest.
+        by_preference = sorted(
+            planned, key=lambda l: preference.index(l) if l in preference else len(preference)
+        )
+        for lane, row in zip(by_preference, _by_seed_time(rows)):
             row["lane"] = lane
         ordered.extend(rows)
     return sorted(ordered, key=lambda r: r["lane"])

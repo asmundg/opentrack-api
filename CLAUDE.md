@@ -37,7 +37,7 @@ scheduler/
 ├── schedule_builder.py         # Event Overview CSV → SchedulingResult
 ├── constraint_validator.py     # Validate a manual/agent layout against the atoms
 ├── html_schedule_generator.py  # SchedulingResult → HTML grid
-├── hurdle_plan_generator.py    # SchedulingResult → hurdle setup plan HTML
+├── lane_plan.py                # Track lane bands + hurdle setup plan HTML
 │
 └── CONSTRAINTS.md              # Documentation of scheduling constraints
 ```
@@ -102,8 +102,12 @@ until every constraint passes.
 - Rowspan for multi-slot events
 - Visual category grouping
 
-**Hurdle plan** (`hurdle_plan_generator.py`):
+**Lane plan** (`lane_plan.py`):
 - Per-heat hurdle setup (distance, height, lane/gutter layout) for hurdle events
+- `*_track_lanes.csv`: lanes the start lists must respect, one row per occupied
+  lane naming its band. Bands are athletes sharing a hurdle setup and a start
+  type (blocks from 13); adjacent bands are separated by an empty gutter lane.
+  Consumed by `opentrack admin seed --track-lanes`.
 
 **Event Overview CSV** (`event_csv.py`):
 - One row per event group

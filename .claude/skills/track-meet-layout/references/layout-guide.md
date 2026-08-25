@@ -113,9 +113,10 @@ these as `AGE-MERGE WARNINGS`, and the seed already splits sprints at 12/13.
 
 **Override it to rescue a lone athlete.** A single entrant left alone in a heat is
 worse than a mixed-age heat, so merging her up (J12 into a G13-14 heat) is the
-right call. Leave **1-2 empty lanes** between the age bands when you do — that is
-a lane-draw instruction for the start list, not something the event CSV records,
-so say it out loud in the handover.
+right call. The empty lane between the age bands is handled for you: athletes
+start from blocks from 13, and `from-events` writes the resulting lane bands to
+`*_track_lanes.csv` for `opentrack admin seed --track-lanes`, which keeps a
+gutter lane between the block starters and the standing one.
 
 ### Choosing groups (merging heuristic)
 

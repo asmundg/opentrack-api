@@ -116,14 +116,15 @@ Seed start lists and draw track lanes by seed time. Run it after `schedule`
 
 ```bash
 opentrack admin seed <opentrack-url> \
-    --hurdle-lanes <schedule>_hurdle_lanes.csv
+    --track-lanes <schedule>_track_lanes.csv
 ```
 
-Pass `--hurdle-lanes` whenever the meet has hurdles. A heat mixing hurdle
-setups needs an empty gutter lane between each distinct (distance, height)
-pair, which seeding order knows nothing about, so those lanes come from the
-same plan `from-events` prints for the setup crew. Without it the draw can put
-two heights in adjacent lanes, which cannot be rigged.
+Pass `--track-lanes` whenever `from-events` writes that file. Some heats cannot
+be laned by seed time alone: a hurdle heat mixing setups needs an empty lane
+between each distinct (distance, height) pair, and a sprint heat mixing block
+starters with standing ones needs one between the age bands. Both come from the
+scheduler's plan, so the start lists match what the crew rigs. Seeding still
+decides who gets which lane inside a band.
 
 ```bash
 opentrack admin set-implements <opentrack-url> schedule.csv

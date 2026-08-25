@@ -1,11 +1,15 @@
-"""Hurdle setup plan generator.
+"""Track lane assignment, and the hurdle setup plan the crew rigs from.
 
-Generates an HTML document showing hurdle configurations per lane for each
-hurdle heat, for use by the hurdle setup crew.
+Lanes in a track heat are grouped into *bands* of athletes with identical lane
+requirements, and each band is separated from the next by one empty gutter lane.
+A band is a unique combination of:
 
-Supports heats that mix hurdle distances and heights. Each distinct (distance,
-height) setup is separated from the next by one empty gutter lane; the lane between
-two different distances is styled "SONE-SKILLE" and between two heights "LEDIG".
+* hurdle spacing — different spacing needs its own zone ("SONE-SKILLE")
+* hurdle height — a height change needs an empty lane to work in ("LEDIG")
+* start type — blocks vs standing (see `models.uses_starting_blocks`)
+
+Lanes within a band are interchangeable, so the start list seeds them by
+performance; the bands and their gutters are what this module fixes.
 """
 
 from dataclasses import dataclass
@@ -14,12 +18,32 @@ from . import models
 from .models import (
     Category,
     EventGroup,
+    TRACK_DISTANCE_ORDER,
     available_hurdle_lane_list,
     get_category_age_order,
     get_hurdle_spec,
     is_hurdles_event,
+    uses_starting_blocks,
 )
 from .types import SchedulingResult
+
+
+@dataclass(frozen=True)
+class _Band:
+    """The lane requirements shared by one contiguous run of lanes."""
+
+    distance_between_m: float | None
+    height_cm: float | None
+    blocks: bool
+
+
+def _band_order(band: _Band) -> tuple[float, float, bool]:
+    """Sort key placing standing starters before block starters."""
+    return (
+        band.distance_between_m if band.distance_between_m is not None else -1.0,
+        band.height_cm if band.height_cm is not None else -1.0,
+        band.blocks,
+    )
 
 
 @dataclass
@@ -107,25 +131,73 @@ def generate_hurdle_plan_html(
     return _render_html(heats)
 
 
-def hurdle_lane_assignments(
+def track_lane_assignments(
     result: SchedulingResult,
     start_hour: int,
     start_minute: int,
 ) -> list[tuple[str, str, int]]:
-    """Return the athlete lanes of the hurdle plan as (event_type, category, lane).
+    """Lanes to impose on the start lists, as (event_type, categories, lane).
 
-    One entry per occupied lane, so a category with three athletes yields three
-    lanes. Gutter and blocked lanes are omitted — they are exactly the lanes
-    absent from this list. This is the same assignment the printed plan shows,
-    exported so the OpenTrack start lists can be drawn to match it instead of
-    diverging from the crew's setup.
+    One row per occupied lane, with `categories` naming the whole band that lane
+    belongs to, so the start list can seed a band's lanes by performance while
+    keeping the bands apart. Gutter and blocked lanes are simply absent.
+
+    Emitted for hurdle heats (each lane carries specific equipment) and for any
+    other track heat split into more than one band; a single-band flat heat has
+    no lane requirements worth imposing, so the normal seeded draw is left alone.
     """
-    return [
-        (heat.event_group.event_type.value, lane.category.value, lane.lane)
-        for heat in _collect_hurdle_heats(result, start_hour, start_minute)
-        for lane in heat.lanes
-        if lane.category is not None
-    ]
+    counts = _athlete_counts(result)
+    rows: list[tuple[str, str, int]] = []
+    for eg in _track_groups(result):
+        lanes = _assign_lanes(eg, counts)
+        bands = _bands(eg, counts)
+        if not is_hurdles_event(eg.event_type) and len(set(bands.values())) < 2:
+            continue
+        for lane in lanes:
+            if lane.category is None:
+                continue
+            rows.append((eg.event_type.value, bands[lane.category], lane.lane))
+    return rows
+
+
+def _bands(eg: EventGroup, counts: dict[str, int]) -> dict[Category, str]:
+    """Map each category with athletes to its band's comma-joined categories."""
+    members: dict[_Band, list[Category]] = {}
+    for ev in eg.events:
+        if counts.get(ev.id, 0) <= 0:
+            continue
+        spec = get_hurdle_spec(eg.event_type, ev.age_category)
+        if is_hurdles_event(eg.event_type) and spec is None:
+            continue
+        band = _Band(
+            distance_between_m=spec.distance_between_m if spec else None,
+            height_cm=spec.height_cm if spec else None,
+            blocks=uses_starting_blocks(eg.event_type, ev.age_category),
+        )
+        members.setdefault(band, []).append(ev.age_category)
+    return {
+        category: ",".join(sorted(c.value for c in categories))
+        for categories in members.values()
+        for category in categories
+    }
+
+
+def _track_groups(result: SchedulingResult):
+    """Every track EventGroup in the schedule, in running order."""
+    for _, entries in sorted(result.schedule.items()):
+        for entry in entries:
+            if entry["is_start"] and entry["event"].event_type in TRACK_DISTANCE_ORDER:
+                yield entry["event"]
+
+
+def _athlete_counts(result: SchedulingResult) -> dict[str, int]:
+    """Number of athletes entered in each individual event."""
+    counts = {ev.id: 0 for eg in result.events for ev in eg.events}
+    for athlete in result.athletes:
+        for ev in athlete.events:
+            if ev.id in counts:
+                counts[ev.id] += 1
+    return counts
 
 
 def _collect_hurdle_heats(
@@ -134,15 +206,7 @@ def _collect_hurdle_heats(
     start_minute: int,
 ) -> list[_HurdleHeat]:
     """Walk the schedule and build heat info for each hurdle EventGroup."""
-    # Count athletes per individual event id
-    athlete_counts: dict[str, int] = {}
-    for eg in result.events:
-        for ev in eg.events:
-            athlete_counts[ev.id] = 0
-    for athlete in result.athletes:
-        for ev in athlete.events:
-            if ev.id in athlete_counts:
-                athlete_counts[ev.id] += 1
+    athlete_counts = _athlete_counts(result)
 
     heats: list[_HurdleHeat] = []
 
@@ -206,42 +270,33 @@ def _assign_lanes(
     eg: EventGroup,
     athlete_counts: dict[str, int],
 ) -> list[_LaneInfo]:
-    """Assign lanes for a hurdle heat.
-
-    Primary grouping: by distance_between_m (1 gutter lane between zones).
-    Secondary grouping: by height_cm within a distance zone (1 gutter lane).
+    """Assign lanes for a track heat, one gutter lane between adjacent bands.
 
     When blocked lanes exist, tries to position the layout so blocked lanes
     coincide with gutter positions (saving a usable lane).
     """
-    # Build (category, distance, height, count) for categories with athletes
-    cat_info: list[tuple[Category, float, float, int]] = []
+    hurdles = is_hurdles_event(eg.event_type)
+
+    # Build (category, band, count) for categories with athletes
+    cat_info: list[tuple[Category, _Band, int]] = []
     for ev in eg.events:
         spec = get_hurdle_spec(eg.event_type, ev.age_category)
-        if spec is None:
+        if hurdles and spec is None:
             continue
         count = athlete_counts.get(ev.id, 0)
-        if count > 0:
-            cat_info.append((ev.age_category, spec.distance_between_m, spec.height_cm, count))
+        if count <= 0:
+            continue
+        cat_info.append((
+            ev.age_category,
+            _Band(
+                distance_between_m=spec.distance_between_m if spec else None,
+                height_cm=spec.height_cm if spec else None,
+                blocks=uses_starting_blocks(eg.event_type, ev.age_category),
+            ),
+            count,
+        ))
 
-    # Sort by (distance, height, category) for stable grouping
-    cat_info.sort(key=lambda x: (x[1], x[2], x[0].value))
-
-    # Group into distance zones, then height zones within each
-    # Structure: list of distance zones, each containing list of height zones
-    distance_zones: list[list[list[tuple[Category, float, float, int]]]] = []
-    current_distance: float | None = None
-    current_height: float | None = None
-    for item in cat_info:
-        _, dist, height, _ = item
-        if current_distance is None or dist != current_distance:
-            distance_zones.append([])
-            current_distance = dist
-            current_height = None
-        if current_height is None or height != current_height:
-            distance_zones[-1].append([])
-            current_height = height
-        distance_zones[-1][-1].append(item)
+    cat_info.sort(key=lambda x: (_band_order(x[1]), x[0].value))
 
     # Build logical layout: flat sequence of slots to place on physical lanes
     _ATHLETE = "athlete"
@@ -249,29 +304,39 @@ def _assign_lanes(
     _DISTANCE_GUTTER = "distance_gutter"
 
     layout: list[tuple[str, Category | None, float | None, float | None]] = []
-    for dz_idx, dz_height_zones in enumerate(distance_zones):
-        if dz_idx > 0:
-            layout.append((_DISTANCE_GUTTER, None, None, None))
-        for hz_idx, hz in enumerate(dz_height_zones):
-            if hz_idx > 0:
-                layout.append((_HEIGHT_GUTTER, None, None, None))
-            for cat, dist, height, count in hz:
-                for _ in range(count):
-                    layout.append((_ATHLETE, cat, height, dist))
+    previous: _Band | None = None
+    for cat, band, count in cat_info:
+        if previous is not None and band != previous:
+            # Only a spacing change makes it a distance zone; a height or start
+            # change just needs the lane left free.
+            layout.append((
+                _DISTANCE_GUTTER
+                if band.distance_between_m != previous.distance_between_m
+                else _HEIGHT_GUTTER,
+                None, None, None,
+            ))
+        for _ in range(count):
+            layout.append((_ATHLETE, cat, band.height_cm, band.distance_between_m))
+        previous = band
 
     total_slots = len(layout)
     gutter_indices = {i for i, (kind, *_) in enumerate(layout) if kind != _ATHLETE}
-    categories = [cat for cat, _, _, _ in cat_info]
+    categories = [cat for cat, _, _ in cat_info]
 
     # Compute max lane number (age-limited, but including blocked lanes)
     max_lane = models.ARENA.total_lanes
-    for cat in categories:
-        age = get_category_age_order(cat)
-        for min_age, limit in models.ARENA.hurdle_lane_limits.items():
-            if age >= min_age:
-                max_lane = min(max_lane, limit)
+    if hurdles:
+        for cat in categories:
+            age = get_category_age_order(cat)
+            for min_age, limit in models.ARENA.hurdle_lane_limits.items():
+                if age >= min_age:
+                    max_lane = min(max_lane, limit)
 
-    blocked = {l for l in models.ARENA.unavailable_hurdle_lanes if 1 <= l <= max_lane}
+    blocked = (
+        {l for l in models.ARENA.unavailable_hurdle_lanes if 1 <= l <= max_lane}
+        if hurdles
+        else set()
+    )
 
     # Try contiguous placements: pick one where blocked lanes align with gutters
     best_start: int | None = None
@@ -322,7 +387,11 @@ def _assign_lanes(
         return lanes
 
     # Fallback: skip blocked lanes, center in available lanes
-    available = available_hurdle_lane_list(categories)
+    available = (
+        available_hurdle_lane_list(categories)
+        if hurdles
+        else list(range(1, models.ARENA.total_lanes + 1))
+    )
     offset = (len(available) - total_slots) // 2
 
     lanes = []
