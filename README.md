@@ -15,8 +15,9 @@ pointing them at a `test-*` URL uses the matching [test server](https://docs.ope
 # Install dependencies
 uv sync
 
-# Install Playwright browsers
-uv run playwright install chromium
+# Browser automation drives your installed Google Chrome (OpenTrack's
+# Cloudflare challenge rejects Playwright's bundled Chromium), using a
+# dedicated profile under ~/.opentrack-admin/chrome-profile.
 
 # Copy and configure environment
 cp .env.example .env
@@ -109,6 +110,27 @@ within 7 days of the competition finish date.
 opentrack admin update-pbs <opentrack-url>
 ```
 
+Seed start lists and draw track lanes by seed time. Run it after `schedule`
+(merging rebuilds heats and discards earlier start lists) and after
+`update-pbs` (the draw sorts on seeding performances).
+
+```bash
+opentrack admin seed <opentrack-url> schedule_events.csv \
+    --track-lanes <schedule>_track_lanes.csv
+```
+
+Pass `--track-lanes` whenever `from-events` writes that file. Some heats cannot
+be laned by seed time alone: a hurdle heat mixing setups needs an empty lane
+between each distinct (distance, height) pair, and a sprint heat mixing block
+starters with standing ones needs one between the age bands. Both come from the
+scheduler's plan, so the start lists match what the crew rigs. Seeding still
+decides who gets which lane inside a band.
+
+The event CSV is optional but worth passing: seeding rebuilds the heats, so
+`seed` re-asserts the merged track names as its final step. A merged heat that
+keeps its primary's single-category name misnames every athlete merged into it,
+e.g. "J12 60 meter" for a heat G13 and G14 also run in.
+
 ```bash
 opentrack admin set-implements <opentrack-url> schedule.csv
 ```
@@ -117,6 +139,18 @@ opentrack admin set-implements <opentrack-url> schedule.csv
 event (SP, DT, JT, HT) in the schedule. Run `update-pbs` first so athletes
 are seeded into pools; otherwise the weight editor is empty and the command
 will fail. This step runs through the browser.
+
+**Run it after `seed`, not before.** Seeding rebuilds every pool, which clears
+the weights, and they are browser-only so nothing can read them back to warn
+you — the field cards just print an empty Vekt column. `seed` says so when the
+meet has throwing events. Re-running needs `--no-checkpoint`, since the
+checkpoint still believes the earlier run finished.
+
+### Order
+
+```
+create → import-athletes → schedule → update-pbs → seed → set-implements → reports
+```
 
 ### Reports
 

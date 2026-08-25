@@ -10,7 +10,7 @@ from urllib.parse import urljoin, urlparse
 
 from openpyxl import load_workbook
 
-from .browser import OpenTrackSession, screenshot_on_error
+from .browser import OpenTrackSession, poll_until, screenshot_on_error
 
 logger = logging.getLogger(__name__)
 
@@ -487,11 +487,16 @@ class CompetitionCreator:
         page.locator("button[name=upload]").click()
         self._wait_for_background_task("upload")
 
-        # The post-upload DOM still shows the Process button, but its handler
-        # is not wired up until the page is reloaded with a fresh GET.
-        # page.reload() would resubmit the upload POST and 500, so navigate.
-        logger.debug("Refreshing custom import page to enable Process step")
-        page.goto(custom_url)
+        # Uploading queues a server-side task ("Scheduled an upload task,
+        # please check back shortly") with no in-page progress banner, so the
+        # stored file — and with it the Process button — only appears once the
+        # task has run. Reload until the server offers Process.
+        logger.info("Waiting for the uploaded file to be stored")
+        poll_until(
+            lambda: self._process_button_ready(custom_url),
+            timeout=240.0,
+            description="uploaded file to be accepted",
+        )
 
         # Step 2: Process - create competitor/event records
         # Accept the "Are you sure?" confirmation dialog
@@ -500,6 +505,12 @@ class CompetitionCreator:
         page.locator("button[name=process]").click(timeout=240_000)
         self._wait_for_background_task("process")
         logger.info("Athletes imported successfully")
+
+    def _process_button_ready(self, custom_url: str) -> bool:
+        """Reload the custom import page and report whether Process is live."""
+        page = self.page
+        page.goto(custom_url)
+        return not page.locator("button[name=process]").is_disabled()
 
     def prepare_athletes(self) -> None:
         """Number competitors and seed start lists after import."""
