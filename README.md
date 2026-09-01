@@ -131,6 +131,11 @@ The event CSV is optional but worth passing: seeding rebuilds the heats, so
 keeps its primary's single-category name misnames every athlete merged into it,
 e.g. "J12 60 meter" for a heat G13 and G14 also run in.
 
+The draw picks lanes by race type: sprints down the straight take the middle
+lanes outwards (4, 5, 3, 6, ...), bend races and relays keep the fastest off the
+tightest bends (5, 6, 7, ...), and distance races (600m, and 1500m up) start as
+a group at the kerb with everyone in lane 1. The 800m starts in lanes.
+
 ```bash
 opentrack admin set-implements <opentrack-url> schedule.csv
 ```
