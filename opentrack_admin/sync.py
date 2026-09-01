@@ -271,6 +271,21 @@ def is_staggered(discipline: str) -> bool:
     return bool(re.match(r"^\d+x\d+m$", discipline))
 
 
+def is_group_start(discipline: str) -> bool:
+    """Whether a race starts as a group at the kerb, so everyone runs lane 1.
+
+    Distance races are not run in lanes: the field starts together on the
+    waterfall line and cuts in immediately, so every athlete is recorded in
+    lane 1. Covers 600m and everything from 1500m up. The 800m is excluded —
+    it starts in lanes and breaks after the first bend.
+    """
+    m = re.match(r"^(\d+)m$", discipline)
+    if not m:
+        return False
+    distance = int(m.group(1))
+    return distance == 600 or distance >= 1500
+
+
 def lane_preference(lanes: int, staggered: bool = False) -> list[int]:
     """Lane numbers in seeding preference order, fastest athlete first.
 
@@ -334,6 +349,7 @@ def draw_lanes(
         if not is_track_event(discipline):
             continue
 
+        group_start = is_group_start(discipline)
         lanes = lane_preference(
             int(event.get("lanes") or 8), staggered=is_staggered(discipline)
         )
@@ -346,7 +362,13 @@ def draw_lanes(
                     continue
 
                 planned = _planned_lanes(track_lanes, code, results, categories, lanes)
-                if planned is not None:
+                if group_start:
+                    # A waterfall start has no lanes to run out of, so the
+                    # heat size is not capped by the track.
+                    ordered = _by_seed_time(results)
+                    for row in ordered:
+                        row["lane"] = 1
+                elif planned is not None:
                     ordered = planned
                 else:
                     if len(results) > len(lanes):
