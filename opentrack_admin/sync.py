@@ -42,16 +42,17 @@ STAGGERED_LANE_ORDER = [5, 6, 7, 3, 4, 8, 1, 2]
 def _to_api_event_code(schedule_code: str) -> str:
     """Map an admin discipline code to OpenTrack's API ``event_code``.
 
-    Distances carry an 'm' in the schedule ("400m") but are bare in the API
-    ("400"); hurdles ("60H") and field codes ("LJ") already match.
+    Distances carry an 'm' in the schedule ("400m", "4x60m") but are bare in
+    the API ("400", "4x60"); hurdles ("60H") and field codes ("LJ") already
+    match.
     """
-    m = re.match(r"^(\d+)m$", schedule_code)
+    m = re.match(r"^(\d+(?:x\d+)?)m$", schedule_code)
     return m.group(1) if m else schedule_code
 
 
 def _discipline_from_api_code(api_code: str) -> str:
     """Inverse of :func:`_to_api_event_code`: API ``event_code`` to admin code."""
-    return f"{api_code}m" if api_code.isdigit() else api_code
+    return f"{api_code}m" if re.match(r"^\d+(?:x\d+)?$", api_code) else api_code
 
 
 def set_merged_names(
