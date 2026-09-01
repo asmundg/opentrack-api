@@ -146,8 +146,7 @@ def test_athlete_recovery_under13_no_rule():
     validate_event_schedule(rows, [sp, lj], athletes)  # no raise
 
 
-def test_athlete_recovery_13_14_no_warn(capsys):
-    # 13-14: >=10 min passes with no warning (the <15 min warn is 15+ only).
+def test_athlete_recovery_13_14_no_warn(capsys):    # 13-14: >=10 min passes with no warning (the <15 min warn is 15+ only).
     sp = _atom(EventType.sp, Category.j14)
     lj = _atom(EventType.lj, Category.j14)
     athletes = [Athlete("A", [sp, lj])]
@@ -157,6 +156,47 @@ def test_athlete_recovery_13_14_no_warn(capsys):
     ]
     validate_event_schedule(rows, [sp, lj], athletes)
     assert "recovery" not in capsys.readouterr().out.lower()
+
+
+def test_waive_field_recovery_allows_back_to_back_field_events():
+    # Two field events in a row: the athlete walks between venues rather than
+    # recovering, so the floor is waivable.
+    sp = _atom(EventType.sp, Category.j13)
+    dt = _atom(EventType.dt, Category.j13)
+    athletes = [Athlete("A", [sp, dt])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j13], "17:00", "17:20"),
+        _row("dt", EventType.dt, [Category.j13], "17:20", "17:40"),  # 0 min gap
+    ]
+    with pytest.raises(ConstraintViolation, match="recovery time for A"):
+        validate_event_schedule(rows, [sp, dt], athletes)
+    validate_event_schedule(rows, [sp, dt], athletes, waive_field_recovery=True)
+
+
+def test_waive_field_recovery_still_enforces_track_pairs():
+    # The waiver is field-to-field only: a track leg still needs its recovery.
+    m60 = _atom(EventType.m60, Category.j13)
+    dt = _atom(EventType.dt, Category.j13)
+    athletes = [Athlete("A", [m60, dt])]
+    rows = [
+        _row("dt", EventType.dt, [Category.j13], "17:00", "17:20"),
+        _row("m60", EventType.m60, [Category.j13], "17:25", "17:30"),  # 5 min gap
+    ]
+    with pytest.raises(ConstraintViolation, match="recovery time for A"):
+        validate_event_schedule(rows, [m60, dt], athletes, waive_field_recovery=True)
+
+
+def test_waive_field_recovery_still_fails_overlap():
+    # Waiving recovery must not let an athlete be in two places at once.
+    sp = _atom(EventType.sp, Category.j13)
+    dt = _atom(EventType.dt, Category.j13)
+    athletes = [Athlete("A", [sp, dt])]
+    rows = [
+        _row("sp", EventType.sp, [Category.j13], "17:00", "17:20"),
+        _row("dt", EventType.dt, [Category.j13], "17:15", "17:35"),
+    ]
+    with pytest.raises(ConstraintViolation, match="Athlete conflict for A"):
+        validate_event_schedule(rows, [sp, dt], athletes, waive_field_recovery=True)
 
 
 def test_athlete_recovery_15plus_under_15min_warns(capsys):

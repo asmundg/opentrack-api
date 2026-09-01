@@ -6,7 +6,7 @@ from .isonen_parser import _calculate_event_duration
 from .models import Athlete, Category, Event, EventType, Venue
 
 
-def _event(category: Category, entries: int) -> Event:
+def _event(category: Category, participants: int) -> Event:
     return Event(
         id=f"relay_{category.value}",
         event_type=EventType.relay_4x60,
@@ -15,7 +15,7 @@ def _event(category: Category, entries: int) -> Event:
         duration_minutes=5,
         personnel_required=1,
         priority_weight=10,
-        entries=entries,
+        participants=participants,
     )
 
 
@@ -38,7 +38,7 @@ def test_relay_heat_is_one_slot_per_team_not_per_runner():
 
 
 def test_atom_counts_uses_teams_for_relays_and_athletes_otherwise():
-    relay = _event(Category.stafett_13_14, entries=2)
+    relay = _event(Category.stafett_13_14, participants=2)
     sprint = Event(
         id="60m_G11",
         event_type=EventType.m60,
@@ -47,7 +47,7 @@ def test_atom_counts_uses_teams_for_relays_and_athletes_otherwise():
         duration_minutes=5,
         personnel_required=1,
         priority_weight=10,
-        entries=1,
+        participants=1,
     )
     # Eight runners across the two relay teams, plus one of them in the 60m.
     athletes = [
@@ -62,8 +62,8 @@ def test_atom_counts_uses_teams_for_relays_and_athletes_otherwise():
 def test_merged_relay_classes_pass_lane_cap_on_team_count():
     """Two classes of 3 teams = 6 lanes: legal, though it is 24 runners."""
     events = [
-        _event(Category.stafett_11_12, entries=3),
-        _event(Category.stafett_13_14, entries=3),
+        _event(Category.stafett_11_12, participants=3),
+        _event(Category.stafett_13_14, participants=3),
     ]
     athletes = [
         Athlete(name=f"R{i}", events=[events[i % 2]]) for i in range(24)
@@ -76,8 +76,8 @@ def test_merged_relay_classes_pass_lane_cap_on_team_count():
 def test_relay_still_rejects_illegal_age_merge():
     """Rekrutt teams may not share a heat with older ones, same as any track heat."""
     events = [
-        _event(Category.stafett_6_10, entries=1),
-        _event(Category.stafett_11_12, entries=1),
+        _event(Category.stafett_6_10, participants=1),
+        _event(Category.stafett_11_12, participants=1),
     ]
     counts = _atom_counts([], events)
     rows = [_row("relay_all", "Stafett 6-10,Stafett 11-12")]

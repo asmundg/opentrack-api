@@ -2,20 +2,19 @@
 
 import logging
 import time
-from contextlib import contextmanager
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Generator, ParamSpec, TypeVar
+from typing import Any, Callable, ParamSpec, TypeVar
 
-from playwright.sync_api import Browser, BrowserContext, Page, Response, sync_playwright
-from playwright_stealth import Stealth
+from playwright.sync_api import BrowserContext, Page, Response, sync_playwright
 
 from .config import OpenTrackConfig
 
 logger = logging.getLogger(__name__)
 
-_stealth = Stealth()
+# Shared across checkouts: holds the Cloudflare clearance cookie and login.
+CHROME_PROFILE_DIR = Path.home() / ".opentrack-admin" / "chrome-profile"
 
 # Upstream / Cloudflare error statuses we transparently retry on.
 _RETRYABLE_STATUSES = {502, 503, 504}
@@ -101,6 +100,27 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
+def poll_until(
+    ready: Callable[[], bool],
+    *,
+    timeout: float,
+    description: str,
+    interval: float = 5.0,
+) -> None:
+    """Call `ready` until it returns True, or raise once `timeout` elapses.
+
+    For OpenTrack steps that queue a server-side task and report no in-page
+    progress, so the only signal is the post-condition showing up.
+    """
+    deadline = time.monotonic() + timeout
+    while True:
+        if ready():
+            return
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"Timed out after {timeout:.0f}s waiting for {description}")
+        time.sleep(interval)
+
+
 def save_screenshot(page: Page, name: str) -> Path:
     """Save a screenshot to the screenshots directory.
     
@@ -164,54 +184,32 @@ def screenshot_on_error(func: Callable[P, T]) -> Callable[P, T]:
     return wrapper
 
 
-@contextmanager
-def create_browser(config: OpenTrackConfig) -> Generator[tuple[Browser, BrowserContext, Page], None, None]:
-    """Create a browser instance with the given configuration.
-    
-    Usage:
-        with create_browser(config) as (browser, context, page):
-            page.goto(config.base_url)
-            # ... do stuff
-    """
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=config.headless,
-            slow_mo=config.slow_mo,
-        )
-        context = browser.new_context(
-            viewport={"width": 1280, "height": 720},
-        )
-        page = context.new_page()
-        _stealth.apply_stealth_sync(page)
-
-        try:
-            yield browser, context, page
-        finally:
-            context.close()
-            browser.close()
-
-
 class OpenTrackSession:
     """A session for interacting with OpenTrack."""
 
     def __init__(self, config: OpenTrackConfig | None = None):
         self.config = config or OpenTrackConfig.from_env()
         self._playwright = None
-        self._browser: Browser | None = None
         self._context: BrowserContext | None = None
         self._page: Page | None = None
 
     def __enter__(self) -> "OpenTrackSession":
         self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch(
+        # OpenTrack sits behind a Cloudflare managed challenge that bundled
+        # Chromium never clears. Real Chrome with the automation switches
+        # removed does, and the persistent profile keeps the resulting
+        # cf_clearance cookie (and the OpenTrack login) between runs.
+        CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+        self._context = self._playwright.chromium.launch_persistent_context(
+            str(CHROME_PROFILE_DIR),
+            channel="chrome",
             headless=self.config.headless,
             slow_mo=self.config.slow_mo,
-        )
-        self._context = self._browser.new_context(
+            args=["--disable-blink-features=AutomationControlled"],
+            ignore_default_args=["--enable-automation"],
             viewport={"width": 1280, "height": 720},
         )
-        self._page = self._context.new_page()
-        _stealth.apply_stealth_sync(self._page)
+        self._page = self._context.pages[0] if self._context.pages else self._context.new_page()
         # Transparent retry on Cloudflare/upstream 5xx errors for all
         # page.goto() calls — keeps the real browser navigation intact
         # (avoids triggering Cloudflare bot detection).
@@ -221,8 +219,6 @@ class OpenTrackSession:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self._context:
             self._context.close()
-        if self._browser:
-            self._browser.close()
         if self._playwright:
             self._playwright.stop()
 

@@ -575,6 +575,11 @@ def is_track_event(event_code: str) -> bool:
     )
 
 
+def is_hurdles_event(event_code: str) -> bool:
+    """Check if an event code is a hurdles race ("60H".."400H")."""
+    return bool(re.match(r"^\d+H$", event_code))
+
+
 def is_horizontal_field_event(event_code: str) -> bool:
     """Check if event code is a horizontal field event (has attempts).
 
@@ -1372,6 +1377,14 @@ _EVENT_NAME_TO_CODE.update({
 })
 
 
+def event_code_from_scheduler_name(name: str) -> str:
+    """Map a scheduler `event_type` value to an admin event code.
+
+    Unknown names pass through, so plain codes ("60m") work unchanged.
+    """
+    return _EVENT_NAME_TO_CODE.get(name, name)
+
+
 def parse_event_schedule_csv(path: Path) -> list[EventSchedule]:
     """Parse a schedule_events.csv (event overview from scheduler).
 
@@ -1390,7 +1403,7 @@ def parse_event_schedule_csv(path: Path) -> list[EventSchedule]:
         for line_num, row in enumerate(reader, start=2):
             event_name = row["event_type"].strip()
             # Look up event code, fall back to identity (handles "60m" etc.)
-            event_code = _EVENT_NAME_TO_CODE.get(event_name, event_name)
+            event_code = event_code_from_scheduler_name(event_name)
             start = parse_time(row["start_time"])
 
             for cat in row["categories"].split(","):
@@ -1429,7 +1442,7 @@ def parse_event_merge_groups(path: Path) -> list[EventMergeGroup]:
         reader = csv.DictReader(f)
         for row in reader:
             event_name = row["event_type"].strip()
-            event_code = _EVENT_NAME_TO_CODE.get(event_name, event_name)
+            event_code = event_code_from_scheduler_name(event_name)
             if not is_track_event(event_code):
                 continue
 

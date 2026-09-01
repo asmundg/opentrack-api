@@ -103,7 +103,7 @@ def _atom_counts(
                 counts[key] += 1
     for e in atom_events or []:
         if e.event_type in TEAM_EVENTS:
-            counts[(e.event_type, e.age_category)] = e.entries
+            counts[(e.event_type, e.age_category)] = e.participants
     return counts
 
 
@@ -114,6 +114,7 @@ def validate_event_schedule(
     *,
     slot_duration_minutes: int = 5,
     allow_athlete_conflicts: bool = False,
+    waive_field_recovery: bool = False,
 ) -> None:
     """Validate the agent's layout against the raw entries.
 
@@ -124,6 +125,8 @@ def validate_event_schedule(
         allow_athlete_conflicts: when True, athlete overlaps and recovery
             shortfalls are reported as warnings instead of raising, so a layout
             with deliberate double-bookings (resolved on the day) still emits.
+        waive_field_recovery: when True, consecutive field events may run
+            back-to-back for any age. Overlaps still fail.
 
     Raises:
         ConstraintViolation: if any hard constraint is violated.
@@ -138,7 +141,10 @@ def validate_event_schedule(
         _validate_venue_stickiness(rows)
 
     _validate_athlete_conflicts(
-        athletes, rows_by_atom, allow_conflicts=allow_athlete_conflicts
+        athletes,
+        rows_by_atom,
+        allow_conflicts=allow_athlete_conflicts,
+        waive_field_recovery=waive_field_recovery,
     )
     _validate_track_ordering(regular_rows)
     _validate_age_merges(regular_rows, _atom_counts(athletes, atom_events))
@@ -257,11 +263,17 @@ _MIN_RECOVERY_MINUTES = 10  # hard: 13+ must have >= this gap
 _WARN_RECOVERY_MINUTES = 15  # soft: 15+ prefer >= this gap
 
 
+def _is_field_event(event_type: EventType) -> bool:
+    """True for throws and jumps; False for anything run on the track."""
+    return EventVenueMapping.get(event_type) is not Venue.TRACK
+
+
 def _validate_athlete_conflicts(
     athletes: list[Athlete],
     rows_by_atom: dict[tuple[EventType, Category], EventScheduleRow],
     *,
     allow_conflicts: bool = False,
+    waive_field_recovery: bool = False,
 ) -> None:
     """Validate per-athlete timing across rows.
 
@@ -272,6 +284,10 @@ def _validate_athlete_conflicts(
     When ``allow_conflicts`` is set, overlaps and recovery shortfalls are
     printed as warnings instead of raising, for layouts whose double-bookings
     are resolved by the officials on the day.
+
+    When ``waive_field_recovery`` is set, the recovery floor is dropped for
+    field-to-field pairs, where the athlete only walks between venues rather
+    than recovering from an effort. Overlaps still fail.
     """
     for athlete in athletes:
         placed: list[EventScheduleRow] = []
@@ -297,6 +313,8 @@ def _validate_athlete_conflicts(
                     print(f"⚠️  Athlete conflict (allowed): {msg}")
                     continue
                 raise ConstraintViolation(msg)
+            if waive_field_recovery and _is_field_event(current.event_type) and _is_field_event(nxt.event_type):
+                continue
             if age_order >= 13 and gap < _MIN_RECOVERY_MINUTES:
                 msg = (
                     f"Too little recovery time for {athlete.name}: only {gap} min "

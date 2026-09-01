@@ -10,6 +10,9 @@ wheels/
 *.csv
 *.html
 *.pdf
+# Participant lists pulled from iSonen: personal data, including minors.
+# Scoped to the repo root so scheduler/goldens fixtures stay tracked.
+/*.xlsx
 # but keep checked-in test fixtures
 !pblookup/fixtures/*.html
 

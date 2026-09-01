@@ -134,6 +134,42 @@ def _sprint_age_warnings(rows) -> list[str]:
     return out
 
 
+def _vertical_merge_warnings(rows) -> list[str]:
+    """Vertical jump groups spanning a wide ability range, prefixed 'warn'.
+
+    Høyde and stav share one bar progression, so a group whose categories start
+    at very different heights wastes venue time: the youngest are out before the
+    oldest come in. Two adjacent groups beat one wide one.
+    """
+    from scheduler.models import (
+        Category, VERTICAL_FIELD_EVENTS, get_category_age_order,
+    )
+
+    # Senior and masters sort as 99; treat them as one adult tier for spread.
+    def tier(cat: Category) -> int:
+        return min(get_category_age_order(cat), 20)
+
+    out: list[str] = []
+    for r in rows:
+        if r.event_type not in VERTICAL_FIELD_EVENTS:
+            continue
+        tiers = set()
+        for raw in r.categories.split(","):
+            name = raw.strip()
+            if not name:
+                continue
+            try:
+                tiers.add(tier(Category(name)))
+            except ValueError:
+                continue
+        if tiers and max(tiers) - min(tiers) > 4:
+            out.append(
+                f"warn {r.event_group_id} ({r.event_type.value}): merges categories "
+                f"{max(tiers) - min(tiers)} age tiers apart — they share one bar "
+                f"progression, so split into adjacent groups")
+    return out
+
+
 def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str], list[str]]:
     """Return (athlete_conflicts, age_violations, recovery, sizing) for the layout.
 
@@ -166,6 +202,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
     counts = _atom_counts(athletes, events)
     age = age_merge_errors(rows, counts)
     age += _sprint_age_warnings(rows)
+    age += _vertical_merge_warnings(rows)
 
     # Per-row sizing: athletes in the merge + the duration the scheduler would assign
     # (built from the same Event objects/EventGroup as dump_groups, so it matches what
@@ -222,6 +259,12 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
             except ValueError:
                 continue
 
+    field_rows = {
+        r.event_group_id
+        for r in rows
+        if EventVenueMapping.get(r.event_type) is not Venue.TRACK
+    }
+
     for ath in athletes:
         age_order = max(
             (get_category_age_order(e.age_category) for e in ath.events), default=0
@@ -242,6 +285,8 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
                     f"({b[0]//60:02d}:{b[0]%60:02d}-{b[1]//60:02d}:{b[1]%60:02d})")
                 continue
             gap = b[0] - a[1]
+            if args.no_field_recovery and a[2] in field_rows and b[2] in field_rows:
+                continue
             if age_order >= 13 and gap < 10:
                 recovery.append(
                     f"FAIL {ath.name}: only {gap}m between {a[2]} and {b[2]} "
@@ -261,6 +306,9 @@ def main() -> None:
                     help="Report idle gaps >= this many minutes (default 5)")
     ap.add_argument("--xlsx", type=Path, default=None,
                     help="Participant XLSX; enables full athlete-conflict listing")
+    ap.add_argument("--no-field-recovery", action="store_true",
+                    help="Allow an athlete's consecutive field events to run "
+                         "back-to-back (matches from-events --no-field-recovery)")
     ap.add_argument("--arena", default="generic")
     ap.add_argument("--date", default=None)
     ap.add_argument("--shared", action="append", default=[],

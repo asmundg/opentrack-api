@@ -369,7 +369,7 @@ def parse_isonen_xlsx(
             participant_count = len(event_team_names.get(event_id, ())) or 1
         else:
             participant_count = event_participant_counts.get(event_id, 1)
-        event.entries = participant_count
+        event.participants = participant_count
         event.duration_minutes = _calculate_event_duration(
             event.event_type, event.age_category, participant_count
         )

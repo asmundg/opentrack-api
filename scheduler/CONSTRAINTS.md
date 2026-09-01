@@ -134,14 +134,49 @@ The gap is measured between one event's `end_time` and the next event's `start_t
 for the same athlete. Younger than 13 has no recovery requirement (the overlap check
 still applies to everyone).
 
+`--no-field-recovery` waives the floor for **field-to-field** pairs only, for meets
+where the throws and jumps queue on one officials team and the athlete just walks
+between venues instead of recovering from an effort. Recovery still applies whenever
+a track event is on either side of the gap, and overlaps still fail. Leave it off
+unless the meet is actually run that way.
+
 ## Field Event Merging
 
 Field events from similar age groups can be merged into a single event group that runs sequentially sharing equipment.
+
+### Event duration and the per-attempt clock
+
+A field group's window is `attempts × minutes-per-attempt`, and the per-attempt
+clock depends on how many athletes are in the competition. A shrinking field is
+entitled to **more** time per attempt, so halving the entries does not halve the
+window:
+
+| Athletes | High jump | Pole vault | Throws, LJ, TJ |
+| --- | --- | --- | --- |
+| 4+ | 1 min | 1 min | 1 min |
+| 2-3 | 1.5 min | 2 min | 1 min |
+| 1 | 3 min | 5 min | 2 min (consecutive attempts) |
+
+A lone high jumper therefore needs ~23 minutes, not the ~11 a flat per-athlete
+rate would suggest. `EventGroup.duration_minutes` applies this, keyed on the
+group's starting size; `attempt_minutes()` in `models.py` holds the table.
 
 ### Why Merge?
 - **Rest between attempts**: With 4-8 athletes, each person gets ~3-5 minutes between their attempts
 - **Avoid rapid-fire**: A solo athlete would have attempts back-to-back with no recovery
 - **Equipment efficiency**: One setup serves multiple categories
+
+### Vertical jumps merge by ability, not by convenience
+
+Høyde and stav run **one shared bar progression** for the whole group, so the
+usual "any ages may merge" rule does not apply. A group spanning a wide ability
+range wastes the venue: the youngest are eliminated long before the oldest enter,
+and the bar spends the middle of the competition at heights nobody is jumping.
+
+Merge **adjacent** categories only (G13+G14, J15+J16, J17+KS). Splitting a wide
+group into two narrow ones costs venue time but is still the right call. A group
+merging categories more than four age tiers apart is flagged by
+`layout_report.py` under `AGE-MERGE WARNINGS`.
 
 ### Merging Tiers (field)
 
