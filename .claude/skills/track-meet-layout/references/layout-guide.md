@@ -170,7 +170,8 @@ Then:
    checks below catch mistakes.
 2. **Keep the track chain ordered.** All track rows, sorted by start time, must be in
    `TRACK_DISTANCE_ORDER`: 60m, 60m hekk, 80m hekk, 100m, 100m hekk, 150m, 200m,
-   200m hekk, 600m, 5000m, 300m, 1500m, 3000m, 400m, 800m. Younger-first within a
+   200m hekk, 600m, 5000m, 300m, 1500m, 3000m, 400m, 800m, 4x60m stafett.
+   Younger-first within a
    distance is soft (warning only). When you move a track heat, move it within the
    chain, not across a different distance. **Exception:** a Rekrutt (10-year-old) round
    race (e.g. their 400m) may run out of order — typically first, on a clear track

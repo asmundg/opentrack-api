@@ -59,6 +59,7 @@ EVENT_NAMES = {
     "200H": "200 meter hekk",
     "400H": "400 meter hekk",
     # Relays
+    "4x60m": "4x60 meter",
     "4x100m": "4x100 meter",
     "4x400m": "4x400 meter",
 }
@@ -1321,6 +1322,8 @@ ISONEN_EVENT_CODES: dict[str, str] = {
     "100 meter hekk": "100H",
     "110 meter hekk": "110H",
     "400 meter hekk": "400H",
+    # Relays
+    "4x60 meter stafett": "4x60m",
     # Field events
     "Høyde": "HJ",
     "Høyde uten tilløp": "SHJ",
@@ -1365,6 +1368,7 @@ _EVENT_NAME_TO_CODE.update({
     "80m hekk": "80H",
     "100m hekk": "100H",
     "200m hekk": "200H",
+    "4x60m stafett": "4x60m",
 })
 
 

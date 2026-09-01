@@ -6,7 +6,7 @@ from typing import Any
 
 from openpyxl import load_workbook
 
-from .models import Athlete, Category, Event, EventType, MASTERS_CATEGORIES
+from .models import Athlete, Category, Event, EventType, MASTERS_CATEGORIES, TEAM_EVENTS
 
 
 def parse_event_type(ovelse: str) -> EventType:
@@ -27,6 +27,7 @@ def parse_event_type(ovelse: str) -> EventType:
         "80 meter hekk": EventType.m80_hurdles,
         "100 meter hekk": EventType.m100_hurdles,
         "200 meter hekk": EventType.m200_hurdles,
+        "4x60 meter stafett": EventType.relay_4x60,
         "Kule": EventType.sp,
         "Lengde": EventType.lj,
         "Lengde uten tilløp": EventType.lj_standing,
@@ -78,6 +79,9 @@ def parse_category(klasse: str) -> Category:
         "Menn Senior": Category.ms,  # Fixed the typo
         "Menn senior": Category.ms,  # Handle both variations
         "Kvinner senior": Category.ks,  # Handle both variations
+        "Stafett 6-10": Category.stafett_6_10,
+        "Stafett 11-12": Category.stafett_11_12,
+        "Stafett 13-14": Category.stafett_13_14,
     }
 
     if klasse in mapping:
@@ -250,6 +254,7 @@ def parse_isonen_xlsx(
     """
     events: dict[str, Event] = {}
     athletes_data: dict[str, dict[str, Any]] = {}
+    event_team_names: dict[str, set[str]] = {}
 
     rows = _read_xlsx_rows(xlsx_file_path)
 
@@ -257,10 +262,12 @@ def parse_isonen_xlsx(
         # Extract athlete info
         first_name = row.get("Fornavn", "").strip()
         last_name = row.get("Etternavn", "").strip()
-        athlete_name = f"{first_name} {last_name}"
+        athlete_name = f"{first_name} {last_name}".strip()
+        team_name = row.get("Lag", "").strip()
 
-        # Skip if no name
-        if not first_name and not last_name:
+        # A relay team that has not named its runners yet still occupies a lane,
+        # so a row may identify a team instead of an athlete.
+        if not athlete_name and not team_name:
             continue
 
         # Extract event info
@@ -310,9 +317,12 @@ def parse_isonen_xlsx(
             )
 
         # Track athlete-event relationships
-        if athlete_name not in athletes_data:
-            athletes_data[athlete_name] = {"events": []}
-        athletes_data[athlete_name]["events"].append(event_id)
+        if athlete_name:
+            if athlete_name not in athletes_data:
+                athletes_data[athlete_name] = {"events": []}
+            athletes_data[athlete_name]["events"].append(event_id)
+        if team_name:
+            event_team_names.setdefault(event_id, set()).add(team_name)
 
         # Create or update event (count participants)
         if event_id not in events:
@@ -352,9 +362,14 @@ def parse_isonen_xlsx(
                 event_participant_counts.get(event_id, 0) + 1
             )
 
-    # Update event durations based on participant counts
+    # Update event durations based on participant counts. Team events are sized
+    # by the number of teams sharing the heat, not the number of runners.
     for event_id, event in events.items():
-        participant_count = event_participant_counts.get(event_id, 1)
+        if event.event_type in TEAM_EVENTS:
+            participant_count = len(event_team_names.get(event_id, ())) or 1
+        else:
+            participant_count = event_participant_counts.get(event_id, 1)
+        event.entries = participant_count
         event.duration_minutes = _calculate_event_duration(
             event.event_type, event.age_category, participant_count
         )
