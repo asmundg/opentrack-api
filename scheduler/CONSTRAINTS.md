@@ -46,7 +46,20 @@ Distance order is enforced by `constraint_validator._validate_track_ordering`
 (using `get_track_event_order`), with the Rekrutt round-event exception allowed
 as a warning. Younger-first within a distance is a soft policy, not enforced.
 
-This ordering minimizes equipment moves and starting position changes.
+This ordering minimizes equipment moves and starting position changes. Relays
+run last, after the individual races.
+
+#### Relays
+Relay classes (`4x60m stafett`) are contested by teams, so a heat holds one team
+per lane, not one athlete: three 4-person teams are a heat of 3. The parser
+counts teams via the `Lag` column and records it as `Event.entries`; the age-merge
+rules apply as for any track heat, with the relay classes slotted by age
+(`Stafett 6-10` counts as Rekrutt, `Stafett 11-12`/`Stafett 13-14` as 11-14).
+
+Relay teams are **team registrations** in Isonen, so they live in
+`publicEvent.teams`, not `publicEvent.participants`, and the manual
+"Deltakerliste" XLSX export omits them entirely. A team that has not named its
+runners yet still gets a row (team name only) so its heat is scheduled.
 
 #### Spacing between consecutive track events
 Spacing is a soft layout goal, checked by the track-meet-layout skill's

@@ -36,15 +36,19 @@ from .models import (
     hurdle_lane_capacity,
     is_hurdles_event,
     ROUND_EVENTS,
+    TEAM_EVENTS,
     TRACK_DISTANCE_ORDER,
 )
 
 
 # Age tiers for merge validation, by Category identity.
-_REKRUTT: frozenset[Category] = frozenset({Category.g10, Category.j10})
+_REKRUTT: frozenset[Category] = frozenset(
+    {Category.g10, Category.j10, Category.stafett_6_10}
+)
 _ELEVEN_FOURTEEN: frozenset[Category] = frozenset({
     Category.g11, Category.g12, Category.g13, Category.g14,
     Category.j11, Category.j12, Category.j13, Category.j14,
+    Category.stafett_11_12, Category.stafett_13_14,
 })
 # Seniors that 11-14 may never share a track heat with (15-17 is allowed).
 _EIGHTEEN_PLUS_SR: frozenset[Category] = frozenset({
@@ -81,8 +85,14 @@ def _row_categories(row: EventScheduleRow) -> list[Category]:
     return cats
 
 
-def _atom_counts(athletes: list[Athlete]) -> dict[tuple[EventType, Category], int]:
-    """Count distinct athletes registered for each (event_type, category) atom."""
+def _atom_counts(
+    athletes: list[Athlete], atom_events: list[Event] | None = None
+) -> dict[tuple[EventType, Category], int]:
+    """Count the heat slots each (event_type, category) atom needs.
+
+    Individual events need one slot per athlete. Team events need one per team,
+    which the parser records on the Event: four relay runners share one lane.
+    """
     counts: dict[tuple[EventType, Category], int] = defaultdict(int)
     for athlete in athletes:
         seen: set[tuple[EventType, Category]] = set()
@@ -91,6 +101,9 @@ def _atom_counts(athletes: list[Athlete]) -> dict[tuple[EventType, Category], in
             if key not in seen:
                 seen.add(key)
                 counts[key] += 1
+    for e in atom_events or []:
+        if e.event_type in TEAM_EVENTS:
+            counts[(e.event_type, e.age_category)] = e.participants
     return counts
 
 
@@ -134,7 +147,7 @@ def validate_event_schedule(
         waive_field_recovery=waive_field_recovery,
     )
     _validate_track_ordering(regular_rows)
-    _validate_age_merges(regular_rows, _atom_counts(athletes))
+    _validate_age_merges(regular_rows, _atom_counts(athletes, atom_events))
 
     print("✓ All constraints validated successfully")
 

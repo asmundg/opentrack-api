@@ -33,6 +33,7 @@ class EventType(Enum):
     m80_hurdles = "80m hekk"
     m100_hurdles = "100m hekk"
     m200_hurdles = "200m hekk"
+    relay_4x60 = "4x60m stafett"
     sp = "Kule"
     lj = "Lengde"
     lj_standing = "Lengde uten tilløp"
@@ -98,6 +99,11 @@ class Category(Enum):
     kv85_89 = "KV85-89"
     kv90_94 = "KV90-94"
     kv95_99 = "KV95-99"
+    # Relay classes. Teams are age-banded and mixed-gender, so they are their
+    # own categories rather than a boys/girls pair.
+    stafett_6_10 = "Stafett 6-10"
+    stafett_11_12 = "Stafett 11-12"
+    stafett_13_14 = "Stafett 13-14"
     # Special category for non-athletic events (breaks, etc.) - shown in schedule but ignored for opentrack
     fifa = "FIFA"
 
@@ -158,6 +164,7 @@ YOUNGEST_CATEGORIES: frozenset[Category] = frozenset(
     {
         Category.j10,
         Category.g10,
+        Category.stafett_6_10,
     }
 )
 
@@ -170,6 +177,8 @@ YOUNG_CATEGORIES: frozenset[Category] = frozenset(
         Category.g11,
         Category.j12,
         Category.g12,
+        Category.stafett_6_10,
+        Category.stafett_11_12,
     }
 )
 
@@ -206,6 +215,9 @@ CATEGORY_AGE_ORDER: dict[Category, int] = {
     Category.g18_19: 18,
     Category.ks: 99,
     Category.ms: 99,  # Seniors last
+    Category.stafett_6_10: 10,
+    Category.stafett_11_12: 11,
+    Category.stafett_13_14: 13,
     # Masters share the senior tier (run after youth). Per-bracket distinction
     # is preserved through the enum identity, not the ordering value.
     **{cat: 99 for cat in MASTERS_CATEGORIES},
@@ -240,6 +252,7 @@ TRACK_DISTANCE_ORDER: list[EventType] = [
     EventType.m3000,  # 300m to goal (7×400 + 300)
     EventType.m400,  # Full lap, at finish area
     EventType.m800,  # 2 laps, at finish area
+    EventType.relay_4x60,  # Relays close the meet, after the individual races
 ]
 
 
@@ -254,6 +267,7 @@ ROUND_EVENTS: frozenset[EventType] = frozenset({
     EventType.m150,
     EventType.m200, EventType.m200_hurdles, EventType.m300, EventType.m400,
     EventType.m600, EventType.m800, EventType.m1500, EventType.m3000, EventType.m5000,
+    EventType.relay_4x60,
 })
 
 
@@ -558,6 +572,7 @@ EventVenueMapping: dict[EventType, Venue] = {
     EventType.m80_hurdles: Venue.TRACK,
     EventType.m100_hurdles: Venue.TRACK,
     EventType.m200_hurdles: Venue.TRACK,
+    EventType.relay_4x60: Venue.TRACK,
     # Throwing events - use throwing circles/areas
     EventType.sp: Venue.SHOT_PUT_CIRCLE,
     EventType.dt: Venue.THROWING_CIRCLE,
@@ -656,7 +671,9 @@ class Event:
     duration_minutes: int
     personnel_required: int
     priority_weight: int  # higher = schedule earlier
-    participants: int = 0  # entries in this category, for group-size timing
+    # Heat slots this event needs: one per athlete, or one per team for the
+    # team events (a 4-person relay team occupies a single lane).
+    participants: int = 0
 
 
 @dataclass
@@ -726,6 +743,7 @@ EventDuration: dict[EventType, int] = {
     EventType.m80_hurdles: 5,
     EventType.m100_hurdles: 5,
     EventType.m200_hurdles: 5,
+    EventType.relay_4x60: 5,
     # Vertical jumps take time x number of participants (horizontal field events
     # are derived from their attempt count instead, see HORIZONTAL_FIELD_EVENTS)
     EventType.hj: 6,
@@ -748,6 +766,11 @@ HORIZONTAL_FIELD_EVENTS: set[EventType] = {
 }
 
 MINUTES_PER_ATTEMPT = 1
+
+# Events contested by teams, not individuals. Their heat size is counted in
+# teams (one lane each), so a class of three 4-person teams is one heat of 3,
+# not 12 athletes.
+TEAM_EVENTS: frozenset[EventType] = frozenset({EventType.relay_4x60})
 
 # One-off setup (bar, stands, starting height) per vertical jump group.
 VERTICAL_SETUP_MINUTES = 5

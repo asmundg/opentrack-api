@@ -199,7 +199,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
     events, athletes = parse_isonen_xlsx(str(args.xlsx), filter_date=args.date)
     rows = import_event_overview_csv(csv_path)
 
-    counts = _atom_counts(athletes)
+    counts = _atom_counts(athletes, events)
     age = age_merge_errors(rows, counts)
     age += _sprint_age_warnings(rows)
     age += _vertical_merge_warnings(rows)
