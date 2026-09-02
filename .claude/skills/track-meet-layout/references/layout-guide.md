@@ -140,6 +140,11 @@ Decide each event type's groups like this:
   applies too). Merging hurdle heats of
   different distances cuts the number of heats (and the reconfigure gaps between them),
   so it is often worth doing when the lanes fit.
+- **Relays**: a heat holds one team per lane, not one athlete, so lane capacity is
+  rarely the limit — merge relay classes into **as few starts as the age rules
+  allow**, typically one senior heat and one for everyone younger. A relay class
+  whose team has no named runners still holds its lane, so it stays in the layout
+  even when the team may not turn up.
 - **No legal partner / acceptable singletons**: keep a group as-is when no legal,
   in-capacity partner exists (a single senior thrower, the only 100m hekk entry, a
   hurdle category that would overflow the lanes if merged). For **field** events any
@@ -211,6 +216,12 @@ Then:
      into 600m needs **no gap at all**. `layout_report.py` does not know this and will
      flag the 0-minute gap; that warning is safe to ignore for a hurdles →
      middle-distance transition.
+   - **The 4x60m relay starts 40 m from the 200m start** (240 m to go against 200 m),
+    so slotting a relay heat in among the 200m heats costs the starter almost
+    nothing. `TRACK_DISTANCE_ORDER` puts relays last, which is the usual finale, but
+    a relay tucked between two 200m heats is a cheap way to use an idle track slot.
+    Only the Rekrutt exception makes that legal today; a non-Rekrutt relay placed
+    there fails ordering.
    The same reconfiguration logic
    applies on the **field**: leave >=5 min whenever the event **type changes** at a
    venue or within a `--shared` personnel bucket (Liten ball -> Spyd, Spyd -> Slegge,
@@ -223,11 +234,12 @@ Then:
    conflicts (two overlapping rows sharing an athlete), age-merge violations, track
    spacing gaps that are too short, field reconfig gaps that are too short (pass the
    same `--shared` groups you give `from-events` so cross-venue transitions are seen),
-   off-grid starts, and same-venue overlaps. Fix each:
+   off-grid starts, same-venue overlaps, and sprint doubles under 30 min. Fix each:
    - athlete conflict → move one of the two rows to a non-overlapping slot, or re-merge
      so the clashing categories no longer share an overlap;
    - age/hurdle violation → re-split the offending row per the merge rules;
-   - short track or field gap → widen it to >=5 min.
+   - short track or field gap → widen it to >=5 min;
+   - sprint double → widen to >=30 min, ideally 40.
    Prefer moving the row whose venue timeline has the most slack (idle gaps in the
    report) and that does not disturb the track distance chain.
 5. **Re-check after every batch of edits** (a move or re-merge can create a new venue
@@ -261,9 +273,20 @@ Optimise only after the schedule is valid and reasonably tight, in this order
    shorter gap only warns). Maximise the smallest such gap across athletes; do not
    spend makespan you do not have beyond meeting these floors.
 
-   **15 min is not enough for a sprint/hurdles double.** An athlete doubling 80m hekk
-   into 100m, or any two maximal sprints, wants **>= 20 min**. The track is cheap to
-   stretch (heuristic 6), so give it to them even though the tool stays quiet at 15.
+   **A sprint double needs far more than the floors above.** Two maximal efforts
+   off the blocks (60m/100m/200m and the hurdles) want **>= 30 min, ideally 40**.
+   A 100m into a 200m at 15 min will be sent back by the meet crew. The track is
+   cheap to stretch (heuristic 6), so give it to them; `layout_report.py` lists
+   these under `SPRINT DOUBLES`.
+
+   **Coming off a field event into a race, leave >= 5 min to warm up.** The 13+
+   recovery floor already covers this, but do not treat a field-to-track gap as
+   slack to reclaim when compacting.
+
+3. **Do not strand the young waiting for one late event.** A 10-12 year old whose
+   last event sits 30+ min after everything else they do is likely to go home
+   instead. If a trailing heat (typically a relay) cannot be pulled forward to
+   meet the rest of their day, expect it not to run.
 
 ### Compaction
 

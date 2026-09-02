@@ -82,7 +82,7 @@ soft goals, and flags. Keep it open while working.
 - `scripts/layout_report.py` — mistake detector + compactness metrics: athlete conflicts,
   age-merge violations (including wide vertical-jump merges), track-spacing gaps, field
   reconfig gaps, shared-bucket overlaps, venue stickiness, group sizing/durations,
-  off-grid starts, idle gaps, concurrency.
+  sprint doubles, off-grid starts, idle gaps, concurrency.
 - `references/layout-guide.md` — CSV contract, venue model, merge + age rules, error
   catalog, heuristics, soft goals, flags.
 - `scheduler/CONSTRAINTS.md` (repo) — background on constraints and merge rationale.
