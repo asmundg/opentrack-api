@@ -5,6 +5,7 @@ This module generates HTML tables showing time x venue allocation of events
 from a SchedulingResult, providing a visual grid layout of the schedule.
 """
 
+from collections import Counter
 from typing import Any
 from .models import MASTERS_MEN, MASTERS_WOMEN, Venue, Category, EventGroup, get_venue_for_event
 from .types import SchedulingResult
@@ -279,6 +280,13 @@ def _build_venue_grid_with_spans_from_result(
     schedule = result.schedule
     slot_duration_minutes = result.slot_duration_minutes
 
+    # Slots each group actually occupies. The scheduled window is authoritative:
+    # a group's estimated duration can exceed it, and spanning by the estimate
+    # would cover the next group's cell and drop it from the grid.
+    scheduled_slots: dict[str, int] = Counter(
+        entry["event"].id for entries in schedule.values() for entry in entries
+    )
+
     # Initialize venue grid for all slots from 0 to max slot
     # This ensures we have venue entries for all slots that events might span across
     if schedule:
@@ -298,8 +306,11 @@ def _build_venue_grid_with_spans_from_result(
                 if event_info['is_start'] and event_group.id not in processed_events:
                     processed_events.add(event_group.id)
 
-                    # Calculate span duration for this event
-                    event_duration_slots = _calculate_event_slots(event_group, slot_duration_minutes)
+                    # Span the slots this group was scheduled for, falling back
+                    # to its estimate only when the schedule records none.
+                    event_duration_slots = scheduled_slots.get(
+                        event_group.id
+                    ) or _calculate_event_slots(event_group, slot_duration_minutes)
                     participant_count = participants_by_event.get(event_group.id, 0)
 
                     # Get per-category counts for this event group
