@@ -5,6 +5,7 @@ This module generates HTML tables showing time x venue allocation of events
 from a SchedulingResult, providing a visual grid layout of the schedule.
 """
 
+from collections import Counter
 from typing import Any
 from .models import MASTERS_MEN, MASTERS_WOMEN, Venue, Category, EventGroup, get_venue_for_event
 from .types import SchedulingResult
@@ -279,6 +280,13 @@ def _build_venue_grid_with_spans_from_result(
     schedule = result.schedule
     slot_duration_minutes = result.slot_duration_minutes
 
+    # Slots each group actually occupies. The scheduled window is authoritative:
+    # a group's estimated duration can exceed it, and spanning by the estimate
+    # would cover the next group's cell and drop it from the grid.
+    scheduled_slots: dict[str, int] = Counter(
+        entry["event"].id for entries in schedule.values() for entry in entries
+    )
+
     # Initialize venue grid for all slots from 0 to max slot
     # This ensures we have venue entries for all slots that events might span across
     if schedule:
@@ -298,8 +306,11 @@ def _build_venue_grid_with_spans_from_result(
                 if event_info['is_start'] and event_group.id not in processed_events:
                     processed_events.add(event_group.id)
 
-                    # Calculate span duration for this event
-                    event_duration_slots = _calculate_event_slots(event_group, slot_duration_minutes)
+                    # Span the slots this group was scheduled for, falling back
+                    # to its estimate only when the schedule records none.
+                    event_duration_slots = scheduled_slots.get(
+                        event_group.id
+                    ) or _calculate_event_slots(event_group, slot_duration_minutes)
                     participant_count = participants_by_event.get(event_group.id, 0)
 
                     # Get per-category counts for this event group
@@ -319,6 +330,7 @@ def _build_venue_grid_with_spans_from_result(
                         'participant_count': participant_count,
                         'category_counts': category_counts,
                         'duration_slots': event_duration_slots,
+                        'window_minutes': event_duration_slots * slot_duration_minutes,
                         'category_color': category_color,
                     }
 
@@ -535,11 +547,14 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
         # Put categories on separate line for readability
         categories_line = f"{categories_str} ({counts_str})"
 
-    # Duration text - skip participant count for FIFA events
+    # Duration text. The scheduled window, not the estimate: this is the sheet
+    # the crew runs to, so it has to agree with the block drawn on the grid.
+    # An estimate that exceeds its window is reported by layout_report instead.
+    window_minutes = event_info.get('window_minutes') or event.duration_minutes
     if is_fifa:
-        duration_text = f"{event.duration_minutes}min"
+        duration_text = f"{window_minutes}min"
     else:
-        duration_text = f"{event.duration_minutes}min • {participant_count} totalt"
+        duration_text = f"{window_minutes}min • {participant_count} totalt"
 
     # Track heats are one slot with the count already in the title; the duration line
     # only eats vertical space there.
