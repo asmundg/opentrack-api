@@ -2,6 +2,41 @@
 
 This document describes the code layout and basic principles of the track meet scheduler system.
 
+## Git and GitHub accounts
+
+This is a personal repo owned by `asmundg`. Agent shells inherit a work
+account (`asgramme_microsoft`) that has read-only access here, so pushes fail
+with a 403 unless the account is selected explicitly.
+
+Two separate overrides cause this, and each needs its own fix:
+
+```bash
+env -u GIT_CONFIG_PARAMETERS git push    # git: use the asmundg credential helper
+direnv exec . gh pr create ...           # gh: use the asmundg token
+```
+
+`GIT_CONFIG_PARAMETERS` is injected into the environment and has command-line
+config precedence, so it resets the credential helper list configured by
+`includeIf` in `~/.gitconfig` and installs its own. Unsetting it restores the
+correct helper. Separately, `GH_TOKEN` is injected with the work token;
+`/Volumes/src/priv/.envrc` already selects the right one, but direnv only hooks
+interactive shells, so non-interactive agent shells need `direnv exec`.
+
+Do not work around this by embedding a token in a remote URL. `git push -u`
+with such a URL writes the token into `.git/config`.
+
+## CI
+
+`.github/workflows/ci.yml` runs `uv sync --frozen && uv run pytest` on pull
+requests and pushes to `main`. `main` requires the `test` check to pass, so
+`gh pr merge --auto --squash` lands a PR once CI is green.
+
+`uv.lock` must stay in sync with `pyproject.toml` or `--frozen` fails. Verify
+with `uv lock --check`. On a machine where the default index is unreachable,
+add `--default-index https://pypi.org/simple`.
+
+CI does not run `ruff`; the existing code does not pass it.
+
 ## Core Principles
 
 ### 1. All Interaction Through Top-Level CLI
