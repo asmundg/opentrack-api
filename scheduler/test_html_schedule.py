@@ -89,6 +89,20 @@ def test_an_overrunning_estimate_does_not_swallow_the_next_event():
     )
 
 
+def test_the_printed_duration_is_the_scheduled_window():
+    """The crew runs to the grid, so the label must agree with the block.
+
+    The estimate (32 min here) belongs in layout_report's GROUP SIZING, not on
+    the meet-day printout, where it would contradict a 25-minute block.
+    """
+    rendered = _rendered_rows(
+        generate_html_schedule_table(_result(), start_hour=17, start_minute=0)
+    )
+    assert "25min" in rendered
+    assert "32min" not in rendered
+
+
+
 def test_each_group_starts_in_its_scheduled_slot():
     rendered = _rendered_rows(
         generate_html_schedule_table(_result(), start_hour=17, start_minute=0)

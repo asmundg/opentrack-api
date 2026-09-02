@@ -330,6 +330,7 @@ def _build_venue_grid_with_spans_from_result(
                         'participant_count': participant_count,
                         'category_counts': category_counts,
                         'duration_slots': event_duration_slots,
+                        'window_minutes': event_duration_slots * slot_duration_minutes,
                         'category_color': category_color,
                     }
 
@@ -546,11 +547,14 @@ def _format_spanning_event_cell(event_info: dict[str, Any]) -> str:
         # Put categories on separate line for readability
         categories_line = f"{categories_str} ({counts_str})"
 
-    # Duration text - skip participant count for FIFA events
+    # Duration text. The scheduled window, not the estimate: this is the sheet
+    # the crew runs to, so it has to agree with the block drawn on the grid.
+    # An estimate that exceeds its window is reported by layout_report instead.
+    window_minutes = event_info.get('window_minutes') or event.duration_minutes
     if is_fifa:
-        duration_text = f"{event.duration_minutes}min"
+        duration_text = f"{window_minutes}min"
     else:
-        duration_text = f"{event.duration_minutes}min • {participant_count} totalt"
+        duration_text = f"{window_minutes}min • {participant_count} totalt"
 
     # Track heats are one slot with the count already in the title; the duration line
     # only eats vertical space there.
