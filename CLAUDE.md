@@ -12,15 +12,19 @@ Two separate overrides cause this, and each needs its own fix:
 
 ```bash
 env -u GIT_CONFIG_PARAMETERS git push    # git: use the asmundg credential helper
-direnv exec . gh pr create ...           # gh: use the asmundg token
+GH_TOKEN=$(env -u GH_TOKEN gh auth token --user asmundg) gh pr create ...
 ```
 
 `GIT_CONFIG_PARAMETERS` is injected into the environment and has command-line
 config precedence, so it resets the credential helper list configured by
 `includeIf` in `~/.gitconfig` and installs its own. Unsetting it restores the
-correct helper. Separately, `GH_TOKEN` is injected with the work token;
-`/Volumes/src/priv/.envrc` already selects the right one, but direnv only hooks
-interactive shells, so non-interactive agent shells need `direnv exec`.
+correct helper. Separately, `GH_TOKEN` is injected with the work token, so it
+has to be replaced for `gh`.
+
+Do not use `direnv exec` to pick up the token from `/Volumes/src/priv/.envrc`.
+That also runs `layout uv` from this repo's `.envrc`, which re-locks `uv.lock`
+against the internal package index in the global `~/.config/uv/uv.toml`. The
+resulting lockfile points at hosts CI cannot reach.
 
 Do not work around this by embedding a token in a remote URL. `git push -u`
 with such a URL writes the token into `.git/config`.
