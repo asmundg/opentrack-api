@@ -538,11 +538,6 @@ class CompetitionCreator:
         if not photofinish_files.is_checked():
             photofinish_files.check()
 
-        # Enable results from photofinish
-        results_from_photofinish = page.locator("#id_official_from_photofinish")
-        if not results_from_photofinish.is_checked():
-            results_from_photofinish.check()
-
         logger.debug("Saving photofinish settings")
         page.get_by_role("button", name="Save").click(no_wait_after=True)
         page.wait_for_load_state("networkidle")
