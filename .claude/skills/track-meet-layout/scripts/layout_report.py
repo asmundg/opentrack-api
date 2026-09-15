@@ -170,8 +170,10 @@ def _vertical_merge_warnings(rows) -> list[str]:
     return out
 
 
-def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str], list[str]]:
-    """Return (athlete_conflicts, age_violations, recovery, sizing) for the layout.
+def _xlsx_checks(
+    csv_path: Path, args
+) -> tuple[list[str], list[str], list[str], list[str], list[str]]:
+    """Return (conflicts, age_violations, recovery, sizing, sprint_doubles).
 
     Athlete membership is taken from the CSV's own merges (each row's categories),
     matching exactly what from-events validates. Reuses the validator's age rules so
@@ -189,6 +191,14 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
         Category, EventGroup, EventType, EventVenueMapping, Venue,
         get_category_age_order,
     )
+
+    # Two maximal efforts off the blocks. Doubling these needs far more than the
+    # generic recovery floor: the meet crew asks for >=30 min, ideally 40.
+    _MAXIMAL_SPRINTS = {
+        EventType.m60, EventType.m100, EventType.m200,
+        EventType.m60_hurdles, EventType.m80_hurdles,
+        EventType.m100_hurdles, EventType.m200_hurdles,
+    }
 
     if args.arena not in models.ARENAS:
         sys.exit(f"Unknown arena '{args.arena}'")
@@ -245,6 +255,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
 
     conflicts: list[str] = []
     recovery: list[str] = []
+    doubles: list[str] = []
     # atom (event_type, category) -> (group_id, start, end), from the CSV merges
     atom_to_row: dict[tuple[EventType, Category], tuple[str, int, int]] = {}
     for r in rows:
@@ -275,7 +286,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
             span = atom_to_row.get((e.event_type, e.age_category))
             if span and span[0] not in seen:
                 seen.add(span[0])
-                intervals.append((span[1], span[2], span[0]))
+                intervals.append((span[1], span[2], span[0], e.event_type))
         intervals.sort()
         for a, b in zip(intervals, intervals[1:]):
             if b[0] < a[1]:
@@ -285,6 +296,10 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
                     f"({b[0]//60:02d}:{b[0]%60:02d}-{b[1]//60:02d}:{b[1]%60:02d})")
                 continue
             gap = b[0] - a[1]
+            if a[3] in _MAXIMAL_SPRINTS and b[3] in _MAXIMAL_SPRINTS and gap < 30:
+                doubles.append(
+                    f"{ath.name}: only {gap}m between {a[2]} and {b[2]} "
+                    f"(sprint double wants >=30m, ideally 40m)")
             if args.no_field_recovery and a[2] in field_rows and b[2] in field_rows:
                 continue
             if age_order >= 13 and gap < 10:
@@ -296,7 +311,7 @@ def _xlsx_checks(csv_path: Path, args) -> tuple[list[str], list[str], list[str],
                     f"warn {ath.name}: only {gap}m between {a[2]} and {b[2]} "
                     f"(15+ prefer >=15m)")
 
-    return conflicts, age, recovery, sizing
+    return conflicts, age, recovery, sizing, doubles
 
 
 def main() -> None:
@@ -498,7 +513,7 @@ def main() -> None:
               "the authoritative gate; athlete conflicts are listed below if --xlsx.")
 
     if args.xlsx:
-        conflicts, age, recovery, sizing = _xlsx_checks(args.csv, args)
+        conflicts, age, recovery, sizing, doubles = _xlsx_checks(args.csv, args)
         if sizing:
             print(f"\nGROUP SIZING ({len(sizing)}) — athletes + scheduler slot "
                   f"duration per row (set end_time to start + slot):")
@@ -539,6 +554,11 @@ def main() -> None:
             print(f"\nRECOVERY WARNINGS ({len(warns)}) — 15+ prefer >=15 min:")
             for r in warns:
                 print(f"  - {r}")
+        if doubles:
+            print(f"\nSPRINT DOUBLES ({len(doubles)}) — two maximal sprints want "
+                  f">=30 min, ideally 40:")
+            for d in doubles:
+                print(f"  - {d}")
 
 
 if __name__ == "__main__":
