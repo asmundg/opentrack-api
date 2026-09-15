@@ -57,7 +57,8 @@ Two parallelism levers:
   its events to keep each type contiguous and leave a >=5 min reconfig gap whenever the
   type changes (see heuristic 3).
 - **`--sticky`** (default on): one event type must form a contiguous block per
-  venue/shared bucket (no DT-HT-DT). Track is exempt. `layout_report.py` checks this
+  venue/shared bucket (no DT-HT-DT). Track is exempt, and Lengde and Høyde may recur around
+  other types (Høyde split around standing high jump, Lengde around Tresteg). `layout_report.py` checks this
   locally too (VENUE STICKINESS).
 
 ## Merging model
@@ -341,6 +342,7 @@ validation-time only, so pass them to `from-events` on every run.
 | `--date DD.MM.YYYY` | yes | yes | filter a multi-day meet to one day |
 | `--shared a,b,c` (repeatable) | no | yes | event types sharing officials/equipment; cannot run in parallel |
 | `--sticky / --no-sticky` | no | yes | force each event type into a contiguous block per venue (default on) |
+| `--swap-same-distance` | no | yes | let flat and hurdle races over one distance run in either order (60m / 60m+80m hekk, 100m / 100m hekk, 200m / 200m hekk), e.g. 100m hekk before 100m to keep the straight hurdles together. Different distances stay in order. Off by default. |
 | `--no-field-recovery` | yes | yes | let an athlete's consecutive **field** events run back-to-back (one throws/jumps team; the athlete only walks between venues). Track pairs and overlaps are unaffected. Off by default. |
 
 Gender is **not** a constraint: `from-events` never checks it, so a heat may mix boys and

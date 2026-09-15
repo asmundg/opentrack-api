@@ -37,6 +37,7 @@ from .models import (
     is_hurdles_event,
     ROUND_EVENTS,
     TEAM_EVENTS,
+    HURDLES_BASE_DISTANCE,
     TRACK_DISTANCE_ORDER,
 )
 
@@ -115,6 +116,7 @@ def validate_event_schedule(
     slot_duration_minutes: int = 5,
     allow_athlete_conflicts: bool = False,
     waive_field_recovery: bool = False,
+    swap_same_distance: bool = False,
 ) -> None:
     """Validate the agent's layout against the raw entries.
 
@@ -127,6 +129,8 @@ def validate_event_schedule(
             with deliberate double-bookings (resolved on the day) still emits.
         waive_field_recovery: when True, consecutive field events may run
             back-to-back for any age. Overlaps still fail.
+        swap_same_distance: when True, flat and hurdle races over one distance
+            (e.g. 100m and 100m hekk) may run in either order.
 
     Raises:
         ConstraintViolation: if any hard constraint is violated.
@@ -146,7 +150,7 @@ def validate_event_schedule(
         allow_conflicts=allow_athlete_conflicts,
         waive_field_recovery=waive_field_recovery,
     )
-    _validate_track_ordering(regular_rows)
+    _validate_track_ordering(regular_rows, swap_same_distance=swap_same_distance)
     _validate_age_merges(regular_rows, _atom_counts(athletes, atom_events))
 
     print("✓ All constraints validated successfully")
@@ -222,7 +226,8 @@ def _validate_venue_stickiness(rows: list[EventScheduleRow]) -> None:
 
     Walks every non-track scheduling venue key in start-time order and ensures no
     event type reappears after a different type has occurred (no DT-HT-DT
-    interleaving). Track is exempt; it has its own precedence rules.
+    interleaving). Track is exempt; it has its own precedence rules. Types in
+    NON_STICKY_EVENT_TYPES (Lengde, Høyde) may recur; they still split others.
     """
     venue_events: dict[str, list[EventScheduleRow]] = defaultdict(list)
     for row in rows:
@@ -235,7 +240,11 @@ def _validate_venue_stickiness(rows: list[EventScheduleRow]) -> None:
         rows_sorted = sorted(venue_rows, key=lambda r: r.start_time)
         seen: dict[EventType, int] = {}
         for idx, row in enumerate(rows_sorted):
-            if row.event_type in seen and seen[row.event_type] != idx - 1:
+            if (
+                row.event_type in seen
+                and seen[row.event_type] != idx - 1
+                and row.event_type not in _models.NON_STICKY_EVENT_TYPES
+            ):
                 prev_idx = seen[row.event_type]
                 offender = rows_sorted[prev_idx + 1]
                 if venue_key.startswith("shared:"):
@@ -351,21 +360,30 @@ def _is_rekrutt_round_event(row: EventScheduleRow) -> bool:
     )
 
 
-def _validate_track_ordering(rows: list[EventScheduleRow]) -> None:
+def _validate_track_ordering(
+    rows: list[EventScheduleRow], *, swap_same_distance: bool = False
+) -> None:
     """Validate track event ordering: track rows run in distance order.
 
     Distance order is hard, with one exception: a Rekrutt round race (e.g. a
     10-year-old 400m) may run out of order for welfare, which only warns.
     younger-categories-first within a distance is also a soft policy (a warning).
+    With ``swap_same_distance``, hurdles rank as their base flat distance, so
+    flat and hurdle races over one distance may run in either order.
     """
     track_rows = [r for r in rows if r.event_type in TRACK_DISTANCE_ORDER]
     if len(track_rows) <= 1:
         return
 
+    def order(event_type: EventType) -> int:
+        if swap_same_distance:
+            event_type = HURDLES_BASE_DISTANCE.get(event_type, event_type)
+        return get_track_event_order(event_type)
+
     track_rows.sort(key=lambda r: r.start_time)
     for current, nxt in zip(track_rows, track_rows[1:]):
-        current_order = get_track_event_order(current.event_type)
-        next_order = get_track_event_order(nxt.event_type)
+        current_order = order(current.event_type)
+        next_order = order(nxt.event_type)
         if next_order < current_order:
             # Rekrutt round-event exception: a 10-year-old round race may run early
             # (out of strict distance order) so the youngest finish first. Warn only.

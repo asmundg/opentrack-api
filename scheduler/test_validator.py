@@ -378,3 +378,83 @@ def test_rekrutt_round_out_of_order_passes():
         _row("r60", EventType.m60, [Category.j15], "17:10", "17:15"),
     ]
     validate_event_schedule(rows, [m400_g, m400_j, m60], athletes)
+
+
+def _hj_split_rows(first, middle):
+    # A venue running `first`, then `middle`, then `first` again.
+    return [
+        _row("a", first, [Category.g13], "17:00", "17:25"),
+        _row("b", middle, [Category.ks], "17:30", "17:50"),
+        _row("c", first, [Category.ms], "17:55", "18:20"),
+    ]
+
+
+def test_high_jump_may_recur_at_venue():
+    # Høyde is never sticky: it may split around Høyde uten tilløp.
+    atoms = [
+        _atom(EventType.hj, Category.g13),
+        _atom(EventType.hj_standing, Category.ks),
+        _atom(EventType.hj, Category.ms),
+    ]
+    athletes = [Athlete(str(i), [a]) for i, a in enumerate(atoms)]
+    validate_event_schedule(
+        _hj_split_rows(EventType.hj, EventType.hj_standing), atoms, athletes
+    )
+
+
+def test_long_jump_may_recur_at_venue():
+    # Lengde is never sticky: it may split around Tresteg at the pit.
+    atoms = [
+        _atom(EventType.lj, Category.g13),
+        _atom(EventType.tj, Category.ks),
+        _atom(EventType.lj, Category.ms),
+    ]
+    athletes = [Athlete(str(i), [a]) for i, a in enumerate(atoms)]
+    validate_event_schedule(
+        _hj_split_rows(EventType.lj, EventType.tj), atoms, athletes
+    )
+
+
+def test_non_sticky_type_still_splits_others():
+    # Høyde being exempt does not let Høyde uten tilløp recur around it.
+    atoms = [
+        _atom(EventType.hj_standing, Category.g13),
+        _atom(EventType.hj, Category.ks),
+        _atom(EventType.hj_standing, Category.ms),
+    ]
+    athletes = [Athlete(str(i), [a]) for i, a in enumerate(atoms)]
+    with pytest.raises(ConstraintViolation, match="stickiness"):
+        validate_event_schedule(
+            rows=_hj_split_rows(EventType.hj_standing, EventType.hj),
+            atom_events=atoms,
+            athletes=athletes,
+        )
+
+
+def test_swap_same_distance_lets_hurdles_precede_flat():
+    # 100m hekk before 100m keeps the straight hurdles in one block. Distance order
+    # forbids it by default; the per-meet flag allows it.
+    m100 = _atom(EventType.m100, Category.ms)
+    m100h = _atom(EventType.m100_hurdles, Category.ks)
+    athletes = [Athlete("A", [m100]), Athlete("B", [m100h])]
+    rows = [
+        _row("h100", EventType.m100_hurdles, [Category.ks], "17:00", "17:05"),
+        _row("r100", EventType.m100, [Category.ms], "17:10", "17:15"),
+    ]
+    with pytest.raises(ConstraintViolation, match="Track event ordering violation"):
+        validate_event_schedule(rows, [m100, m100h], athletes)
+    validate_event_schedule(rows, [m100, m100h], athletes, swap_same_distance=True)
+
+
+def test_swap_same_distance_keeps_distance_order():
+    # The flag only relaxes flat vs hurdles over one distance: 200m hekk may not
+    # jump ahead of 100m.
+    m100 = _atom(EventType.m100, Category.ms)
+    m200h = _atom(EventType.m200_hurdles, Category.g11)
+    athletes = [Athlete("A", [m100]), Athlete("B", [m200h])]
+    rows = [
+        _row("h200", EventType.m200_hurdles, [Category.g11], "17:00", "17:05"),
+        _row("r100", EventType.m100, [Category.ms], "17:10", "17:15"),
+    ]
+    with pytest.raises(ConstraintViolation, match="Track event ordering violation"):
+        validate_event_schedule(rows, [m100, m200h], athletes, swap_same_distance=True)
