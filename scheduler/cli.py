@@ -222,6 +222,15 @@ def schedule_from_events(
                  "athlete only walks between venues. Overlaps still fail.",
         ),
     ] = False,
+    swap_same_distance: Annotated[
+        bool,
+        typer.Option(
+            "--swap-same-distance",
+            help="Let flat and hurdle races over one distance (e.g. 100m and "
+                 "100m hekk) run in either order. Different distances stay "
+                 "in distance order.",
+        ),
+    ] = False,
 ) -> None:
     """
     Generate outputs from manually edited event overview CSV.
@@ -293,6 +302,7 @@ def schedule_from_events(
             slot_duration_minutes=5,
             allow_athlete_conflicts=allow_conflicts,
             waive_field_recovery=no_field_recovery,
+            swap_same_distance=swap_same_distance,
         )
     except ConstraintViolation as e:
         typer.echo(f"\n❌ Constraint violation detected:", err=True)

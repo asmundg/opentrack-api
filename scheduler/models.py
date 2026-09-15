@@ -612,6 +612,11 @@ SHARED_VENUE_GROUPS: list[frozenset[EventType]] = []
 # it has its own precedence rules. Toggle via CLI --sticky/--no-sticky.
 STICKY_VENUES: bool = True
 
+# Event types that are never sticky: they may recur at a venue after other types
+# ran in between (Høyde split around Høyde uten tilløp, Lengde around Tresteg).
+# Every other type still forms one block.
+NON_STICKY_EVENT_TYPES: frozenset[EventType] = frozenset({EventType.lj, EventType.hj})
+
 
 def get_venue_for_event(
     event_type: EventType, category: Category | None = None

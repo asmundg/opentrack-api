@@ -84,18 +84,18 @@ def _stream_overlaps(stream: list[dict], hhmm) -> list[str]:
     return out
 
 
-def _stream_sticky(stream: list[dict], hhmm) -> list[str]:
+def _stream_sticky(stream: list[dict], hhmm, unstuck: set[str]) -> list[str]:
     """Stickiness messages: a type reappears after a different type ran in between.
 
     Mirrors constraint_validator._validate_venue_stickiness so the batch view and the
-    authoritative gate never drift.
+    authoritative gate never drift. Types in ``unstuck`` may recur.
     """
     evs = sorted(stream, key=lambda x: x["start"])
     out: list[str] = []
     seen: dict[str, int] = {}
     for idx, ev in enumerate(evs):
         t = ev["type"]
-        if t in seen and seen[t] != idx - 1:
+        if t in seen and seen[t] != idx - 1 and t not in unstuck:
             offender = evs[seen[t] + 1]
             out.append(
                 f"{t} runs at {hhmm(evs[seen[t]]['start'])} and again at "
@@ -473,9 +473,14 @@ def main() -> None:
     for labels in shared_groups:
         sticky_buckets["shared:" + ",".join(sorted(labels))] = [
             ev for ev in events if ev["type"] in labels]
+    if (_REPO_ROOT / "scheduler").is_dir():
+        sys.path.insert(0, str(_REPO_ROOT))
+    from scheduler.models import NON_STICKY_EVENT_TYPES
+
+    unstuck = {et.value for et in NON_STICKY_EVENT_TYPES}
     sticky: list[str] = []
     for name, evs in sticky_buckets.items():
-        for msg in _stream_sticky(evs, hhmm):
+        for msg in _stream_sticky(evs, hhmm, unstuck):
             sticky.append(f"{name}: {msg}")
     if sticky:
         print(f"\nVENUE STICKINESS ({len(sticky)}) — keep each event type contiguous "

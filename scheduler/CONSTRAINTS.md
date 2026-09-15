@@ -25,7 +25,10 @@ Only one event can use a venue at any given time slot.
   (e.g., with `--shared jt,dt,ht --sticky`, the throws form three back-to-back
   type blocks across the throwing circle and javelin area). Track is exempt
   because its precedence rules already determine event order. Stickiness is a
-  hard constraint and may make tight schedules infeasible.
+  hard constraint and may make tight schedules infeasible. Lengde and
+  Høyde are exempt (`NON_STICKY_EVENT_TYPES`): they may recur with other types
+  in between (Høyde split around Høyde uten tilløp, Lengde around Tresteg),
+  while every other type still forms one block.
 
 ### 2. Athlete Conflicts
 An athlete cannot compete in two events simultaneously. If an athlete is registered for multiple events, those events must not overlap.
@@ -45,6 +48,12 @@ overall — they occupy the home straight that the round race must run through.
 Distance order is enforced by `constraint_validator._validate_track_ordering`
 (using `get_track_event_order`), with the Rekrutt round-event exception allowed
 as a warning. Younger-first within a distance is a soft policy, not enforced.
+
+**Same-distance swap**: `from-events --swap-same-distance` lets flat and hurdle
+races over one distance run in either order for a single meet (60m with 60m and
+80m hekk, 100m with 100m hekk, 200m with 200m hekk, per
+`HURDLES_BASE_DISTANCE`). Use it to keep the straight hurdles in one block, e.g.
+100m hekk before 100m. Different distances stay in order.
 
 This ordering minimizes equipment moves and starting position changes. Relays
 run last, after the individual races.
