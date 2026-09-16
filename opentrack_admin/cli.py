@@ -515,8 +515,8 @@ def set_implements(
     # Build worklist: skip FIFA (unknown to OpenTrack) and anything that
     # isn't a throw. The schedule's implement_weight is only used as a
     # display hint and as a filter for events where no category in the
-    # schedule has a weight (e.g. rekrutt/G10 DT). Actual weights are
-    # resolved per-row from each athlete's category by set_implement_weights.
+    # schedule has a weight (e.g. rekrutt/G10 DT). set_implement_weights
+    # resolves the weight from the event category, and per-row for masters.
     worklist: list[tuple[EventSchedule, str]] = []
     skipped_no_weight: list[EventSchedule] = []
     for sched in schedules:
@@ -586,7 +586,7 @@ def set_implements(
 
             try:
                 scheduler.find_and_click_event(sched)
-                scheduler.set_implement_weights(sched.event)
+                scheduler.set_implement_weights(sched.event, sched.search_category)
                 processed += 1
 
                 if checkpoint:

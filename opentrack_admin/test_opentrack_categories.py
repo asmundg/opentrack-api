@@ -7,7 +7,7 @@ gender-suffixed U-codes ("U23K") and masters codes ("M75").
 
 import pytest
 
-from .events import get_implement_weight
+from .events import get_implement_weight, get_pool_implement_weight
 
 
 @pytest.mark.parametrize(
@@ -45,3 +45,21 @@ def test_opentrack_masters_codes_use_the_masters_schedule():
 def test_unknown_categories_still_fail_loudly():
     with pytest.raises(ValueError):
         get_implement_weight("SP", "X42")
+
+
+@pytest.mark.parametrize(
+    "event_category,row_category,expected",
+    [
+        # Youth athletes entered up into a senior pool throw the senior implement.
+        ("MS", "G17", "7,26"),
+        ("MS", "U20M", "7,26"),
+        ("KS", "J15", "4"),
+        # Younger athletes entered up into an older youth class throw that class's implement.
+        ("G14", "G13", "4"),
+        # OpenTrack folds masters into the senior pool; they keep their own bracket.
+        ("MS", "M50", "6"),
+        ("KS", "K75", "2"),
+    ],
+)
+def test_pool_weight_follows_the_event_category(event_category, row_category, expected):
+    assert get_pool_implement_weight("SP", event_category, row_category) == expected
