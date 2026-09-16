@@ -93,6 +93,9 @@ class CompetitionDetails:
     competition_type: Literal["track", "indoor", "road", "cross_country", "trail"] = (
         "track"
     )
+    # Venue search term, e.g. "Valhall". OpenTrack only offers the venue field
+    # for track and indoor competitions, where it is required here.
+    venue_search: str = ""
 
     # Display settings
     website: str = ""
@@ -106,6 +109,8 @@ class CompetitionDetails:
     def __post_init__(self):
         if self.end_date is None:
             self.end_date = self.start_date
+        if self.competition_type in ("track", "indoor") and not self.venue_search:
+            raise ValueError(f"A {self.competition_type} competition needs a venue")
 
 
 class CompetitionCreator:
@@ -332,6 +337,15 @@ class CompetitionCreator:
         comp_type_value = COMPETITION_TYPES.get(details.competition_type, "TRACK")
         logger.debug("Setting competition type: %s", comp_type_value)
         page.get_by_label("Type:").select_option(comp_type_value)
+
+        # Venue (Select2 search widget, shown once the type is track or indoor)
+        if details.venue_search:
+            logger.debug("Selecting venue: %s", details.venue_search)
+            page.locator("#select2-id_venue-container").click()
+            page.get_by_role("searchbox").fill(details.venue_search)
+            highlighted_option = page.locator("li.select2-results__option--highlighted")
+            highlighted_option.wait_for(state="visible")
+            highlighted_option.click()
 
         # Contact email
         logger.debug("Setting contact email: %s", details.contact_email)
