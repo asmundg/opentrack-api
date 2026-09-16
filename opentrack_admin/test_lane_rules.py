@@ -1,6 +1,8 @@
 """Lane draw rules per race type: straight, staggered, and group starts."""
 
-from .sync import is_group_start, is_staggered, lane_preference
+from shared.lanes import is_staggered, lane_preference
+
+from .sync import is_group_start
 
 
 def test_sprints_down_the_straight_are_not_staggered():

@@ -147,6 +147,8 @@ until every constraint passes.
   lane naming its band. Bands are athletes sharing a hurdle setup and a start
   type (blocks from 13); adjacent bands are separated by an empty gutter lane.
   Consumed by `opentrack admin seed --track-lanes`.
+- Straight races centre the bands on the track. Staggered races (200m-400m and
+  relays) take the lanes the seeded draw prefers, from `shared/lanes.py`.
 
 **Event Overview CSV** (`event_csv.py`):
 - One row per event group

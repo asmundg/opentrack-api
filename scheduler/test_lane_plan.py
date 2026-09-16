@@ -144,3 +144,18 @@ def test_blocks_start_at_13():
 def test_no_blocks_from_600m_up():
     assert not uses_starting_blocks(EventType.m600, Category.ms)
     assert uses_starting_blocks(EventType.m400, Category.ms)
+
+
+def test_lone_staggered_hurdler_runs_lane_5():
+    # Round the bend the best lanes are 5-7, not the middle of the track.
+    assert _lanes(EventType.m200_hurdles, [Category.g11]) == {Category.g11: [5]}
+
+
+def test_staggered_bands_keep_off_the_tight_bends():
+    # Different spacing needs a gutter; the pair should straddle it in 5 and 7.
+    lanes = _lanes(EventType.m200_hurdles, [Category.g14, Category.j14])
+    assert sorted(lanes[Category.g14] + lanes[Category.j14]) == [5, 7]
+
+
+def test_straight_hurdles_stay_centred():
+    assert _lanes(EventType.m60_hurdles, [Category.g11]) == {Category.g11: [4]}
