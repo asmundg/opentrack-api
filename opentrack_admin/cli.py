@@ -70,6 +70,7 @@ def create(
     end_date: Annotated[Optional[str], typer.Option("--end-date", help="End date if multi-day (YYYY-MM-DD)")] = None,
     short_name: Annotated[Optional[str], typer.Option("--short-name", help="Short name (optional)")] = None,
     competition_type: Annotated[str, typer.Option("--type", help="Competition type (track, indoor, road, cross_country, trail)")] = "track",
+    venue: Annotated[Optional[str], typer.Option("--venue", help="Venue search term (e.g., 'Valhall'); required for track and indoor")] = None,
     website: Annotated[Optional[str], typer.Option("--website", help="Competition/club website URL")] = None,
     entry_link: Annotated[Optional[str], typer.Option("--entry-link", help="External entry link (e.g., Isonen URL)")] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose/debug logging")] = False,
@@ -108,6 +109,7 @@ def create(
         organiser_search=organiser,
         short_name=short_name or "",
         competition_type=competition_type,
+        venue_search=venue or "",
         website=website or "",
         external_entry_link=entry_link or "",
         combined_events_table="tyrving",
@@ -117,6 +119,7 @@ def create(
     print(f"   Slug: {details.slug}")
     print(f"   Date: {details.start_date}")
     print(f"   Type: {details.competition_type}")
+    print(f"   Venue: {details.venue_search}")
     print(f"   Organiser: {details.organiser_search}")
     print()
     
