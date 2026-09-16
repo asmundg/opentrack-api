@@ -1,6 +1,8 @@
 """Tests for lane drawing from seeding performances."""
 
-from .sync import is_staggered, lane_preference, parse_seed_performance
+from shared.lanes import is_staggered, lane_preference
+
+from .sync import parse_seed_performance
 
 
 def test_lane_preference_works_outwards_from_the_middle():
@@ -24,6 +26,9 @@ def test_only_races_round_a_bend_are_staggered():
     assert is_staggered("4x100m")
     assert not is_staggered("800m")
     assert not is_staggered("LJ")
+    assert is_staggered("200m hekk")
+    assert is_staggered("4x60m stafett")
+    assert not is_staggered("60m hekk")
 
 
 def test_parse_seed_performance_handles_the_formats_opentrack_emits():

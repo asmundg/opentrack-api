@@ -14,6 +14,8 @@ performance; the bands and their gutters are what this module fixes.
 
 from dataclasses import dataclass
 
+from shared.lanes import is_staggered, lane_preference
+
 from . import models
 from .models import (
     Category,
@@ -273,9 +275,13 @@ def _assign_lanes(
     """Assign lanes for a track heat, one gutter lane between adjacent bands.
 
     When blocked lanes exist, tries to position the layout so blocked lanes
-    coincide with gutter positions (saving a usable lane).
+    coincide with gutter positions (saving a usable lane). Straight races sit
+    in the middle of the track. Staggered races take the lanes the seeded draw
+    prefers, which keeps athletes off the tight bends.
     """
     hurdles = is_hurdles_event(eg.event_type)
+    staggered = is_staggered(eg.event_type.value)
+    preference = lane_preference(models.ARENA.total_lanes, staggered=True)
 
     # Build (category, band, count) for categories with athletes
     cat_info: list[tuple[Category, _Band, int]] = []
@@ -321,6 +327,7 @@ def _assign_lanes(
 
     total_slots = len(layout)
     gutter_indices = {i for i, (kind, *_) in enumerate(layout) if kind != _ATHLETE}
+    athlete_indices = [i for i in range(total_slots) if i not in gutter_indices]
     categories = [cat for cat, _, _ in cat_info]
 
     # Compute max lane number (age-limited, but including blocked lanes)
@@ -356,9 +363,12 @@ def _assign_lanes(
                         break
             if not valid:
                 continue
-            center = (1 + max_lane) / 2
-            centering = -abs((start + (total_slots - 1) / 2) - center)
-            score = (gutter_matches, centering)
+            if staggered:
+                placement = -sum(preference.index(start + i) for i in athlete_indices)
+            else:
+                center = (1 + max_lane) / 2
+                placement = -abs((start + (total_slots - 1) / 2) - center)
+            score = (gutter_matches, placement)
             if best_score is None or score > best_score:
                 best_score = score
                 best_start = start
@@ -386,13 +396,19 @@ def _assign_lanes(
                 ))
         return lanes
 
-    # Fallback: skip blocked lanes, center in available lanes
+    # Fallback: skip blocked lanes, place within the available lanes
     available = (
         available_hurdle_lane_list(categories)
         if hurdles
         else list(range(1, models.ARENA.total_lanes + 1))
     )
-    offset = (len(available) - total_slots) // 2
+    if staggered:
+        offset = min(
+            range(len(available) - total_slots + 1),
+            key=lambda o: sum(preference.index(available[o + i]) for i in athlete_indices),
+        )
+    else:
+        offset = (len(available) - total_slots) // 2
 
     lanes = []
     for i, (kind, cat, height, dist) in enumerate(layout):
