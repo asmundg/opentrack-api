@@ -267,6 +267,21 @@ def _get_masters_implement_weight(event_code: str, category: str) -> str | None:
     return weight
 
 
+def get_pool_implement_weight(
+    event_code: str, event_category: str, row_category: str
+) -> str | None:
+    """Weight for one athlete in an OpenTrack throwing pool.
+
+    The implement follows the event's category, so a G17 entered in MS throws
+    the senior implement. The row category (OpenTrack derives it from birth
+    year) only matters for masters, who are folded into the senior pool but
+    keep their own age-bracketed weights.
+    """
+    if _MASTERS_CATEGORY_RE.match(normalize_category(row_category)):
+        return _get_masters_implement_weight(event_code, row_category)
+    return get_implement_weight(event_code, event_category)
+
+
 def get_implement_weight(event_code: str, category: str) -> str | None:
     """Get the implement weight for a throwing event and category.
 
@@ -875,18 +890,18 @@ class EventScheduler:
         return names
 
     @screenshot_on_error
-    def set_implement_weights(self, event_code: str) -> None:
+    def set_implement_weights(self, event_code: str, event_category: str) -> None:
         """Set per-competitor implement weights for a throwing event.
 
         Navigates to the per-pool attempts/heights editor, reads each
         athlete row's category from the Handsontable data (the 'category'
         column is hidden in the UI but present in the data model), and
-        types the resolved weight from `get_implement_weight(event_code,
-        row_category)` into the Weight column.
+        types the weight from `get_pool_implement_weight` into the Weight
+        column.
 
-        Per-row resolution is required because masters athletes (MV*/KV*)
-        are folded into senior pools (MS/KS) on OpenTrack, but they use
-        their own age-bracketed implement weights — not the senior weight.
+        Weights follow the event category. Per-row resolution is required
+        because masters athletes (MV*/KV*) are folded into senior pools
+        (MS/KS) on OpenTrack, but they use their own age-bracketed weights.
 
         Assumes we're on the event detail page. Pool seeding must have
         been done first (athletes need QPs and to be assigned to pools);
@@ -895,6 +910,7 @@ class EventScheduler:
 
         Args:
             event_code: OpenTrack event code (SP, DT, HT, JT)
+            event_category: Category of the OpenTrack event (e.g. "MS")
 
         Raises:
             RuntimeError: If the pool is empty, the data table is
@@ -969,7 +985,7 @@ class EventScheduler:
                     "has no category in pool data; cannot resolve implement weight."
                 )
             try:
-                weight = get_implement_weight(event_code, category)
+                weight = get_pool_implement_weight(event_code, event_category, category)
             except ValueError as e:
                 raise RuntimeError(
                     f"Cannot resolve implement weight for athlete bib "
